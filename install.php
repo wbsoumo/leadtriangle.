@@ -17,11 +17,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status = "danger";
     } else {
         try {
-            // Test connection
+            // Test connection with multi-statement support enabled
             $dsn = "mysql:host=$db_host;charset=utf8mb4";
-            $pdo = new PDO($dsn, $db_user, $db_pass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-            ]);
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_EMULATE_PREPARES => true
+            ];
+            if (defined('PDO::MYSQL_ATTR_MULTI_STATEMENTS')) {
+                $options[PDO::MYSQL_ATTR_MULTI_STATEMENTS] = true;
+            }
+
+            $pdo = new PDO($dsn, $db_user, $db_pass, $options);
 
             // Create database if not exists
             $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
@@ -96,40 +102,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leadstriangle CRM - One-Click cPanel Installer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Leadstriangle CRM - One-Click Installer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #2563eb;
-            --bg: #0f172a;
-            --card-bg: #1e293b;
-            --text: #f8fafc;
-            --muted: #94a3b8;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
             --success: #10b981;
             --danger: #ef4444;
-            --border: #334155;
+            --border: #e2e8f0;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
         body { background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 520px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
-        .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-        .logo-icon { width: 40px; height: 40px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; color: #fff; }
-        .logo-text { font-size: 22px; font-weight: 700; color: #fff; }
-        .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
-        .form-group { margin-bottom: 18px; }
-        label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
-        input { width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; color: #fff; font-size: 14px; outline: none; transition: border 0.2s; }
-        input:focus { border-color: var(--primary); }
-        .btn { width: 100%; padding: 14px; background: var(--primary); color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        .btn:hover { background: #1d4ed8; }
-        .alert { padding: 14px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; line-height: 1.4; }
-        .alert-success { background: rgba(16, 185, 129, 0.15); border: 1px solid var(--success); color: #34d399; }
-        .alert-danger { background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); color: #f87171; }
-        .credentials-box { background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-top: 16px; }
-        .credentials-title { font-size: 13px; font-weight: 600; color: var(--success); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .cred-item { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-        .cred-item span { color: #fff; font-weight: 600; font-family: monospace; }
-        .login-btn { display: inline-block; width: 100%; text-align: center; text-decoration: none; margin-top: 16px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 500px; padding: 36px; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08); }
+        .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #4f46e5, #6366f1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #ffffff; box-shadow: 0 4px 12px rgba(79,70,229,0.25); }
+        .logo-text { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.4px; }
+        .subtitle { color: var(--muted); font-size: 13.5px; margin-bottom: 24px; line-height: 1.5; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 12.5px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+        input { width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text); font-size: 13.5px; outline: none; transition: all 0.2s; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        .btn { width: 100%; padding: 13px; background: var(--primary); color: #ffffff; border: none; border-radius: 8px; font-size: 14.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .alert { padding: 14px; border-radius: 8px; margin-bottom: 20px; font-size: 13.5px; line-height: 1.4; }
+        .alert-success { background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; }
+        .alert-danger { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+        .credentials-box { background: #f8fafc; padding: 18px; border-radius: 10px; border: 1px solid var(--border); margin-top: 20px; }
+        .credentials-title { font-size: 12px; font-weight: 700; color: #047857; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .cred-item { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+        .cred-item span { color: var(--text); font-weight: 600; font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; }
+        .login-btn { display: inline-flex; text-decoration: none; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -139,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="logo-icon">▲</div>
         <div class="logo-text">Leadstriangle CRM</div>
     </div>
-    <div class="subtitle">One-Click cPanel & Shared Hosting Database Setup Installer.</div>
+    <div class="subtitle">One-Click cPanel Database Installer & Initializer</div>
 
     <?php if (!empty($message)): ?>
         <div class="alert alert-<?= $status ?>">
@@ -149,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php if ($status === 'success'): ?>
         <div class="credentials-box">
-            <div class="credentials-title">Default Login Credentials Created</div>
+            <div class="credentials-title">✅ Database Initialized & Seeded Successfully</div>
             <div class="cred-item">Super Admin: <span>admin@leadstriangle.com</span></div>
             <div class="cred-item">Manager: <span>amit.manager@leadstriangle.com</span></div>
             <div class="cred-item">Executive: <span>rahul.op@leadstriangle.com</span></div>
@@ -157,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <a href="index.php" class="btn login-btn">Proceed to Login & Application →</a>
     <?php else: ?>
-        <form method="POST" action="install.php">
+        <form method="POST" action="install.php" onsubmit="handleInstallSubmit(this)">
             <div class="form-group">
                 <label>MySQL Database Host</label>
                 <input type="text" name="db_host" value="localhost" required>
@@ -178,10 +189,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="password" name="db_pass" value="Soumojit1234@" placeholder="Enter DB Password">
             </div>
 
-            <button type="submit" class="btn">🚀 Run One-Click Database Setup</button>
+            <button type="submit" class="btn" id="install-btn">
+                <span class="spinner" id="btn-spinner"></span>
+                <span id="btn-text">🚀 Run One-Click Database Setup</span>
+            </button>
         </form>
     <?php endif; ?>
 </div>
 
+<script>
+function handleInstallSubmit(form) {
+    const btn = document.getElementById('install-btn');
+    const spinner = document.getElementById('btn-spinner');
+    const text = document.getElementById('btn-text');
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    text.innerText = 'Installing Database & Seed Records...';
+}
+</script>
 </body>
 </html>

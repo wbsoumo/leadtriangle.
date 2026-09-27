@@ -476,6 +476,17 @@ body { background: var(--bg-main); color: var(--text-primary); display: flex; mi
     transition: var(--transition);
     text-decoration: none;
     box-shadow: var(--shadow-xs);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: scale(0.97) translateY(0);
+    box-shadow: none;
 }
 
 .btn-primary {

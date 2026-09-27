@@ -14,6 +14,9 @@ class LeadModel {
   final String? nextFollowupAt;
   final String? initialRemark;
 
+  final String? latestCallOutcome;
+  final int callCount;
+
   LeadModel({
     required this.id,
     required this.leadCode,
@@ -29,6 +32,8 @@ class LeadModel {
     this.lastContactedAt,
     this.nextFollowupAt,
     this.initialRemark,
+    this.latestCallOutcome,
+    this.callCount = 0,
   });
 
   factory LeadModel.fromJson(Map<String, dynamic> json) {
@@ -44,9 +49,11 @@ class LeadModel {
       statusName: json['status_name'] ?? 'Pending',
       statusColor: json['status_color'] ?? '#64748b',
       priority: json['priority'] ?? 'Medium',
-      lastContactedAt: json['last_contacted_at'],
+      lastContactedAt: json['last_contacted_at'] ?? json['latest_call_at'],
       nextFollowupAt: json['next_followup_at'],
       initialRemark: json['initial_remark'],
+      latestCallOutcome: json['latest_call_outcome'],
+      callCount: json['call_count'] != null ? (json['call_count'] as num).toInt() : 0,
     );
   }
 }

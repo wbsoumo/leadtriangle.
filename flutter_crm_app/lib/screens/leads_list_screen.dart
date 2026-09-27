@@ -22,10 +22,19 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
 
   String _selectedTopPill = 'to_call'; // 'to_call', 'followups', 'called', 'all'
   String _searchQuery = '';
+
+  // Filter Modal Controls
   String _selectedStatusFilter = 'All';
   String _selectedFollowupFilter = 'All';
   String _selectedPriorityFilter = 'All';
+  String _selectedServiceFilter = 'All';
   String _sortOption = 'newest';
+
+  // Live Pill Counts
+  int _toCallCount = 0;
+  int _followupsCount = 0;
+  int _calledCount = 0;
+  int _totalCount = 0;
 
   final Set<int> _starredLeadIds = {};
 
@@ -40,9 +49,38 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
     final leads = await _apiService.fetchLeads(filter: 'all');
     setState(() {
       _allLeads = leads;
+      _calculatePillCounts();
       _applyFilters();
       _isLoading = false;
     });
+  }
+
+  void _calculatePillCounts() {
+    int toCall = 0;
+    int followups = 0;
+    int called = 0;
+
+    for (final l in _allLeads) {
+      final isCalled = l.callCount > 0 || (l.lastContactedAt != null && l.lastContactedAt!.isNotEmpty);
+      final isFollowup = (l.latestCallOutcome != null && l.latestCallOutcome!.toLowerCase().contains('follow')) ||
+          l.statusName.toLowerCase().contains('follow') ||
+          l.nextFollowupAt != null;
+
+      if (!isCalled) {
+        toCall++;
+      } else {
+        called++;
+      }
+
+      if (isFollowup) {
+        followups++;
+      }
+    }
+
+    _toCallCount = toCall;
+    _followupsCount = followups;
+    _calledCount = called;
+    _totalCount = _allLeads.length;
   }
 
   void _applyFilters() {
@@ -50,11 +88,15 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
 
     // Top Workload Pill Filter
     if (_selectedTopPill == 'to_call') {
-      temp = temp.where((l) => l.statusName != 'Converted' && l.statusName != 'Lost').toList();
+      temp = temp.where((l) => l.callCount == 0 && (l.lastContactedAt == null || l.lastContactedAt!.isEmpty)).toList();
     } else if (_selectedTopPill == 'followups') {
-      temp = temp.where((l) => l.statusName.contains('Follow-up') || l.statusName == 'Contacted').toList();
+      temp = temp.where((l) {
+        final outcome = (l.latestCallOutcome ?? '').toLowerCase();
+        final status = l.statusName.toLowerCase();
+        return outcome.contains('follow') || status.contains('follow') || l.nextFollowupAt != null;
+      }).toList();
     } else if (_selectedTopPill == 'called') {
-      temp = temp.where((l) => l.statusName != 'New' && l.statusName != 'Fresh Lead').toList();
+      temp = temp.where((l) => l.callCount > 0 || (l.lastContactedAt != null && l.lastContactedAt!.isNotEmpty)).toList();
     }
 
     // Search Query Filter
@@ -68,12 +110,33 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
       ).toList();
     }
 
-    // Detailed Modal Filters
+    // Status Filter Modal Selection
     if (_selectedStatusFilter != 'All') {
-      temp = temp.where((l) => l.statusName.toLowerCase() == _selectedStatusFilter.toLowerCase()).toList();
+      final s = _selectedStatusFilter.toLowerCase();
+      temp = temp.where((l) {
+        final st = l.statusName.toLowerCase();
+        final outcome = (l.latestCallOutcome ?? '').toLowerCase();
+        return st.contains(s) || outcome.contains(s);
+      }).toList();
     }
+
+    // Priority Filter Modal Selection
     if (_selectedPriorityFilter != 'All') {
       temp = temp.where((l) => l.priority.toLowerCase() == _selectedPriorityFilter.toLowerCase()).toList();
+    }
+
+    // Service Filter Modal Selection
+    if (_selectedServiceFilter != 'All') {
+      temp = temp.where((l) => (l.serviceName ?? '').toLowerCase().contains(_selectedServiceFilter.toLowerCase())).toList();
+    }
+
+    // Follow-up Filter Selection
+    if (_selectedFollowupFilter != 'All') {
+      if (_selectedFollowupFilter == 'Today') {
+        temp = temp.where((l) => l.nextFollowupAt != null && l.nextFollowupAt!.contains(_getTodayDateString())).toList();
+      } else if (_selectedFollowupFilter == 'No Follow-up') {
+        temp = temp.where((l) => l.nextFollowupAt == null || l.nextFollowupAt!.isEmpty).toList();
+      }
     }
 
     // Sorting
@@ -81,11 +144,18 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
       temp.sort((a, b) => b.id.compareTo(a.id));
     } else if (_sortOption == 'oldest') {
       temp.sort((a, b) => a.id.compareTo(b.id));
+    } else if (_sortOption == 'name') {
+      temp.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     }
 
     setState(() {
       _filteredLeads = temp;
     });
+  }
+
+  String _getTodayDateString() {
+    final now = DateTime.now();
+    return "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
   }
 
   Future<void> _makeCall(LeadModel lead) async {
@@ -139,7 +209,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Drag handle indicator
+                  // Drag handle
                   Center(
                     child: Container(
                       width: 40,
@@ -179,8 +249,8 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              'All', 'New', 'Follow-up', 'Contacted', 'Interested', 
-                              'Not Interested', 'Qualified', 'Converted', 'Lost', 'Pending'
+                              'All', 'New', 'Follow-up', 'Connected', 'Busy', 
+                              'No Answer', 'Interested', 'Qualified', 'Converted', 'Lost'
                             ].map((st) => _buildFilterChip(
                               label: st,
                               isSelected: _selectedStatusFilter == st,
@@ -197,7 +267,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              'All', 'Today', 'Tomorrow', 'Overdue', 'No Follow-up'
+                              'All', 'Today', 'No Follow-up'
                             ].map((fu) => _buildFilterChip(
                               label: fu,
                               isSelected: _selectedFollowupFilter == fu,
@@ -223,24 +293,38 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                           ),
                           const SizedBox(height: 20),
 
-                          // Service Interested Dropdown
+                          // Service Section
                           _buildFilterTitle('Service Interested'),
-                          _buildDropdownPicker('Select Service'),
-                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: ['All', 'Telecalling', 'CRM System', 'Web Development', 'Digital Marketing'].map((srv) => _buildFilterChip(
+                              label: srv,
+                              isSelected: _selectedServiceFilter == srv,
+                              onTap: () {
+                                setModalState(() => _selectedServiceFilter = srv);
+                              },
+                            )).toList(),
+                          ),
+                          const SizedBox(height: 20),
 
-                          // Lead Source Dropdown
-                          _buildFilterTitle('Lead Source'),
-                          _buildDropdownPicker('Select Source'),
-                          const SizedBox(height: 16),
-
-                          // Assigned To Dropdown
-                          _buildFilterTitle('Assigned To'),
-                          _buildDropdownPicker('Select Operation Executive'),
-                          const SizedBox(height: 16),
-
-                          // Date Range Dropdown
-                          _buildFilterTitle('Date Range'),
-                          _buildDropdownPicker('Select Date Range', icon: Icons.calendar_today_outlined),
+                          // Sort Option
+                          _buildFilterTitle('Sort Leads By'),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              {'key': 'newest', 'label': 'Newest First'},
+                              {'key': 'oldest', 'label': 'Oldest First'},
+                              {'key': 'name', 'label': 'Name (A-Z)'},
+                            ].map((opt) => _buildFilterChip(
+                              label: opt['label']!,
+                              isSelected: _sortOption == opt['key'],
+                              onTap: () {
+                                setModalState(() => _sortOption = opt['key']!);
+                              },
+                            )).toList(),
+                          ),
                           const SizedBox(height: 20),
                         ],
                       ),
@@ -257,11 +341,15 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                               _selectedStatusFilter = 'All';
                               _selectedFollowupFilter = 'All';
                               _selectedPriorityFilter = 'All';
+                              _selectedServiceFilter = 'All';
+                              _sortOption = 'newest';
                             });
                             setState(() {
                               _selectedStatusFilter = 'All';
                               _selectedFollowupFilter = 'All';
                               _selectedPriorityFilter = 'All';
+                              _selectedServiceFilter = 'All';
+                              _sortOption = 'newest';
                               _applyFilters();
                             });
                             Navigator.of(ctx).pop();
@@ -335,38 +423,14 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
     );
   }
 
-  Widget _buildDropdownPicker(String placeholder, {IconData icon = Icons.keyboard_arrow_down_rounded}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(placeholder, style: const TextStyle(fontSize: 13.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500)),
-          Icon(icon, color: const Color(0xFF64748B), size: 20),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Calculate counts for top pills
-    final toCallCount = _allLeads.where((l) => l.statusName != 'Converted' && l.statusName != 'Lost').length;
-    final followupsCount = _allLeads.where((l) => l.statusName.contains('Follow-up') || l.statusName == 'Contacted').length;
-    final calledCount = _allLeads.where((l) => l.statusName != 'New' && l.statusName != 'Fresh Lead').length;
-    final totalCount = _allLeads.length;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar: Title "Leads" + Search & Filter Icons (Requirement Screenshot 1)
+            // Top Bar: Title "Leads" + Search & Filter Icons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
               child: Row(
@@ -378,10 +442,6 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                   ),
                   Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.search_rounded, color: Color(0xFF0F172A), size: 26),
-                        onPressed: () {},
-                      ),
                       IconButton(
                         icon: const Icon(Icons.tune_rounded, color: Color(0xFF0F172A), size: 24),
                         onPressed: _openFilterBottomSheet,
@@ -398,13 +458,13 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 children: [
-                  _buildTopCountPill('To Call', toCallCount > 0 ? toCallCount : 16, 'to_call'),
+                  _buildTopCountPill('To Call', _toCallCount, 'to_call'),
                   const SizedBox(width: 8),
-                  _buildTopCountPill('Follow-ups', followupsCount > 0 ? followupsCount : 8, 'followups'),
+                  _buildTopCountPill('Follow-ups', _followupsCount, 'followups'),
                   const SizedBox(width: 8),
-                  _buildTopCountPill('Called', calledCount > 0 ? calledCount : 8, 'called'),
+                  _buildTopCountPill('Called', _calledCount, 'called'),
                   const SizedBox(width: 8),
-                  _buildTopCountPill('All', totalCount > 0 ? totalCount : 32, 'all'),
+                  _buildTopCountPill('All', _totalCount, 'all'),
                 ],
               ),
             ),
@@ -444,25 +504,29 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: const [
-                      Text('Sort by: ', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-                      Text('Follow-up Time ⬇', style: TextStyle(fontSize: 12.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
-                    ],
+                  Text(
+                    'Showing ${_filteredLeads.length} leads',
+                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.swap_vert_rounded, size: 14, color: Color(0xFF475569)),
-                        SizedBox(width: 4),
-                        Text('Newest', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                      ],
+                  InkWell(
+                    onTap: _openFilterBottomSheet,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.swap_vert_rounded, size: 14, color: Color(0xFF475569)),
+                          const SizedBox(width: 4),
+                          Text(
+                            _sortOption == 'newest' ? 'Newest First' : (_sortOption == 'oldest' ? 'Oldest First' : 'Name A-Z'),
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -539,7 +603,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
     );
   }
 
-  // Lead Card Component Matching Reference UI Screenshot Exactly
+  // Lead Card Component with Latest Updated Status Tag
   Widget _buildLeadItemCard(LeadModel lead, int index) {
     final avatarColors = [
       const Color(0xFFE0F2FE), // Cyan
@@ -558,6 +622,13 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
 
     final colorIdx = index % avatarColors.length;
     final isStarred = _starredLeadIds.contains(lead.id);
+
+    // Latest status display calculation
+    final latestOutcomeText = (lead.latestCallOutcome != null && lead.latestCallOutcome!.isNotEmpty)
+        ? lead.latestCallOutcome!
+        : lead.statusName;
+
+    final outcomeColors = _getOutcomeBadgeColors(latestOutcomeText);
 
     return InkWell(
       onTap: () {
@@ -607,7 +678,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        lead.companyName ?? lead.city ?? 'ABC Private Limited',
+                        lead.companyName ?? lead.city ?? 'Client Lead',
                         style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8)),
                       ),
                     ],
@@ -633,14 +704,14 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Tag Pills Row (Status & Priority)
+            // Tag Pills Row (Latest Call Outcome Status & Priority)
             Row(
               children: [
                 _buildTagPill(
-                  label: lead.statusName.isNotEmpty ? lead.statusName : 'Follow-up Today',
-                  icon: Icons.access_time_rounded,
-                  bgColor: const Color(0xFFFEF2F2),
-                  textColor: const Color(0xFFEF4444),
+                  label: latestOutcomeText,
+                  icon: Icons.bookmark_outline_rounded,
+                  bgColor: outcomeColors['bg']!,
+                  textColor: outcomeColors['text']!,
                 ),
                 const SizedBox(width: 8),
                 _buildTagPill(
@@ -648,21 +719,34 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                   bgColor: const Color(0xFFEFF6FF),
                   textColor: const Color(0xFF2563EB),
                 ),
+                if (lead.callCount > 0) ...[
+                  const SizedBox(width: 8),
+                  _buildTagPill(
+                    label: '${lead.callCount} Calls',
+                    bgColor: const Color(0xFFF1F5F9),
+                    textColor: const Color(0xFF475569),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 8),
 
-            // Time Row: Calendar + Today, 10:30 AM
+            // Time Row: Last contacted / Next follow-up
             Row(
-              children: const [
-                Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF94A3B8)),
-                SizedBox(width: 6),
-                Text('Today, 10:30 AM', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              children: [
+                const Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF94A3B8)),
+                const SizedBox(width: 6),
+                Text(
+                  lead.lastContactedAt != null && lead.lastContactedAt!.isNotEmpty
+                      ? 'Last Call: ${lead.lastContactedAt}'
+                      : 'Not Called Yet',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                ),
               ],
             ),
             const SizedBox(height: 14),
 
-            // Call & WhatsApp Action Buttons Row (Matching Reference Screenshot)
+            // Call & WhatsApp Action Buttons Row
             Row(
               children: [
                 Expanded(
@@ -700,6 +784,20 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
         ),
       ),
     );
+  }
+
+  Map<String, Color> _getOutcomeBadgeColors(String outcome) {
+    final lower = outcome.toLowerCase();
+    if (lower.contains('connect') || lower.contains('converted') || lower.contains('interested') || lower.contains('qualified')) {
+      return {'bg': const Color(0xFFDCFCE7), 'text': const Color(0xFF16A34A)};
+    } else if (lower.contains('follow')) {
+      return {'bg': const Color(0xFFF3E8FF), 'text': const Color(0xFF9333EA)};
+    } else if (lower.contains('busy') || lower.contains('no answer') || lower.contains('switch')) {
+      return {'bg': const Color(0xFFFEF3C7), 'text': const Color(0xFFD97706)};
+    } else if (lower.contains('wrong') || lower.contains('lost') || lower.contains('not interested')) {
+      return {'bg': const Color(0xFFFEF2F2), 'text': const Color(0xFFEF4444)};
+    }
+    return {'bg': const Color(0xFFEFF6FF), 'text': const Color(0xFF2563EB)};
   }
 
   Widget _buildTagPill({

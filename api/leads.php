@@ -39,6 +39,7 @@ if ($action === 'list') {
     $limit = min(100, max(10, (int)($_GET['limit'] ?? 15)));
     $offset = ($page - 1) * $limit;
 
+    $filter = $_GET['filter'] ?? 'all';
     $search = trim($_GET['search'] ?? '');
     $statusId = $_GET['status_id'] ?? null;
     $sourceId = $_GET['source_id'] ?? null;
@@ -60,6 +61,14 @@ if ($action === 'list') {
         $where[] = "(l.assigned_manager_id = :rbac_mgr_id OR l.assigned_executive_id IN (SELECT id FROM users WHERE team_id = :rbac_team_id))";
         $params['rbac_mgr_id'] = $userId;
         $params['rbac_team_id'] = $teamId;
+    }
+
+    if ($filter === 'to_call') {
+        $where[] = "((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0 AND l.last_contacted_at IS NULL)";
+    } elseif ($filter === 'followups' || $filter === 'followup') {
+        $where[] = "(l.status_id = 6 OR EXISTS (SELECT 1 FROM followups f WHERE f.lead_id = l.id AND f.status = 'Pending') OR EXISTS (SELECT 1 FROM call_logs cl WHERE cl.lead_id = l.id AND cl.call_outcome_id IN (3, 6)))";
+    } elseif ($filter === 'called') {
+        $where[] = "((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) > 0 OR l.last_contacted_at IS NOT NULL)";
     }
 
     if (!empty($search)) {
@@ -106,7 +115,7 @@ if ($action === 'list') {
     $countStmt->execute($params);
     $totalRecords = (int)$countStmt->fetch()['total'];
 
-    // Fetch Records
+    // Fetch Records with Latest Call Outcome
     $sql = "
         SELECT 
             l.*, 
@@ -114,7 +123,10 @@ if ($action === 'list') {
             src.name as source_name,
             srv.name as service_name,
             u_exec.name as executive_name,
-            u_mgr.name as manager_name
+            u_mgr.name as manager_name,
+            (SELECT co.name FROM call_logs cl JOIN call_outcomes co ON cl.call_outcome_id = co.id WHERE cl.lead_id = l.id ORDER BY cl.id DESC LIMIT 1) as latest_call_outcome,
+            (SELECT cl.called_at FROM call_logs cl WHERE cl.lead_id = l.id ORDER BY cl.id DESC LIMIT 1) as latest_call_at,
+            (SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) as call_count
         FROM leads l
         LEFT JOIN lead_statuses ls ON l.status_id = ls.id
         LEFT JOIN lead_sources src ON l.lead_source_id = src.id
@@ -135,10 +147,35 @@ if ($action === 'list') {
     $stmt->execute();
     $leads = $stmt->fetchAll();
 
+    // Summary counts for tabs
+    $countsWhere = "WHERE l.is_archived = 0";
+    $countsParams = [];
+    if ($roleName === 'operation_executive') {
+        $countsWhere .= " AND l.assigned_executive_id = :exec_id";
+        $countsParams['exec_id'] = $userId;
+    }
+    $countsSql = "
+        SELECT 
+            COUNT(*) as total_count,
+            SUM(CASE WHEN ((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0 AND l.last_contacted_at IS NULL) THEN 1 ELSE 0 END) as to_call_count,
+            SUM(CASE WHEN (l.status_id = 6 OR EXISTS (SELECT 1 FROM followups f WHERE f.lead_id = l.id AND f.status = 'Pending') OR EXISTS (SELECT 1 FROM call_logs cl WHERE cl.lead_id = l.id AND cl.call_outcome_id IN (3, 6))) THEN 1 ELSE 0 END) as followups_count,
+            SUM(CASE WHEN ((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) > 0 OR l.last_contacted_at IS NOT NULL) THEN 1 ELSE 0 END) as called_count
+        FROM leads l $countsWhere
+    ";
+    $cStmt = $pdo->prepare($countsSql);
+    $cStmt->execute($countsParams);
+    $summaryCounts = $cStmt->fetch();
+
     echo json_encode([
         'success' => true,
         'data' => [
             'leads' => $leads,
+            'counts' => [
+                'to_call' => (int)($summaryCounts['to_call_count'] ?? 0),
+                'followups' => (int)($summaryCounts['followups_count'] ?? 0),
+                'called' => (int)($summaryCounts['called_count'] ?? 0),
+                'all' => (int)($summaryCounts['total_count'] ?? 0),
+            ],
             'pagination' => [
                 'total' => $totalRecords,
                 'page' => $page,

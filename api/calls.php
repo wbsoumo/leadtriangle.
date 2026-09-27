@@ -106,51 +106,58 @@ if ($action === 'end_call') {
 
 // 3. GET ACTIVE CALL (Web CRM Polling & Mobile check)
 if ($action === 'get_active_call') {
-    $isManagement = in_array($roleName, ['super_admin', 'admin', 'manager']);
-    
-    $query = "
-        SELECT ac.*, l.name as lead_name, l.company_name, l.mobile as lead_phone, l.status_id as lead_status_id, ls.name as status_name
-        FROM active_calls ac
-        JOIN leads l ON ac.lead_id = l.id
-        LEFT JOIN lead_statuses ls ON l.status_id = ls.id
-        WHERE ac.status IN ('calling', 'connected')
-          AND ac.started_at >= NOW() - INTERVAL 15 MINUTE
-    ";
-    
-    $params = [];
-    if (!$isManagement) {
-        $query .= " AND ac.user_id = :uid";
-        $params['uid'] = $userId;
-    }
-    
-    $query .= " ORDER BY ac.id DESC LIMIT 1";
+    try {
+        $isManagement = in_array($roleName, ['super_admin', 'admin', 'manager']);
+        
+        $query = "
+            SELECT ac.*, l.name as lead_name, l.company_name, l.mobile as lead_phone, l.status_id as lead_status_id, ls.name as status_name
+            FROM active_calls ac
+            JOIN leads l ON ac.lead_id = l.id
+            LEFT JOIN lead_statuses ls ON l.status_id = ls.id
+            WHERE ac.status IN ('calling', 'connected')
+              AND ac.started_at >= NOW() - INTERVAL 15 MINUTE
+        ";
+        
+        $params = [];
+        if (!$isManagement) {
+            $query .= " AND ac.user_id = :uid";
+            $params['uid'] = $userId;
+        }
+        
+        $query .= " ORDER BY ac.id DESC LIMIT 1";
 
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $activeCall = $stmt->fetch();
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $activeCall = $stmt->fetch();
 
-    if ($activeCall) {
-        $statuses = $pdo->query("SELECT id, name FROM lead_statuses ORDER BY display_order ASC")->fetchAll();
-        $outcomes = $pdo->query("SELECT id, name FROM call_outcomes ORDER BY id ASC")->fetchAll();
+        if ($activeCall) {
+            $statuses = $pdo->query("SELECT id, name FROM lead_statuses ORDER BY display_order ASC")->fetchAll();
+            $outcomes = $pdo->query("SELECT id, name FROM call_outcomes ORDER BY id ASC")->fetchAll();
 
-        echo json_encode([
-            'success' => true,
-            'active_call' => true,
-            'data' => [
-                'id' => (int)$activeCall['id'],
-                'lead_id' => (int)$activeCall['lead_id'],
-                'lead_name' => $activeCall['lead_name'],
-                'company_name' => $activeCall['company_name'],
-                'phone' => $activeCall['lead_phone'],
-                'status' => $activeCall['status'],
-                'started_at' => $activeCall['started_at'],
-                'lead_status_id' => (int)$activeCall['lead_status_id'],
-                'lead_status' => $activeCall['status_name'],
-                'statuses' => $statuses,
-                'outcomes' => $outcomes
-            ]
-        ]);
-    } else {
+            echo json_encode([
+                'success' => true,
+                'active_call' => true,
+                'data' => [
+                    'id' => (int)$activeCall['id'],
+                    'lead_id' => (int)$activeCall['lead_id'],
+                    'lead_name' => $activeCall['lead_name'],
+                    'company_name' => $activeCall['company_name'],
+                    'phone' => $activeCall['lead_phone'],
+                    'status' => $activeCall['status'],
+                    'started_at' => $activeCall['started_at'],
+                    'lead_status_id' => (int)$activeCall['lead_status_id'],
+                    'lead_status' => $activeCall['status_name'],
+                    'statuses' => $statuses,
+                    'outcomes' => $outcomes
+                ]
+            ]);
+        } else {
+            echo json_encode([
+                'success' => true,
+                'active_call' => false
+            ]);
+        }
+    } catch (Exception $e) {
         echo json_encode([
             'success' => true,
             'active_call' => false

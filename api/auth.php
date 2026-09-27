@@ -158,7 +158,7 @@ if ($action === 'check') {
 
     try {
         $stmt = $pdo->prepare("
-            SELECT u.id, u.name, u.email, u.mobile, u.role_id, u.team_id, r.name as role_name, r.display_name as role_display,
+            SELECT u.id, u.name, u.email, u.mobile, u.role_id, u.team_id, u.allowed_pages, r.name as role_name, r.display_name as role_display,
                    COALESCE(t.team_name, 'Sales Team') as team_name
             FROM users u
             JOIN roles r ON u.role_id = r.id

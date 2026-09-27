@@ -95,6 +95,19 @@ const App = {
         if (this.currentUser.role_name === 'operation_executive') {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         }
+
+        // Apply page-level permissions filtering for sidebar items
+        if (this.currentUser.allowed_pages && this.currentUser.role_name !== 'super_admin') {
+            const allowed = this.currentUser.allowed_pages.split(',').map(s => s.trim());
+            document.querySelectorAll('.sidebar-menu .menu-item[data-view]').forEach(item => {
+                const view = item.getAttribute('data-view');
+                if (view && !allowed.includes(view)) {
+                    item.style.display = 'none';
+                } else {
+                    item.style.display = 'flex';
+                }
+            });
+        }
     },
 
     toggleSidebar: function() {
@@ -1417,16 +1430,19 @@ const App = {
     },
 
     // 10. USER MANAGEMENT MODULE
+    usersCache: [],
+
     renderUsers: async function() {
         const res = await fetch('api/users?action=list');
         const data = await res.json();
         if (!data.success) return;
+        this.usersCache = data.data;
 
         let html = `
             <div class="page-header">
                 <div>
                     <div class="page-title">User & Role Management</div>
-                    <div class="page-subtitle">Manage system users, managers, and operation executives</div>
+                    <div class="page-subtitle">Manage system users, managers, operation executives, and page access permissions</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-primary" onclick="App.openCreateUserModal()">+ Add New User</button>
@@ -1443,30 +1459,171 @@ const App = {
                                 <th>Mobile</th>
                                 <th>Role</th>
                                 <th>Team</th>
+                                <th>Allowed Page Access</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.data.map(u => `
+                            ${data.data.map(u => {
+                                const pages = u.allowed_pages ? u.allowed_pages.split(',') : ['dashboard','leads','calling_queue','followups','meetings'];
+                                return `
                                 <tr>
                                     <td><strong>${u.name}</strong></td>
                                     <td>${u.email}</td>
                                     <td>${u.mobile}</td>
                                     <td><span class="badge badge-blue">${u.role_display}</span></td>
                                     <td>${u.team_name || 'General'}</td>
+                                    <td>
+                                        <div style="display:flex; flex-wrap:wrap; gap:4px; max-width:240px;">
+                                            ${pages.map(p => `<span class="badge" style="background:#f1f5f9; color:#334155; font-size:10.5px; text-transform:capitalize;">${p.replace('_',' ')}</span>`).join('')}
+                                        </div>
+                                    </td>
                                     <td><span class="badge ${u.status==='active'?'badge-green':'badge-red'}">${u.status}</span></td>
                                     <td>
-                                        <button class="btn btn-secondary btn-sm" onclick="App.toggleUserStatus(${u.id}, '${u.status==='active'?'inactive':'active'}')">Toggle Status</button>
+                                        <div style="display:flex; gap:6px;">
+                                            <button class="btn btn-secondary btn-sm" onclick="App.openCreateUserModal(App.usersCache.find(x => x.id == ${u.id}))">✏️ Edit</button>
+                                            <button class="btn btn-secondary btn-sm" onclick="App.toggleUserStatus(${u.id}, '${u.status==='active'?'inactive':'active'}')">Status</button>
+                                        </div>
                                     </td>
                                 </tr>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
             </div>
         `;
         document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    openCreateUserModal: async function(userData = null) {
+        if (document.getElementById('create-user-modal')) return;
+
+        const res = await fetch('api/users?action=list');
+        const data = await res.json();
+        const roles = data.roles || [
+            { id: 1, name: 'super_admin', display_name: 'Super Admin' },
+            { id: 2, name: 'manager', display_name: 'Manager' },
+            { id: 3, name: 'operation_executive', display_name: 'Operation Executive' }
+        ];
+        const teams = data.teams || [
+            { id: 1, team_name: 'Alpha Sales & Calling Team' },
+            { id: 2, team_name: 'Enterprise Solutions Team' }
+        ];
+        const availablePages = data.available_pages || [
+            { key: 'dashboard', label: 'Dashboard' },
+            { key: 'leads', label: 'All Leads' },
+            { key: 'calling_queue', label: 'Calling Queue' },
+            { key: 'followups', label: 'Follow-ups' },
+            { key: 'meetings', label: 'Meetings' },
+            { key: 'funnel', label: 'Sales Funnel' },
+            { key: 'projects', label: 'Projects Workspace' },
+            { key: 'reports', label: 'Analytics & Reports' },
+            { key: 'users', label: 'Members & User Management' },
+            { key: 'import', label: 'Bulk CSV Import' }
+        ];
+
+        const isEdit = !!userData;
+        const userAllowedPages = (userData && userData.allowed_pages) 
+            ? userData.allowed_pages.split(',') 
+            : ['dashboard', 'leads', 'calling_queue', 'followups', 'meetings'];
+
+        const modalHtml = `
+            <div class="modal-backdrop show" id="create-user-modal">
+                <div class="modal-box" style="max-width: 640px; border-radius: 18px; border-top: 4px solid var(--primary); padding: 24px;">
+                    <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:14px;">
+                        <div class="modal-title" style="font-size:18px; font-weight:800; color:#0f172a;">
+                            ${isEdit ? '✏️ Edit Member & Selected Page Access' : '✨ Add New Team Member'}
+                        </div>
+                        <button class="close-modal" onclick="App.closeModal('create-user-modal')">✕</button>
+                    </div>
+
+                    <form onsubmit="App.submitCreateUser(event, ${isEdit ? userData.id : 'null'})" style="margin-top:16px;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                            <div>
+                                <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Full Name *</label>
+                                <input type="text" name="name" class="form-control" value="${isEdit ? userData.name : ''}" placeholder="e.g. Amit Sharma" required style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Email Address *</label>
+                                <input type="email" name="email" class="form-control" value="${isEdit ? userData.email : ''}" placeholder="amit@company.com" required style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;">
+                            <div>
+                                <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Mobile Number *</label>
+                                <input type="text" name="mobile" class="form-control" value="${isEdit ? userData.mobile : ''}" placeholder="+91 9876543210" required style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Password ${isEdit ? '(Leave blank to keep unchanged)' : '*'}</label>
+                                <input type="password" name="password" class="form-control" placeholder="••••••••" ${isEdit ? '' : 'required'} style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;">
+                            <div>
+                                <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Select System Role *</label>
+                                <select name="role_id" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px;">
+                                    ${roles.map(r => `<option value="${r.id}" ${isEdit && userData.role_id == r.id ? 'selected' : (r.id == 3 ? 'selected' : '')}>${r.display_name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Select Calling Team</label>
+                                <select name="team_id" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px;">
+                                    <option value="">No Specific Team</option>
+                                    ${teams.map(t => `<option value="${t.id}" ${isEdit && userData.team_id == t.id ? 'selected' : ''}>${t.team_name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- SELECT ALLOWED PAGES DROPDOWN / CHECKBOXES -->
+                        <div style="margin-top:18px;">
+                            <label style="font-size:13px; font-weight:800; color:#0f172a; display:block; margin-bottom:4px;">
+                                🔒 Select Allowed Pages & Modules for this User
+                            </label>
+                            <div style="font-size:12px; color:#64748b; margin-bottom:10px;">Check which pages will be visible to this user on their menu and dashboard:</div>
+                            <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; background:#f8fafc; border:1px solid #e2e8f0; padding:14px; border-radius:12px; max-height:180px; overflow-y:auto;">
+                                ${availablePages.map(p => `
+                                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#334155; cursor:pointer;">
+                                        <input type="checkbox" name="allowed_pages[]" value="${p.key}" ${userAllowedPages.includes(p.key) ? 'checked' : ''} style="width:16px; height:16px; accent-color:#2563eb;">
+                                        <span>${p.label}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:16px;">
+                            <button type="button" class="btn btn-secondary" onclick="App.closeModal('create-user-modal')">Cancel</button>
+                            <button type="submit" class="btn btn-primary" style="font-weight:700;">${isEdit ? 'Save User & Permissions' : 'Create User Account'}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+
+    submitCreateUser: async function(e, editId = null) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        if (editId) {
+            formData.append('action', 'edit');
+            formData.append('id', editId);
+        } else {
+            formData.append('action', 'create');
+        }
+
+        const res = await fetch('api/users', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message);
+        if (data.success) {
+            this.closeModal('create-user-modal');
+            this.renderUsers();
+        }
     },
 
     toggleUserStatus: async function(id, newStatus) {

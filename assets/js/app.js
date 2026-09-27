@@ -75,7 +75,7 @@ const App = {
         document.getElementById('app').innerHTML = `
             <div style="width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
                 <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 36px; width: 100%; max-width: 440px; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.08);">
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
                         <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #4f46e5, #6366f1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #ffffff; box-shadow: 0 4px 12px rgba(79,70,229,0.25);">▲</div>
                         <div>
                             <div style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.4px;">Leadstriangle CRM</div>
@@ -85,7 +85,13 @@ const App = {
 
                     ${warningBanner}
 
-                    <div style="color: #475569; font-size: 13.5px; margin-bottom: 24px;">Sign in to your CRM telecalling account</div>
+                    <!-- TAB SELECTOR -->
+                    <div style="display: flex; background: #f1f5f9; padding: 4px; border-radius: 8px; margin-bottom: 20px;">
+                        <button id="tab-login" onclick="App.toggleAuthTab('login')" style="flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; background: #ffffff; color: #0f172a; box-shadow: var(--shadow-xs);">Sign In</button>
+                        <button id="tab-register" onclick="App.toggleAuthTab('register')" style="flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: #64748b;">+ Register Admin</button>
+                    </div>
+
+                    <!-- LOGIN FORM -->
                     <form id="login-form" onsubmit="App.handleLogin(event)">
                         <div style="margin-bottom: 16px;">
                             <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Email Address</label>
@@ -97,10 +103,84 @@ const App = {
                         </div>
                         <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; justify-content: center; font-size: 14.5px;">Sign In to Dashboard →</button>
                     </form>
+
+                    <!-- REGISTER ADMIN FORM -->
+                    <form id="register-admin-form" style="display: none;" onsubmit="App.handleAdminRegister(event)">
+                        <div style="margin-bottom: 14px;">
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Full Name</label>
+                            <input type="text" id="reg-name" required value="System Super Admin" placeholder="Super Admin" style="width: 100%; padding: 10px 12px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13px; outline: none;">
+                        </div>
+                        <div style="margin-bottom: 14px;">
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Admin Email Address</label>
+                            <input type="email" id="reg-email" required value="admin@leadstriangle.com" placeholder="admin@leadstriangle.com" style="width: 100%; padding: 10px 12px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13px; outline: none;">
+                        </div>
+                        <div style="margin-bottom: 14px;">
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Mobile Number</label>
+                            <input type="text" id="reg-mobile" value="+919876543210" placeholder="+919876543210" style="width: 100%; padding: 10px 12px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13px; outline: none;">
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">New Admin Password</label>
+                            <input type="password" id="reg-pass" required value="Admin@123" placeholder="Set Password" style="width: 100%; padding: 10px 12px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13px; outline: none;">
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; justify-content: center; font-size: 14.5px;">👑 Create / Reset Super Admin →</button>
+                    </form>
+
                     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center;">Default demo password: <strong style="color: #4f46e5;">Admin@123</strong></div>
                 </div>
             </div>
         `;
+    },
+
+    toggleAuthTab: function(tab) {
+        const loginForm = document.getElementById('login-form');
+        const regForm = document.getElementById('register-admin-form');
+        const tabLogin = document.getElementById('tab-login');
+        const tabReg = document.getElementById('tab-register');
+
+        if (tab === 'register') {
+            loginForm.style.display = 'none';
+            regForm.style.display = 'block';
+            tabLogin.style.background = 'transparent';
+            tabLogin.style.color = '#64748b';
+            tabLogin.style.boxShadow = 'none';
+            tabReg.style.background = '#ffffff';
+            tabReg.style.color = '#0f172a';
+            tabReg.style.boxShadow = 'var(--shadow-xs)';
+        } else {
+            regForm.style.display = 'none';
+            loginForm.style.display = 'block';
+            tabReg.style.background = 'transparent';
+            tabReg.style.color = '#64748b';
+            tabReg.style.boxShadow = 'none';
+            tabLogin.style.background = '#ffffff';
+            tabLogin.style.color = '#0f172a';
+            tabLogin.style.boxShadow = 'var(--shadow-xs)';
+        }
+    },
+
+    handleAdminRegister: async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('reg-name').value;
+        const email = document.getElementById('reg-email').value;
+        const mobile = document.getElementById('reg-mobile').value;
+        const password = document.getElementById('reg-pass').value;
+
+        const formData = new FormData();
+        formData.append('action', 'register_admin');
+        formData.append('name', name);
+        formData.append('email', email);
+        formData.append('mobile', mobile);
+        formData.append('password', password);
+
+        const res = await fetch('api/auth', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            alert(data.message);
+        }
     },
 
     handleLogin: async function(e) {

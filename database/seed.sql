@@ -59,14 +59,14 @@ INSERT INTO teams (id, team_name, description) VALUES
 -- Hash for 'Admin@123'
 -- Hash string: $2y$10$w3S24P2B/yJ5O13K6kX7e.gR/5hXv8Uf.Q61vA4TfC/Jz0Q5c9xSe
 INSERT INTO users (id, role_id, team_id, name, email, mobile, password_hash, status, joining_date) VALUES
-(1, 1, NULL, 'System Super Admin', 'admin@leadstriangle.com', '+919876543210', '$2y$10$44.bM3u.N4P7XvW8h44OJeJ6F9Yh5/zU3q548vL2n7Z1w84y1724W', 'active', '2026-01-01'),
-(2, 2, 1, 'Amit Sharma (Manager)', 'amit.manager@leadstriangle.com', '+919876543211', '$2y$10$44.bM3u.N4P7XvW8h44OJeJ6F9Yh5/zU3q548vL2n7Z1w84y1724W', 'active', '2026-01-15'),
-(3, 2, 2, 'Priya Verma (Manager)', 'priya.manager@leadstriangle.com', '+919876543212', '$2y$10$44.bM3u.N4P7XvW8h44OJeJ6F9Yh5/zU3q548vL2n7Z1w84y1724W', 'active', '2026-01-15'),
-(4, 3, 1, 'Rahul Kumar (Executive)', 'rahul.op@leadstriangle.com', '+919876543213', '$2y$10$44.bM3u.N4P7XvW8h44OJeJ6F9Yh5/zU3q548vL2n7Z1w84y1724W', 'active', '2026-02-01'),
-(5, 3, 1, 'Neha Singh (Executive)', 'neha.op@leadstriangle.com', '+919876543214', '$2y$10$44.bM3u.N4P7XvW8h44OJeJ6F9Yh5/zU3q548vL2n7Z1w84y1724W', 'active', '2026-02-01'),
-(6, 3, 1, 'Vikram Roy (Executive)', 'vikram.op@leadstriangle.com', '+919876543215', '$2y$10$44.bM3u.N4P7XvW8h44OJeJ6F9Yh5/zU3q548vL2n7Z1w84y1724W', 'active', '2026-02-10'),
-(7, 3, 2, 'Suresh Patel (Executive)', 'suresh.op@leadstriangle.com', '+919876543216', '$2y$10$44.bM3u.N4P7XvW8h44OJeJ6F9Yh5/zU3q548vL2n7Z1w84y1724W', 'active', '2026-02-15'),
-(8, 3, 2, 'Ananya Das (Executive)', 'ananya.op@leadstriangle.com', '+919876543217', '$2y$10$44.bM3u.N4P7XvW8h44OJeJ6F9Yh5/zU3q548vL2n7Z1w84y1724W', 'active', '2026-02-15');
+(1, 1, NULL, 'System Super Admin', 'admin@leadstriangle.com', '+919876543210', '$2y$12$d6AjWp57AJqaXdjyt93pZu1DxZWaudxHo58GW9s7j6F8zM4kdxkHe', 'active', '2026-01-01'),
+(2, 2, 1, 'Amit Sharma (Manager)', 'amit.manager@leadstriangle.com', '+919876543211', '$2y$12$d6AjWp57AJqaXdjyt93pZu1DxZWaudxHo58GW9s7j6F8zM4kdxkHe', 'active', '2026-01-15'),
+(3, 2, 2, 'Priya Verma (Manager)', 'priya.manager@leadstriangle.com', '+919876543212', '$2y$12$d6AjWp57AJqaXdjyt93pZu1DxZWaudxHo58GW9s7j6F8zM4kdxkHe', 'active', '2026-01-15'),
+(4, 3, 1, 'Rahul Kumar (Executive)', 'rahul.op@leadstriangle.com', '+919876543213', '$2y$12$d6AjWp57AJqaXdjyt93pZu1DxZWaudxHo58GW9s7j6F8zM4kdxkHe', 'active', '2026-02-01'),
+(5, 3, 1, 'Neha Singh (Executive)', 'neha.op@leadstriangle.com', '+919876543214', '$2y$12$d6AjWp57AJqaXdjyt93pZu1DxZWaudxHo58GW9s7j6F8zM4kdxkHe', 'active', '2026-02-01'),
+(6, 3, 1, 'Vikram Roy (Executive)', 'vikram.op@leadstriangle.com', '+919876543215', '$2y$12$d6AjWp57AJqaXdjyt93pZu1DxZWaudxHo58GW9s7j6F8zM4kdxkHe', 'active', '2026-02-10'),
+(7, 3, 2, 'Suresh Patel (Executive)', 'suresh.op@leadstriangle.com', '+919876543216', '$2y$12$d6AjWp57AJqaXdjyt93pZu1DxZWaudxHo58GW9s7j6F8zM4kdxkHe', 'active', '2026-02-15'),
+(8, 3, 2, 'Ananya Das (Executive)', 'ananya.op@leadstriangle.com', '+919876543217', '$2y$12$d6AjWp57AJqaXdjyt93pZu1DxZWaudxHo58GW9s7j6F8zM4kdxkHe', 'active', '2026-02-15');
 
 UPDATE teams SET manager_id = 2 WHERE id = 1;
 UPDATE teams SET manager_id = 3 WHERE id = 2;

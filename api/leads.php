@@ -641,6 +641,9 @@ if ($action === 'import_csv') {
         exit;
     }
 
+    // Clean any prior output buffer to ensure pure JSON
+    if (ob_get_length()) ob_clean();
+
     $rawInput = file_get_contents('php://input');
     $inputData = json_decode($rawInput, true);
     if (!$inputData) {
@@ -654,7 +657,7 @@ if ($action === 'import_csv') {
 
     $assignedManagerId = !empty($inputData['assigned_manager_id']) ? (int)$inputData['assigned_manager_id'] : null;
     $assignedExecutiveId = !empty($inputData['assigned_executive_id']) ? (int)$inputData['assigned_executive_id'] : null;
-    $priorityOverride = $inputData['priority'] ?? null;
+    $priorityOverride = $inputData['priority_override'] ?? $inputData['priority'] ?? null;
 
     if (empty($leads) || !is_array($leads)) {
         echo json_encode(['success' => false, 'message' => 'No valid lead rows provided for import.']);
@@ -672,16 +675,16 @@ if ($action === 'import_csv') {
     $checkStmt = $pdo->prepare("SELECT id FROM leads WHERE mobile = :mobile LIMIT 1");
 
     foreach ($leads as $l) {
-        $name = trim($l['name'] ?? '');
+        $name = trim($l['full_name'] ?? $l['name'] ?? '');
         $mobile = trim($l['mobile'] ?? '');
         $email = trim($l['email'] ?? '');
         $company = trim($l['company_name'] ?? '');
         $city = trim($l['city'] ?? '');
-        $req = trim($l['initial_requirement'] ?? $l['requirements'] ?? '');
+        $req = trim($l['requirement'] ?? $l['initial_requirement'] ?? $l['requirements'] ?? '');
         
-        $prio = (!empty($priorityOverride) && $priorityOverride !== 'keep_csv') 
+        $prio = (!empty($priorityOverride) && $priorityOverride !== 'Keep CSV Value' && $priorityOverride !== 'keep_csv') 
             ? $priorityOverride 
-            : (!empty($l['priority']) ? trim($l['priority']) : 'Medium Priority');
+            : (!empty($l['priority']) ? trim($l['priority']) : 'Medium');
 
         if (empty($name) || empty($mobile)) {
             $skipped++;
@@ -722,8 +725,9 @@ if ($action === 'import_csv') {
         'success' => true,
         'message' => "Successfully imported $inserted leads! ($skipped skipped or duplicate numbers)",
         'summary' => [
+            'total_submitted' => count($leads),
             'imported' => $inserted,
-            'skipped'  => $skipped
+            'duplicates_skipped'  => $skipped
         ]
     ]);
     exit;

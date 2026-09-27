@@ -1944,7 +1944,17 @@ const App = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const data = await res.json();
+            
+            const responseText = await res.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (jsonErr) {
+                console.error('Non-JSON response from server:', responseText);
+                outputDiv.innerHTML = `<div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:10px; color:#991b1b; margin-top:12px; font-weight:700;">Server Error: ${responseText.substring(0, 300)}</div>`;
+                return;
+            }
+
             if (data.success) {
                 const s = data.summary;
                 outputDiv.innerHTML = `

@@ -1,5 +1,5 @@
 <?php
-// api/settings.php - System Options, Custom Statuses, Sources & Services API
+// api/settings.php - System Options, Custom Statuses, Sources, Services & Audit Logs API
 
 header('Content-Type: application/json');
 session_start();
@@ -40,5 +40,47 @@ if ($action === 'get_dropdowns') {
             'managers' => $managers
         ]
     ]);
+    exit;
+}
+
+if ($action === 'list_activity_logs') {
+    if ($_SESSION['role_name'] !== 'super_admin') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $stmt = $pdo->query("
+        SELECT al.*, u.name as user_name, u.email as user_email
+        FROM activity_logs al
+        LEFT JOIN users u ON al.user_id = u.id
+        ORDER BY al.id DESC
+        LIMIT 100
+    ");
+    $logs = $stmt->fetchAll();
+
+    echo json_encode(['success' => true, 'data' => $logs]);
+    exit;
+}
+
+if ($action === 'add_status') {
+    if ($_SESSION['role_name'] !== 'super_admin') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    $color = trim($_POST['color_code'] ?? '#3b82f6');
+
+    if (empty($name)) {
+        echo json_encode(['success' => false, 'message' => 'Status name required']);
+        exit;
+    }
+
+    $maxOrder = (int)$pdo->query("SELECT MAX(sort_order) FROM lead_statuses")->fetchColumn();
+
+    $stmt = $pdo->prepare("INSERT INTO lead_statuses (name, color_code, sort_order) VALUES (:name, :color, :ord)");
+    $stmt->execute(['name' => $name, 'color' => $color, 'ord' => $maxOrder + 1]);
+
+    echo json_encode(['success' => true, 'message' => 'New lead status added!']);
     exit;
 }

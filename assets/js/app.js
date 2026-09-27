@@ -1,4 +1,4 @@
-/* assets/js/app.js - SPA AJAX Application Controller */
+/* assets/js/app.js - SPA AJAX Application Controller for LeadTriangle CRM */
 
 const App = {
     currentUser: null,
@@ -44,7 +44,6 @@ const App = {
         document.getElementById('user-role-display').innerText = this.currentUser.role_display;
         document.getElementById('user-avatar').innerText = this.currentUser.name.charAt(0).toUpperCase();
         
-        // Hide unauthorized sidebar items
         if (this.currentUser.role_name === 'operation_executive') {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         }
@@ -85,13 +84,11 @@ const App = {
 
                     ${warningBanner}
 
-                    <!-- TAB SELECTOR -->
                     <div style="display: flex; background: #f1f5f9; padding: 4px; border-radius: 8px; margin-bottom: 20px;">
                         <button id="tab-login" onclick="App.toggleAuthTab('login')" style="flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; background: #ffffff; color: #0f172a; box-shadow: var(--shadow-xs);">Sign In</button>
                         <button id="tab-register" onclick="App.toggleAuthTab('register')" style="flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: #64748b;">+ Register Admin</button>
                     </div>
 
-                    <!-- LOGIN FORM -->
                     <form id="login-form" onsubmit="App.handleLogin(event)">
                         <div style="margin-bottom: 16px;">
                             <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Email Address</label>
@@ -104,7 +101,6 @@ const App = {
                         <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; justify-content: center; font-size: 14.5px;">Sign In to Dashboard →</button>
                     </form>
 
-                    <!-- REGISTER ADMIN FORM -->
                     <form id="register-admin-form" style="display: none;" onsubmit="App.handleAdminRegister(event)">
                         <div style="margin-bottom: 14px;">
                             <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Full Name</label>
@@ -217,14 +213,12 @@ const App = {
             });
         });
 
-        // Listen to browser Back/Forward navigation
         window.addEventListener('popstate', () => {
             const path = window.location.pathname.replace(/^\/+/, '');
             const view = path || 'dashboard';
             this.navigate(view, false);
         });
 
-        // Detect initial URL path on load
         const initialPath = window.location.pathname.replace(/^\/+/, '');
         if (initialPath && initialPath !== 'index.php') {
             this.currentView = initialPath;
@@ -242,7 +236,7 @@ const App = {
         }
 
         const container = document.getElementById('content-viewport');
-        container.innerHTML = '<div style="color: #94a3b8; padding: 40px; text-align: center;">Loading module...</div>';
+        container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Loading module...</div>';
 
         if (view === 'dashboard') this.renderDashboard();
         else if (view === 'leads') this.renderLeads();
@@ -312,7 +306,7 @@ const App = {
         if (d.employee_performance && d.employee_performance.length > 0) {
             html += `
                 <div class="table-card" style="margin-top: 24px;">
-                    <div class="table-filters" style="font-weight: 700; color: #fff;">Telecalling Team Performance Leaderboard</div>
+                    <div class="table-filters" style="font-weight: 700; color: var(--text-primary);">Telecalling Team Performance Leaderboard</div>
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
@@ -373,6 +367,7 @@ const App = {
                     <div class="page-subtitle">Track, filter, call, assign and qualify prospect leads</div>
                 </div>
                 <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="App.exportLeadsCsv()">📤 Export CSV</button>
                     <button class="btn btn-secondary" onclick="App.navigate('import')">📥 Bulk CSV Import</button>
                     <button class="btn btn-primary" onclick="App.openCreateLeadModal()">+ Add New Lead</button>
                 </div>
@@ -381,13 +376,15 @@ const App = {
             <div class="table-card">
                 <div class="table-filters">
                     <input type="text" id="lead-search-input" placeholder="Search by name, phone, email, company..." class="filter-input" style="width: 280px;" value="${search}" onkeyup="if(event.key==='Enter') App.renderLeads(1)">
-                    <button class="btn btn-secondary btn-sm" onclick="App.renderLeads(1)">Filter</button>
+                    <button class="btn btn-secondary btn-sm" onclick="App.renderLeads(1)">Search</button>
+                    <button class="btn btn-secondary btn-sm" onclick="App.autoAssignSelectedLeads()">🔄 Equal Auto Assign</button>
                 </div>
 
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead>
                             <tr>
+                                <th><input type="checkbox" onclick="document.querySelectorAll('.chk-lead').forEach(c=>c.checked=this.checked)"></th>
                                 <th>Lead Code</th>
                                 <th>Client / Company</th>
                                 <th>Mobile Number</th>
@@ -401,16 +398,17 @@ const App = {
                         <tbody>
                             ${leads.map(l => `
                                 <tr>
-                                    <td><strong style="color:#38bdf8;">${l.lead_code}</strong></td>
+                                    <td><input type="checkbox" class="chk-lead" value="${l.id}"></td>
+                                    <td><strong style="color:var(--primary);">${l.lead_code}</strong></td>
                                     <td><strong>${l.name}</strong><br><small style="color:var(--text-muted)">${l.company_name || l.city || 'Individual'}</small></td>
-                                    <td><a href="tel:${l.mobile}" style="color:#34d399; text-decoration:none; font-weight:600;">📞 ${l.mobile}</a></td>
+                                    <td><a href="tel:${l.mobile}" style="color:var(--success-text); text-decoration:none; font-weight:600;">📞 ${l.mobile}</a></td>
                                     <td>${l.service_name || 'General Query'}</td>
                                     <td>${l.executive_name || '<span style="color:var(--text-muted)">Unassigned</span>'}</td>
                                     <td><span class="badge" style="background:${l.status_color}22; color:${l.status_color}; border:1px solid ${l.status_color}55;">${l.status_name}</span></td>
                                     <td><span class="badge badge-amber">${l.priority}</span></td>
                                     <td>
                                         <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${l.id}, '${l.name}', '${l.mobile}')">Call Now</button>
-                                        <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">View</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">Timeline</button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -423,7 +421,65 @@ const App = {
         document.getElementById('content-viewport').innerHTML = html;
     },
 
-    // 3. CALL LOG MODAL
+    autoAssignSelectedLeads: async function() {
+        const selected = Array.from(document.querySelectorAll('.chk-lead:checked')).map(c => c.value);
+        if (selected.length === 0) {
+            alert('Please select at least 1 lead to auto assign.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'auto_assign');
+        selected.forEach(id => formData.append('lead_ids[]', id));
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message);
+        if (data.success) this.renderLeads(1);
+    },
+
+    exportLeadsCsv: function() {
+        window.location.href = 'api/leads?action=export';
+    },
+
+    // 3. CALLING QUEUE MODULE
+    renderCallingQueue: async function() {
+        const res = await fetch('api/leads?action=list&calling_queue=1&limit=50');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const queue = data.data.leads;
+
+        let html = `
+            <div class="page-header">
+                <div>
+                    <div class="page-title">Action Calling Queue</div>
+                    <div class="page-subtitle">Your prioritized daily task queue for telecalling</div>
+                </div>
+            </div>
+
+            <div class="kpi-grid" style="margin-bottom:20px;">
+                ${queue.map(l => `
+                    <div class="kpi-card" style="background:#ffffff; border:1px solid var(--card-border);">
+                        <div class="kpi-header">
+                            <span>${l.lead_code}</span>
+                            <span class="badge badge-blue">${l.priority}</span>
+                        </div>
+                        <div style="font-size:16px; font-weight:700; color:var(--text-primary); margin-top:4px;">${l.name}</div>
+                        <div style="font-size:13px; color:var(--text-muted);">${l.company_name || l.city || 'Client Query'}</div>
+                        <div style="font-size:13.5px; font-weight:600; color:var(--success-text); margin-top:4px;">📞 ${l.mobile}</div>
+                        <div style="display:flex; gap:8px; margin-top:12px;">
+                            <button class="btn btn-primary btn-sm" style="flex:1; justify-center;" onclick="App.openCallModal(${l.id}, '${l.name}', '${l.mobile}')">Call Now</button>
+                            <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">Details</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    // 4. CALL LOG MODAL
     openCallModal: function(leadId, name, mobile) {
         let outcomesHtml = this.dropdowns.outcomes ? this.dropdowns.outcomes.map(o => `<option value="${o.id}">${o.name}</option>`).join('') : '';
 
@@ -431,7 +487,7 @@ const App = {
             <div class="modal-backdrop show" id="call-modal">
                 <div class="modal-box">
                     <div class="modal-header">
-                        <div class="modal-title">📞 Telecalling Log: ${name} (${mobile})</div>
+                        <div class="modal-title">📞 Log Call: ${name} (${mobile})</div>
                         <button class="close-modal" onclick="App.closeModal('call-modal')">✕</button>
                     </div>
                     <form onsubmit="App.submitCallLog(event, ${leadId})">
@@ -442,12 +498,12 @@ const App = {
                             </select>
                         </div>
                         <div style="margin-bottom: 14px;">
-                            <label style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">Call Remarks & Conversation Notes</label>
-                            <textarea id="modal-remarks" required style="width:100%; height:80px; background:#0b0f19; border:1px solid var(--card-border); border-radius:6px; color:#fff; padding:10px; font-size:13px; outline:none;" placeholder="Enter details discussed with client..."></textarea>
+                            <label style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">Call Remarks & Notes</label>
+                            <textarea id="modal-remarks" required style="width:100%; height:80px; background:#ffffff; border:1px solid var(--card-border); border-radius:6px; color:var(--text-primary); padding:10px; font-size:13px; outline:none;" placeholder="Enter details discussed..."></textarea>
                         </div>
 
-                        <div style="background:#0b0f19; padding:14px; border-radius:8px; border:1px solid var(--card-border); margin-bottom:18px;">
-                            <label style="font-size:13px; font-weight:600; color:#fff; display:flex; align-items:center; gap:8px;">
+                        <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid var(--card-border); margin-bottom:18px;">
+                            <label style="font-size:13px; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
                                 <input type="checkbox" id="chk-followup" onchange="document.getElementById('followup-sec').style.display = this.checked ? 'block' : 'none'"> Schedule Follow-up Call
                             </label>
                             <div id="followup-sec" style="display:none; margin-top:12px;">
@@ -491,12 +547,311 @@ const App = {
         }
     },
 
-    closeModal: function(id) {
-        const el = document.getElementById(id);
-        if (el) el.remove();
+    // 5. FOLLOWUPS MODULE
+    renderFollowups: async function() {
+        const res = await fetch('api/followups?action=list&filter=today');
+        const data = await res.json();
+        if (!data.success) return;
+
+        let html = `
+            <div class="page-header">
+                <div>
+                    <div class="page-title">Follow-up Management</div>
+                    <div class="page-subtitle">Track scheduled callback tasks</div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Client / Company</th>
+                                <th>Phone</th>
+                                <th>Followup Date & Time</th>
+                                <th>Purpose / Notes</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.data.map(f => `
+                                <tr>
+                                    <td><strong>${f.lead_name}</strong><br><small style="color:var(--text-muted)">${f.company_name || 'Lead'}</small></td>
+                                    <td><a href="tel:${f.lead_mobile}" style="color:var(--success-text); font-weight:600;">📞 ${f.lead_mobile}</a></td>
+                                    <td>${f.followup_date} at ${f.followup_time}</td>
+                                    <td>${f.purpose || f.notes || 'Routine follow up'}</td>
+                                    <td><span class="badge badge-amber">${f.status}</span></td>
+                                    <td><button class="btn btn-success btn-sm" onclick="App.completeFollowup(${f.id})">Mark Done</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
     },
 
-    // 4. BULK CSV IMPORT UI
+    completeFollowup: async function(id) {
+        const formData = new FormData();
+        formData.append('action', 'update_status');
+        formData.append('id', id);
+        formData.append('status', 'Completed');
+
+        const res = await fetch('api/followups', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) this.renderFollowups();
+    },
+
+    // 6. MEETINGS MODULE
+    renderMeetings: async function() {
+        const res = await fetch('api/meetings?action=list&filter=today');
+        const data = await res.json();
+        if (!data.success) return;
+
+        let html = `
+            <div class="page-header">
+                <div>
+                    <div class="page-title">Meetings Management</div>
+                    <div class="page-subtitle">Client discovery calls & scheduled demos</div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Client</th>
+                                <th>Type</th>
+                                <th>Date & Time</th>
+                                <th>Mode & Link</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.data.map(m => `
+                                <tr>
+                                    <td><strong>${m.meeting_title}</strong></td>
+                                    <td>${m.lead_name}<br><small style="color:var(--text-muted)">${m.company_name || ''}</small></td>
+                                    <td>${m.type_name}</td>
+                                    <td>${m.meeting_date} ${m.meeting_time}</td>
+                                    <td>${m.meeting_mode} ${m.meeting_link ? `<br><a href="${m.meeting_link}" target="_blank" style="color:var(--primary);">Join Link</a>` : ''}</td>
+                                    <td><span class="badge badge-blue">${m.status}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    // 7. SALES FUNNEL KANBAN MODULE
+    renderFunnel: async function() {
+        const res = await fetch('api/funnel?action=kanban');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const k = data.data.kanban;
+
+        let html = `
+            <div class="page-header">
+                <div>
+                    <div class="page-title">Sales Funnel & Opportunities</div>
+                    <div class="page-subtitle">Kanban pipeline tracking for high-value leads</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="App.openPushLeadModal()">+ Push Lead to Funnel</button>
+                </div>
+            </div>
+
+            <div class="kanban-board">
+                ${k.map(col => `
+                    <div class="kanban-column">
+                        <div class="column-header">
+                            <span>${col.stage.name}</span>
+                            <span class="badge badge-blue">${col.items.length}</span>
+                        </div>
+                        <div class="column-body">
+                            ${col.items.map(item => `
+                                <div class="kanban-card">
+                                    <div style="font-size:12px; font-weight:700; color:var(--primary);">${item.opportunity_code}</div>
+                                    <div style="font-size:14px; font-weight:700; color:var(--text-primary);">${item.client_name}</div>
+                                    <div style="font-size:12.5px; color:var(--text-muted);">${item.company_name || 'Enterprise'}</div>
+                                    <div style="font-size:14px; font-weight:800; color:var(--success-text); margin-top:4px;">₹${parseFloat(item.expected_value).toLocaleString()}</div>
+                                    <div style="display:flex; gap:6px; margin-top:6px;">
+                                        ${item.stage_id == 8 ? `<button class="btn btn-success btn-sm" onclick="App.openConvertProjectModal(${item.id}, ${item.expected_value})">Convert to Project</button>` : `<button class="btn btn-secondary btn-sm" onclick="App.moveOppStage(${item.id}, ${item.stage_id + 1})">Advance Stage →</button>`}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    moveOppStage: async function(oppId, nextStageId) {
+        const formData = new FormData();
+        formData.append('action', 'move_stage');
+        formData.append('opportunity_id', oppId);
+        formData.append('stage_id', nextStageId);
+
+        const res = await fetch('api/funnel', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) this.renderFunnel();
+    },
+
+    // 8. PROJECTS WORKSPACE MODULE
+    renderProjects: async function() {
+        const res = await fetch('api/projects?action=list');
+        const data = await res.json();
+        if (!data.success) return;
+
+        let html = `
+            <div class="page-header">
+                <div>
+                    <div class="page-title">Active Projects Workspace</div>
+                    <div class="page-subtitle">Track project delivery, progress percentages & client payments</div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Project Code</th>
+                                <th>Client / Company</th>
+                                <th>Service</th>
+                                <th>Progress %</th>
+                                <th>Stage</th>
+                                ${this.currentUser.role_name !== 'operation_executive' ? '<th>Final Value</th><th>Paid Amount</th>' : ''}
+                                <th>Delivery Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.data.map(p => `
+                                <tr>
+                                    <td><strong style="color:var(--primary);">${p.project_code}</strong></td>
+                                    <td><strong>${p.client_name}</strong><br><small style="color:var(--text-muted)">${p.company_name || ''}</small></td>
+                                    <td>${p.service_name || 'Development'}</td>
+                                    <td>
+                                        <div style="font-weight:700;">${p.progress_percent}%</div>
+                                        <div style="width:100px; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden;">
+                                            <div style="width:${p.progress_percent}%; height:100%; background:var(--primary);"></div>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge" style="background:${p.stage_color}22; color:${p.stage_color}; border:1px solid ${p.stage_color}55;">${p.stage_name}</span></td>
+                                    ${this.currentUser.role_name !== 'operation_executive' ? `<td>₹${parseFloat(p.final_amount).toLocaleString()}</td><td><span class="badge badge-green">₹${parseFloat(p.paid_amount).toLocaleString()}</span></td>` : ''}
+                                    <td>${p.expected_delivery_date || 'TBD'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    // 9. REPORTS MODULE
+    renderReports: async function() {
+        const res = await fetch('api/reports?type=leads');
+        const data = await res.json();
+
+        let html = `
+            <div class="page-header">
+                <div>
+                    <div class="page-title">Analytics & Operations Reports</div>
+                    <div class="page-subtitle">Multi-dimensional operational intelligence</div>
+                </div>
+            </div>
+
+            <div class="kpi-grid">
+                ${data.data.map(r => `
+                    <div class="kpi-card">
+                        <div class="kpi-header"><span>${r.status_name}</span></div>
+                        <div class="kpi-val">${r.lead_count} Leads</div>
+                        <div class="kpi-sub">Qualified: ${r.qualified_count}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    // 10. USER MANAGEMENT MODULE
+    renderUsers: async function() {
+        const res = await fetch('api/users?action=list');
+        const data = await res.json();
+        if (!data.success) return;
+
+        let html = `
+            <div class="page-header">
+                <div>
+                    <div class="page-title">User & Role Management</div>
+                    <div class="page-subtitle">Manage system users, managers, and operation executives</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="App.openCreateUserModal()">+ Add New User</button>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Mobile</th>
+                                <th>Role</th>
+                                <th>Team</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.data.map(u => `
+                                <tr>
+                                    <td><strong>${u.name}</strong></td>
+                                    <td>${u.email}</td>
+                                    <td>${u.mobile}</td>
+                                    <td><span class="badge badge-blue">${u.role_display}</span></td>
+                                    <td>${u.team_name || 'General'}</td>
+                                    <td><span class="badge ${u.status==='active'?'badge-green':'badge-red'}">${u.status}</span></td>
+                                    <td>
+                                        <button class="btn btn-secondary btn-sm" onclick="App.toggleUserStatus(${u.id}, '${u.status==='active'?'inactive':'active'}')">Toggle Status</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    toggleUserStatus: async function(id, newStatus) {
+        const formData = new FormData();
+        formData.append('action', 'update_status');
+        formData.append('id', id);
+        formData.append('status', newStatus);
+
+        const res = await fetch('api/users', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message);
+        if (data.success) this.renderUsers();
+    },
+
+    // 11. BULK CSV IMPORT UI
     renderImport: function() {
         let html = `
             <div class="page-header">
@@ -506,11 +861,11 @@ const App = {
                 </div>
             </div>
 
-            <div class="card" style="background:var(--card-bg); border:1px solid var(--card-border); padding:32px; border-radius:12px; max-width:600px;">
+            <div class="card" style="background:var(--card-bg); border:1px solid var(--card-border); padding:32px; border-radius:12px; max-width:600px; box-shadow:var(--shadow-xs);">
                 <form onsubmit="App.handleCsvUpload(event)">
                     <div style="margin-bottom:20px;">
                         <label style="display:block; font-size:13px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">Select CSV File (.csv)</label>
-                        <input type="file" id="csv-file-input" accept=".csv" required style="width:100%; padding:12px; background:#0b0f19; border:1px solid var(--card-border); border-radius:8px; color:#fff;">
+                        <input type="file" id="csv-file-input" accept=".csv" required style="width:100%; padding:12px; background:#ffffff; border:1px solid var(--card-border); border-radius:8px; color:var(--text-primary);">
                     </div>
                     <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">🚀 Process & Import Leads</button>
                 </form>
@@ -528,7 +883,7 @@ const App = {
         const formData = new FormData();
         formData.append('csv_file', fileInput.files[0]);
 
-        document.getElementById('import-report-box').innerHTML = '<div style="color:#38bdf8;">Parsing CSV and validating phone numbers...</div>';
+        document.getElementById('import-report-box').innerHTML = '<div style="color:var(--primary);">Parsing CSV and validating phone numbers...</div>';
 
         const res = await fetch('api/import', { method: 'POST', body: formData });
         const data = await res.json();
@@ -536,7 +891,7 @@ const App = {
         if (data.success) {
             const s = data.summary;
             document.getElementById('import-report-box').innerHTML = `
-                <div style="background:rgba(16,185,129,0.15); border:1px solid var(--success); padding:16px; border-radius:8px; color:#34d399;">
+                <div style="background:var(--success-light); border:1px solid #a7f3d0; padding:16px; border-radius:8px; color:var(--success-text);">
                     <div style="font-size:16px; font-weight:700; margin-bottom:8px;">Import Complete!</div>
                     <div>Total Rows: ${s.total_rows}</div>
                     <div>Successfully Imported: <strong>${s.imported}</strong></div>
@@ -547,6 +902,11 @@ const App = {
         } else {
             document.getElementById('import-report-box').innerHTML = `<div style="color:var(--danger);">${data.message}</div>`;
         }
+    },
+
+    closeModal: function(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
     }
 };
 

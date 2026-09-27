@@ -1,5 +1,5 @@
 <?php
-// api/leads.php - Lead Management API with RBAC, Filters, Duplicate Detection & Assignment
+// api/leads.php - Lead Management API with Full Specification (CRUD, Search, Filters, RBAC, Auto-Assign & CSV Export)
 
 header('Content-Type: application/json');
 session_start();
@@ -19,16 +19,18 @@ $teamId = $_SESSION['team_id'];
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
 function logActivity($pdo, $module, $action, $recordId, $oldVal = null, $newVal = null) {
-    $stmt = $pdo->prepare("INSERT INTO activity_logs (user_id, module, action, record_id, old_value, new_value, ip_address) VALUES (:uid, :mod, :act, :rec, :old, :new, :ip)");
-    $stmt->execute([
-        'uid' => $_SESSION['user_id'],
-        'mod' => $module,
-        'act' => $action,
-        'rec' => $recordId,
-        'old' => is_array($oldVal) ? json_encode($oldVal) : $oldVal,
-        'new' => is_array($newVal) ? json_encode($newVal) : $newVal,
-        'ip'  => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
-    ]);
+    try {
+        $stmt = $pdo->prepare("INSERT INTO activity_logs (user_id, module, action, record_id, old_value, new_value, ip_address) VALUES (:uid, :mod, :act, :rec, :old, :new, :ip)");
+        $stmt->execute([
+            'uid' => $_SESSION['user_id'],
+            'mod' => $module,
+            'act' => $action,
+            'rec' => $recordId,
+            'old' => is_array($oldVal) ? json_encode($oldVal) : $oldVal,
+            'new' => is_array($newVal) ? json_encode($newVal) : $newVal,
+            'ip'  => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+        ]);
+    } catch (Exception $e) {}
 }
 
 // 1. LIST LEADS
@@ -93,7 +95,6 @@ if ($action === 'list') {
         $params['is_qualified'] = (int)$isQualified;
     }
     if ($callingQueue === '1') {
-        // Today's pending leads to call or follow up
         $where[] = "(DATE(l.next_followup_at) = CURDATE() OR l.status_id IN (1, 2, 3, 4, 6))";
     }
 
@@ -178,12 +179,16 @@ if ($action === 'check_duplicate') {
 if ($action === 'create') {
     $name = trim($_POST['name'] ?? '');
     $mobile = trim($_POST['mobile'] ?? '');
+    $alternateMobile = trim($_POST['alternate_mobile'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $companyName = trim($_POST['company_name'] ?? '');
+    $location = trim($_POST['location'] ?? '');
     $city = trim($_POST['city'] ?? '');
     $state = trim($_POST['state'] ?? '');
+    $industry = trim($_POST['industry'] ?? '');
     $leadSourceId = !empty($_POST['lead_source_id']) ? (int)$_POST['lead_source_id'] : null;
     $serviceId = !empty($_POST['service_id']) ? (int)$_POST['service_id'] : null;
+    $leadType = $_POST['lead_type'] ?? 'Outbound';
     $assignedManagerId = !empty($_POST['assigned_manager_id']) ? (int)$_POST['assigned_manager_id'] : null;
     $assignedExecutiveId = !empty($_POST['assigned_executive_id']) ? (int)$_POST['assigned_executive_id'] : null;
     $priority = $_POST['priority'] ?? 'Medium';
@@ -208,26 +213,27 @@ if ($action === 'create') {
     $leadCode = 'LEAD-' . $nextId;
 
     // Default status: Pending (ID 2) or Assigned if executive selected
-    $statusId = 2; // Pending
-    if ($assignedExecutiveId) {
-        $statusId = 3; // Assigned
-    }
+    $statusId = $assignedExecutiveId ? 3 : 2;
 
     $stmt = $pdo->prepare("
-        INSERT INTO leads (lead_code, name, mobile, email, company_name, city, state, lead_source_id, service_id, assigned_manager_id, assigned_executive_id, priority, status_id, initial_remark, created_by)
-        VALUES (:code, :name, :mobile, :email, :company, :city, :state, :source, :service, :mgr, :exec, :priority, :status, :remark, :cby)
+        INSERT INTO leads (lead_code, name, mobile, alternate_mobile, email, company_name, location, city, state, industry, lead_source_id, service_id, lead_type, assigned_manager_id, assigned_executive_id, priority, status_id, initial_remark, created_by)
+        VALUES (:code, :name, :mobile, :alt_mob, :email, :company, :loc, :city, :state, :ind, :source, :service, :ltype, :mgr, :exec, :priority, :status, :remark, :cby)
     ");
 
     $stmt->execute([
         'code'     => $leadCode,
         'name'     => $name,
         'mobile'   => $mobile,
+        'alt_mob'  => $alternateMobile,
         'email'    => $email,
         'company'  => $companyName,
+        'loc'      => $location,
         'city'     => $city,
         'state'    => $state,
+        'ind'      => $industry,
         'source'   => $leadSourceId,
         'service'  => $serviceId,
+        'ltype'    => $leadType,
         'mgr'      => $assignedManagerId,
         'exec'     => $assignedExecutiveId,
         'priority' => $priority,
@@ -362,5 +368,136 @@ if ($action === 'assign') {
     logActivity($pdo, 'leads', 'assigned', 0, null, ['count' => count($leadIds), 'executive_id' => $executiveId]);
 
     echo json_encode(['success' => true, 'message' => count($leadIds) . ' lead(s) assigned successfully!']);
+    exit;
+}
+
+// 6. AUTO ASSIGN (ROUND ROBIN)
+if ($action === 'auto_assign') {
+    if ($roleName === 'operation_executive') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $leadIds = $_POST['lead_ids'] ?? [];
+    if (!is_array($leadIds)) {
+        $leadIds = [$leadIds];
+    }
+
+    if (empty($leadIds)) {
+        echo json_encode(['success' => false, 'message' => 'Select leads to auto-assign.']);
+        exit;
+    }
+
+    // Get active Operation Executives
+    $execs = $pdo->query("SELECT id FROM users WHERE role_id = 3 AND status = 'active' ORDER BY id ASC")->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($execs)) {
+        echo json_encode(['success' => false, 'message' => 'No active Operation Executives available for auto-assignment.']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("UPDATE leads SET assigned_executive_id = :exec_id, status_id = 3 WHERE id = :id");
+    $histStmt = $pdo->prepare("INSERT INTO lead_assignments_history (lead_id, new_executive_id, assigned_by) VALUES (:lid, :exec_id, :by)");
+
+    $execCount = count($execs);
+    $assignedCount = 0;
+
+    foreach ($leadIds as $idx => $id) {
+        $assignedExec = $execs[$idx % $execCount];
+        $stmt->execute(['exec_id' => $assignedExec, 'id' => $id]);
+        $histStmt->execute(['lid' => $id, 'exec_id' => $assignedExec, 'by' => $userId]);
+        $assignedCount++;
+    }
+
+    logActivity($pdo, 'leads', 'auto_assigned', 0, null, ['count' => $assignedCount]);
+    echo json_encode(['success' => true, 'message' => "$assignedCount leads distributed equally via Round Robin!"]);
+    exit;
+}
+
+// 7. EDIT LEAD
+if ($action === 'edit') {
+    $id = (int)($_POST['id'] ?? 0);
+    if (!$id) {
+        echo json_encode(['success' => false, 'message' => 'Lead ID required']);
+        exit;
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    $mobile = trim($_POST['mobile'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $company = trim($_POST['company_name'] ?? '');
+    $city = trim($_POST['city'] ?? '');
+    $statusId = (int)($_POST['status_id'] ?? 1);
+    $priority = $_POST['priority'] ?? 'Medium';
+    $executiveId = !empty($_POST['assigned_executive_id']) ? (int)$_POST['assigned_executive_id'] : null;
+
+    $stmt = $pdo->prepare("
+        UPDATE leads SET name = :name, mobile = :mobile, email = :email, company_name = :company, city = :city, status_id = :st, priority = :priority, assigned_executive_id = :exec WHERE id = :id
+    ");
+    $stmt->execute([
+        'name'     => $name,
+        'mobile'   => $mobile,
+        'email'    => $email,
+        'company'  => $company,
+        'city'     => $city,
+        'st'       => $statusId,
+        'priority' => $priority,
+        'exec'     => $executiveId,
+        'id'       => $id
+    ]);
+
+    logActivity($pdo, 'leads', 'updated', $id);
+    echo json_encode(['success' => true, 'message' => 'Lead details updated successfully!']);
+    exit;
+}
+
+// 8. DELETE / ARCHIVE LEAD
+if ($action === 'delete') {
+    if ($roleName === 'operation_executive') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $id = (int)($_POST['id'] ?? 0);
+    if (!$id) {
+        echo json_encode(['success' => false, 'message' => 'Lead ID required']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("UPDATE leads SET is_archived = 1 WHERE id = :id");
+    $stmt->execute(['id' => $id]);
+
+    logActivity($pdo, 'leads', 'archived', $id);
+    echo json_encode(['success' => true, 'message' => 'Lead archived successfully!']);
+    exit;
+}
+
+// 9. EXPORT LEADS TO CSV
+if ($action === 'export') {
+    if ($roleName === 'operation_executive') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized to export data']);
+        exit;
+    }
+
+    $stmt = $pdo->query("
+        SELECT l.lead_code, l.name, l.mobile, l.email, l.company_name, l.city, ls.name as status, srv.name as service, u_exec.name as executive, l.created_at
+        FROM leads l
+        LEFT JOIN lead_statuses ls ON l.status_id = ls.id
+        LEFT JOIN services srv ON l.service_id = srv.id
+        LEFT JOIN users u_exec ON l.assigned_executive_id = u_exec.id
+        WHERE l.is_archived = 0
+        ORDER BY l.id DESC
+    ");
+    $rows = $stmt->fetchAll();
+
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="crm_leads_export_' . date('Y-m-d') . '.csv"');
+    
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['Lead Code', 'Name', 'Mobile', 'Email', 'Company', 'City', 'Status', 'Service', 'Executive', 'Created Date']);
+    foreach ($rows as $r) {
+        fputcsv($output, $r);
+    }
+    fclose($output);
     exit;
 }

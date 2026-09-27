@@ -1,5 +1,5 @@
 <?php
-// api/users.php - User & Team Management API (Admin & Manager Access)
+// api/users.php - User, Role & Team Management API (Super Admin Access)
 
 header('Content-Type: application/json');
 session_start();
@@ -83,5 +83,26 @@ if ($action === 'create') {
     } catch (PDOException $e) {
         echo json_encode(['success' => false, 'message' => 'Email or Mobile already registered.']);
     }
+    exit;
+}
+
+if ($action === 'update_status') {
+    if ($roleName !== 'super_admin') {
+        echo json_encode(['success' => false, 'message' => 'Only Super Admin can update user status.']);
+        exit;
+    }
+
+    $targetId = (int)($_POST['id'] ?? 0);
+    $status = $_POST['status'] ?? 'active';
+
+    if ($targetId === $userId) {
+        echo json_encode(['success' => false, 'message' => 'Cannot suspend your own logged-in admin account.']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("UPDATE users SET status = :st WHERE id = :id");
+    $stmt->execute(['st' => $status, 'id' => $targetId]);
+
+    echo json_encode(['success' => true, 'message' => 'User status updated to ' . $status]);
     exit;
 }

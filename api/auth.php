@@ -158,9 +158,11 @@ if ($action === 'check') {
 
     try {
         $stmt = $pdo->prepare("
-            SELECT u.id, u.name, u.email, u.mobile, u.role_id, u.team_id, r.name as role_name, r.display_name as role_display
+            SELECT u.id, u.name, u.email, u.mobile, u.role_id, u.team_id, r.name as role_name, r.display_name as role_display,
+                   COALESCE(t.team_name, 'Sales Team') as team_name
             FROM users u
             JOIN roles r ON u.role_id = r.id
+            LEFT JOIN teams t ON u.team_id = t.id
             WHERE u.id = :id AND u.status = 'active'
         ");
         $stmt->execute(['id' => $_SESSION['user_id']]);
@@ -179,3 +181,84 @@ if ($action === 'check') {
         jsonResponse(false, 'Database tables missing. Please run installer at /install.', ['need_install' => true], 200);
     }
 }
+
+if ($action === 'update_profile') {
+    if (empty($_SESSION['user_id'])) {
+        jsonResponse(false, 'Unauthenticated', [], 401);
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $mobile = trim($_POST['mobile'] ?? '');
+
+    if (empty($name) || empty($email)) {
+        jsonResponse(false, 'Name and email are required.', [], 400);
+    }
+
+    try {
+        // Check if email taken by another user
+        $checkStmt = $pdo->prepare("SELECT id FROM users WHERE email = :email AND id != :id");
+        $checkStmt->execute(['email' => $email, 'id' => $_SESSION['user_id']]);
+        if ($checkStmt->fetch()) {
+            jsonResponse(false, 'This email address is already in use.', [], 400);
+        }
+
+        $stmt = $pdo->prepare("UPDATE users SET name = :name, email = :email, mobile = :mobile WHERE id = :id");
+        $stmt->execute([
+            'name' => $name,
+            'email' => $email,
+            'mobile' => $mobile,
+            'id' => $_SESSION['user_id']
+        ]);
+
+        $_SESSION['name'] = $name;
+        $_SESSION['email'] = $email;
+
+        jsonResponse(true, 'Profile updated successfully!', [
+            'user' => [
+                'id' => $_SESSION['user_id'],
+                'name' => $name,
+                'email' => $email,
+                'mobile' => $mobile,
+            ]
+        ]);
+    } catch (PDOException $e) {
+        jsonResponse(false, 'Failed to update profile: ' . $e->getMessage(), [], 500);
+    }
+}
+
+if ($action === 'change_password') {
+    if (empty($_SESSION['user_id'])) {
+        jsonResponse(false, 'Unauthenticated', [], 401);
+    }
+
+    $currentPassword = $_POST['current_password'] ?? '';
+    $newPassword = $_POST['new_password'] ?? '';
+
+    if (empty($currentPassword) || empty($newPassword)) {
+        jsonResponse(false, 'Current password and new password are required.', [], 400);
+    }
+
+    if (strlen($newPassword) < 6) {
+        jsonResponse(false, 'New password must be at least 6 characters.', [], 400);
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT password_hash FROM users WHERE id = :id");
+        $stmt->execute(['id' => $_SESSION['user_id']]);
+        $user = $stmt->fetch();
+
+        if (!$user || !password_verify($currentPassword, $user['password_hash'])) {
+            jsonResponse(false, 'Current password is incorrect.', [], 400);
+        }
+
+        $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $upStmt = $pdo->prepare("UPDATE users SET password_hash = :hash WHERE id = :id");
+        $upStmt->execute(['hash' => $newHash, 'id' => $_SESSION['user_id']]);
+
+        jsonResponse(true, 'Password changed successfully!');
+    } catch (PDOException $e) {
+        jsonResponse(false, 'Failed to change password: ' . $e->getMessage(), [], 500);
+    }
+}
+

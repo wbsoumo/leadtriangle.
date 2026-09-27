@@ -176,6 +176,36 @@ class ApiService {
     return {};
   }
 
+  // Update Profile Info
+  Future<Map<String, dynamic>> updateProfile({required String name, required String email, required String mobile}) async {
+    try {
+      final headers = await _getHeaders();
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth.php?action=update_profile'),
+        headers: headers,
+        body: {'name': name, 'email': email, 'mobile': mobile},
+      );
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error while updating profile.'};
+    }
+  }
+
+  // Change Password
+  Future<Map<String, dynamic>> changePassword({required String currentPassword, required String newPassword}) async {
+    try {
+      final headers = await _getHeaders();
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth.php?action=change_password'),
+        headers: headers,
+        body: {'current_password': currentPassword, 'new_password': newPassword},
+      );
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error while changing password.'};
+    }
+  }
+
   // Logout
   Future<void> logout() async {
     try {

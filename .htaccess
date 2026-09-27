@@ -16,7 +16,8 @@
     # Handle Install page (/install -> /install.php)
     RewriteRule ^install$ install.php [QSA,L]
 
-    # Remove .php extension from any URL if directly accessed
+    # Remove .php extension ONLY for GET requests (Do NOT redirect POST requests)
+    RewriteCond %{REQUEST_METHOD} !POST
     RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /([^/]+/)*([^.]+)\.php\ HTTP/
     RewriteRule ^(([^/]+/)*[^.]+)\.php$ /$1 [R=301,L]
 

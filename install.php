@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <a href="index.php" class="btn login-btn">Proceed to Login & Application →</a>
     <?php else: ?>
-        <form method="POST" action="install.php" onsubmit="handleInstallSubmit(this)">
+        <form method="POST" action="" onsubmit="handleInstallSubmit(this)">
             <div class="form-group">
                 <label>MySQL Database Host</label>
                 <input type="text" name="db_host" value="localhost" required>

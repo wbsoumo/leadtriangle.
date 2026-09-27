@@ -11,7 +11,49 @@ const App = {
             await this.loadDropdowns();
             this.bindEvents();
             this.navigate(this.currentView);
+            this.startActiveCallPolling();
         }
+    },
+
+    startActiveCallPolling: function() {
+        this.checkActiveCall();
+        setInterval(() => this.checkActiveCall(), 5000);
+    },
+
+    checkActiveCall: async function() {
+        if (!this.currentUser) return;
+        try {
+            const res = await fetch('api/calls?action=get_active_call');
+            const data = await res.json();
+            const existingBanner = document.getElementById('active-call-banner');
+
+            if (data.success && data.active_call && data.data) {
+                const call = data.data;
+                if (!existingBanner) {
+                    const banner = document.createElement('div');
+                    banner.id = 'active-call-banner';
+                    banner.style.cssText = 'position: fixed; bottom: 24px; right: 24px; background: #ffffff; border: 2px solid #2563eb; border-radius: 16px; padding: 18px 22px; box-shadow: 0 10px 30px rgba(37,99,235,0.25); z-index: 9999; display: flex; align-items: center; gap: 16px; animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);';
+                    banner.innerHTML = `
+                        <div style="width: 44px; height: 44px; border-radius: 50%; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">📞</div>
+                        <div>
+                            <div style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px;">Active Mobile Call</div>
+                            <div style="font-size: 15px; font-weight: 800; color: #0f172a;" id="banner-lead-name">${call.lead_name}</div>
+                            <div style="font-size: 12px; color: #64748b;" id="banner-lead-phone">${call.phone} • Status: ${call.status}</div>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-left: 8px;">
+                            <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${call.lead_id}, '${call.lead_name}', '${call.phone}')">+ Log Outcome</button>
+                            <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${call.lead_id})">Lead Info</button>
+                        </div>
+                    `;
+                    document.body.appendChild(banner);
+                } else {
+                    document.getElementById('banner-lead-name').innerText = call.lead_name;
+                    document.getElementById('banner-lead-phone').innerText = `${call.phone} • Status: ${call.status}`;
+                }
+            } else if (existingBanner) {
+                existingBanner.remove();
+            }
+        } catch(e) {}
     },
 
     checkAuth: async function() {

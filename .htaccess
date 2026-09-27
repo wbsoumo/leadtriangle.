@@ -1,0 +1,34 @@
+# .htaccess - Clean URL Routing for cPanel Apache Web Server
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Prevent direct access to sensitive configuration directory
+    RewriteRule ^config/ - [F,L]
+    RewriteRule ^database/ - [F,L]
+
+    # Handle API Endpoints cleanly (e.g. /api/leads -> /api/leads.php)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^api/([a-zA-Z0-9_-]+)$ api/$1.php [QSA,L]
+
+    # Handle Install page (/install -> /install.php)
+    RewriteRule ^install$ install.php [QSA,L]
+
+    # Remove .php extension from any URL if directly accessed
+    RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /([^/]+/)*([^.]+)\.php\ HTTP/
+    RewriteRule ^(([^/]+/)*[^.]+)\.php$ /$1 [R=301,L]
+
+    # If requested file or directory does not exist, route to index.php for SPA HTML5 History API Routing
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# MIME Types & Compression
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>

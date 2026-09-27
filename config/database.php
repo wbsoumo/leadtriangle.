@@ -1,10 +1,10 @@
 <?php
-// config/database.php
+// config/database.php - Production cPanel MySQL Configuration
 
-define('DB_HOST', '127.0.0.1');
-define('DB_NAME', 'leadstriangle_crm');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'helnovexaa_leadtriangle');
+define('DB_USER', 'helnovexaa_leadtriangle');
+define('DB_PASS', 'Soumojit1234@');
 define('DB_CHARSET', 'utf8mb4');
 
 class Database {
@@ -22,11 +22,10 @@ class Database {
         try {
             $this->pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
         } catch (PDOException $e) {
-            // For production/cPanel safety, log error privately
             error_log("Database Connection Error: " . $e->getMessage());
             die(json_encode([
                 'success' => false,
-                'message' => 'Database connection failed. Please check config/database.php settings or run installer.'
+                'message' => 'Database connection failed. Please verify credentials in config/database.php or run /install.'
             ]));
         }
     }

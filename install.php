@@ -165,17 +165,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="form-group">
                 <label>Database Name (cPanel prefix_dbname)</label>
-                <input type="text" name="db_name" placeholder="e.g. leadstr_crm" required>
+                <input type="text" name="db_name" value="helnovexaa_leadtriangle" placeholder="e.g. helnovexaa_leadtriangle" required>
             </div>
 
             <div class="form-group">
                 <label>Database Username</label>
-                <input type="text" name="db_user" placeholder="e.g. leadstr_user" required>
+                <input type="text" name="db_user" value="helnovexaa_leadtriangle" placeholder="e.g. helnovexaa_leadtriangle" required>
             </div>
 
             <div class="form-group">
                 <label>Database Password</label>
-                <input type="password" name="db_pass" placeholder="Enter DB Password">
+                <input type="password" name="db_pass" value="Soumojit1234@" placeholder="Enter DB Password">
             </div>
 
             <button type="submit" class="btn">🚀 Run One-Click Database Setup</button>

@@ -3,6 +3,7 @@ import '../models/lead_model.dart';
 import '../services/api_service.dart';
 import '../services/telephony_service.dart';
 import 'lead_detail_screen.dart';
+import 'home_tab_screen.dart';
 import 'leads_list_screen.dart';
 import 'call_outcome_modal.dart';
 import 'followups_screen.dart';
@@ -19,7 +20,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _tabs = [
-    const HomeCallingTab(),
+    const HomeTabScreen(),
     const LeadsListScreen(),
     const FollowupsScreen(),
     const ProfileScreen(),

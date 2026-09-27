@@ -23,10 +23,7 @@ class Database {
             $this->pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
         } catch (PDOException $e) {
             error_log("Database Connection Error: " . $e->getMessage());
-            die(json_encode([
-                'success' => false,
-                'message' => 'Database connection failed. Please verify credentials in config/database.php or run /install.'
-            ]));
+            throw $e;
         }
     }
 

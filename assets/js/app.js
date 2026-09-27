@@ -18,11 +18,11 @@ const App = {
         try {
             const res = await fetch('api/auth?action=check');
             const data = await res.json();
-            if (data.success && data.data.is_logged_in) {
+            if (data.success && data.data && data.data.is_logged_in) {
                 this.currentUser = data.data.user;
                 this.renderUserUI();
             } else {
-                this.renderLogin();
+                this.renderLogin(data.message && data.data?.need_install ? data.message : null);
             }
         } catch (e) {
             this.renderLogin();
@@ -30,11 +30,13 @@ const App = {
     },
 
     loadDropdowns: async function() {
-        const res = await fetch('api/settings?action=get_dropdowns');
-        const data = await res.json();
-        if (data.success) {
-            this.dropdowns = data.data;
-        }
+        try {
+            const res = await fetch('api/settings?action=get_dropdowns');
+            const data = await res.json();
+            if (data.success) {
+                this.dropdowns = data.data;
+            }
+        } catch(e) {}
     },
 
     renderUserUI: function() {
@@ -59,10 +61,20 @@ const App = {
         }
     },
 
-    renderLogin: function() {
+    renderLogin: function(warningMsg = null) {
+        let warningBanner = '';
+        if (warningMsg) {
+            warningBanner = `
+                <div style="background: #fffbe8; border: 1px solid #ffe58f; padding: 12px 14px; border-radius: 8px; font-size: 12.5px; color: #b45309; margin-bottom: 20px; line-height: 1.4;">
+                    ⚠️ ${warningMsg}
+                    <div style="margin-top: 6px;"><a href="install.php" style="color: #4f46e5; font-weight: 700; text-decoration: underline;">👉 Click here to run One-Click Setup Installer</a></div>
+                </div>
+            `;
+        }
+
         document.getElementById('app').innerHTML = `
             <div style="width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 36px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.08);">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 36px; width: 100%; max-width: 440px; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.08);">
                     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
                         <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #4f46e5, #6366f1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #ffffff; box-shadow: 0 4px 12px rgba(79,70,229,0.25);">▲</div>
                         <div>
@@ -70,15 +82,18 @@ const App = {
                             <div style="font-size: 12px; color: #64748b;">Internal Operations Portal</div>
                         </div>
                     </div>
+
+                    ${warningBanner}
+
                     <div style="color: #475569; font-size: 13.5px; margin-bottom: 24px;">Sign in to your CRM telecalling account</div>
                     <form id="login-form" onsubmit="App.handleLogin(event)">
                         <div style="margin-bottom: 16px;">
                             <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Email Address</label>
-                            <input type="email" id="login-email" required placeholder="admin@leadstriangle.com" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13.5px; outline: none;">
+                            <input type="email" id="login-email" required value="admin@leadstriangle.com" placeholder="admin@leadstriangle.com" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13.5px; outline: none;">
                         </div>
                         <div style="margin-bottom: 24px;">
                             <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Password</label>
-                            <input type="password" id="login-pass" required placeholder="••••••••" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13.5px; outline: none;">
+                            <input type="password" id="login-pass" required value="Admin@123" placeholder="••••••••" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13.5px; outline: none;">
                         </div>
                         <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; justify-content: center; font-size: 14.5px;">Sign In to Dashboard →</button>
                     </form>

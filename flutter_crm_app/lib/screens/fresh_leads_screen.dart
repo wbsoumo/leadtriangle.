@@ -37,7 +37,7 @@ class _FreshLeadsScreenState extends State<FreshLeadsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Fresh / New Assigned Leads', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.extrabold)),
+        title: const Text('Fresh / New Assigned Leads', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
       ),
       body: RefreshIndicator(
         onRefresh: _loadFreshLeads,

@@ -17,7 +17,7 @@ const App = {
 
     startActiveCallPolling: function() {
         this.checkActiveCall();
-        setInterval(() => this.checkActiveCall(), 5000);
+        setInterval(() => this.checkActiveCall(), 4000);
     },
 
     checkActiveCall: async function() {
@@ -29,26 +29,32 @@ const App = {
 
             if (data.success && data.active_call && data.data) {
                 const call = data.data;
+
+                // Create or update floating banner
                 if (!existingBanner) {
                     const banner = document.createElement('div');
                     banner.id = 'active-call-banner';
-                    banner.style.cssText = 'position: fixed; bottom: 24px; right: 24px; background: #ffffff; border: 2px solid #2563eb; border-radius: 16px; padding: 18px 22px; box-shadow: 0 10px 30px rgba(37,99,235,0.25); z-index: 9999; display: flex; align-items: center; gap: 16px; animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);';
+                    banner.style.cssText = 'position: fixed; bottom: 24px; right: 24px; background: #ffffff; border: 2px solid #2563eb; border-radius: 16px; padding: 16px 20px; box-shadow: 0 10px 30px rgba(37,99,235,0.25); z-index: 9999; display: flex; align-items: center; gap: 14px; animation: slideUp 0.3s ease-out;';
                     banner.innerHTML = `
-                        <div style="width: 44px; height: 44px; border-radius: 50%; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">📞</div>
+                        <div style="width: 42px; height: 42px; border-radius: 50%; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; animation: pulse 1.5s infinite;">📞</div>
                         <div>
-                            <div style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px;">Active Mobile Call</div>
-                            <div style="font-size: 15px; font-weight: 800; color: #0f172a;" id="banner-lead-name">${call.lead_name}</div>
-                            <div style="font-size: 12px; color: #64748b;" id="banner-lead-phone">${call.phone} • Status: ${call.status}</div>
+                            <div style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px;">Live Phone Call Active</div>
+                            <div style="font-size: 14.5px; font-weight: 800; color: #0f172a;" id="banner-lead-name">${call.lead_name}</div>
+                            <div style="font-size: 12px; color: #64748b;" id="banner-lead-phone">${call.phone} • Status: <span style="font-weight:700; color:#2563eb;">${call.lead_status || 'In Progress'}</span></div>
                         </div>
                         <div style="display: flex; gap: 8px; margin-left: 8px;">
-                            <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${call.lead_id}, '${call.lead_name}', '${call.phone}')">+ Log Outcome</button>
-                            <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${call.lead_id})">Lead Info</button>
+                            <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${call.lead_id}, '${call.lead_name.replace(/'/g, "\\'")}', '${call.phone}', ${call.lead_status_id || 0})">✏️ Update Lead Status</button>
                         </div>
                     `;
                     document.body.appendChild(banner);
                 } else {
                     document.getElementById('banner-lead-name').innerText = call.lead_name;
-                    document.getElementById('banner-lead-phone').innerText = `${call.phone} • Status: ${call.status}`;
+                    document.getElementById('banner-lead-phone').innerHTML = `${call.phone} • Status: <span style="font-weight:700; color:#2563eb;">${call.lead_status || 'In Progress'}</span>`;
+                }
+
+                // Automatically trigger popup modal if not already open on dashboard screen
+                if (!document.getElementById('call-modal')) {
+                    this.openCallModal(call.lead_id, call.lead_name, call.phone, call.lead_status_id, call.statuses, call.outcomes);
                 }
             } else if (existingBanner) {
                 existingBanner.remove();
@@ -702,31 +708,59 @@ const App = {
     },
 
     // 4. CALL LOG MODAL
-    openCallModal: function(leadId, name, mobile) {
-        let outcomesHtml = this.dropdowns.outcomes ? this.dropdowns.outcomes.map(o => `<option value="${o.id}">${o.name}</option>`).join('') : '';
+    openCallModal: function(leadId, name, mobile, currentStatusId = null, customStatuses = null, customOutcomes = null) {
+        if (document.getElementById('call-modal')) return;
+
+        const statusesList = customStatuses || this.dropdowns.statuses || [];
+        const outcomesList = customOutcomes || this.dropdowns.outcomes || [];
+
+        let statusesHtml = statusesList.map(s => 
+            `<option value="${s.id}" ${currentStatusId && s.id == currentStatusId ? 'selected' : ''}>${s.name}</option>`
+        ).join('');
+
+        let outcomesHtml = outcomesList.map(o => 
+            `<option value="${o.id}">${o.name}</option>`
+        ).join('');
 
         const modalHtml = `
             <div class="modal-backdrop show" id="call-modal">
-                <div class="modal-box">
-                    <div class="modal-header">
-                        <div class="modal-title">📞 Log Call: ${name} (${mobile})</div>
-                        <button class="close-modal" onclick="App.closeModal('call-modal')">✕</button>
+                <div class="modal-box" style="border-top: 4px solid #2563eb; border-radius: 18px; max-width: 500px;">
+                    <div class="modal-header" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 14px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase;">📞 Active Call Status Manager</div>
+                            <div class="modal-title" style="font-size: 17px; font-weight: 800; color: #0f172a; margin-top:2px;">${name}</div>
+                            <div style="font-size: 12.5px; color: #64748b; font-weight: 500;">Phone: ${mobile}</div>
+                        </div>
+                        <button class="close-modal" onclick="App.closeModal('call-modal')" style="background: #f1f5f9; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">✕</button>
                     </div>
-                    <form onsubmit="App.submitCallLog(event, ${leadId})">
-                        <div style="margin-bottom: 14px;">
-                            <label style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">Call Outcome</label>
-                            <select id="modal-outcome" class="filter-select" style="width:100%;" required>
+                    <form onsubmit="App.submitCallLog(event, ${leadId})" style="margin-top: 16px;">
+                        
+                        <!-- Lead Status Selector -->
+                        <div style="margin-bottom: 16px; background: #eff6ff; padding: 14px; border-radius: 12px; border: 1px solid #bfdbfe;">
+                            <label style="display:block; font-size:12px; font-weight:800; color:#1e40af; margin-bottom:6px;">UPDATE LEAD STATUS</label>
+                            <select id="modal-lead-status" class="filter-select" style="width:100%; font-size:14px; font-weight:700; color:#1e3a8a; background:#ffffff; border:1px solid #93c5fd;">
+                                ${statusesHtml}
+                            </select>
+                        </div>
+
+                        <!-- Call Outcome Selector -->
+                        <div style="margin-bottom: 16px;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:6px;">CALL OUTCOME</label>
+                            <select id="modal-outcome" class="filter-select" style="width:100%; font-size:13.5px;" required>
                                 ${outcomesHtml}
                             </select>
                         </div>
-                        <div style="margin-bottom: 14px;">
-                            <label style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">Call Remarks & Notes</label>
-                            <textarea id="modal-remarks" required style="width:100%; height:80px; background:#ffffff; border:1px solid var(--card-border); border-radius:6px; color:var(--text-primary); padding:10px; font-size:13px; outline:none;" placeholder="Enter details discussed..."></textarea>
+
+                        <!-- Remarks Input -->
+                        <div style="margin-bottom: 16px;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:6px;">CALL REMARKS & NOTES</label>
+                            <textarea id="modal-remarks" required style="width:100%; height:80px; background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; color:#0f172a; padding:12px; font-size:13px; outline:none;" placeholder="Write brief notes on the client discussion..."></textarea>
                         </div>
 
-                        <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid var(--card-border); margin-bottom:18px;">
-                            <label style="font-size:13px; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
-                                <input type="checkbox" id="chk-followup" onchange="document.getElementById('followup-sec').style.display = this.checked ? 'block' : 'none'"> Schedule Follow-up Call
+                        <!-- Followup Checkbox -->
+                        <div style="background:#f8fafc; padding:14px; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:20px;">
+                            <label style="font-size:13px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="chk-followup" onchange="document.getElementById('followup-sec').style.display = this.checked ? 'block' : 'none'"> 📅 Schedule Next Follow-up Call
                             </label>
                             <div id="followup-sec" style="display:none; margin-top:12px;">
                                 <div style="display:flex; gap:10px;">
@@ -736,7 +770,7 @@ const App = {
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Save Call Log & Next Action</button>
+                        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:13px; font-size:14px; font-weight:800; border-radius:12px;">Save & Update Lead Status</button>
                     </form>
                 </div>
             </div>
@@ -746,6 +780,7 @@ const App = {
 
     submitCallLog: async function(e, leadId) {
         e.preventDefault();
+        const leadStatusId = document.getElementById('modal-lead-status')?.value || 0;
         const outcomeId = document.getElementById('modal-outcome').value;
         const remarks = document.getElementById('modal-remarks').value;
         const scheduleFollowup = document.getElementById('chk-followup').checked ? '1' : '0';
@@ -755,6 +790,7 @@ const App = {
         const formData = new FormData();
         formData.append('action', 'log');
         formData.append('lead_id', leadId);
+        formData.append('lead_status_id', leadStatusId);
         formData.append('call_outcome_id', outcomeId);
         formData.append('remarks', remarks);
         formData.append('schedule_followup', scheduleFollowup);
@@ -765,6 +801,8 @@ const App = {
         const data = await res.json();
         if (data.success) {
             this.closeModal('call-modal');
+            const banner = document.getElementById('active-call-banner');
+            if (banner) banner.remove();
             this.navigate(this.currentView);
         }
     },

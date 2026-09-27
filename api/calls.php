@@ -107,7 +107,7 @@ if ($action === 'end_call') {
 // 3. GET ACTIVE CALL (Web CRM Polling & Mobile check)
 if ($action === 'get_active_call') {
     $stmt = $pdo->prepare("
-        SELECT ac.*, l.name as lead_name, l.company_name, l.mobile as lead_phone, ls.name as status_name
+        SELECT ac.*, l.name as lead_name, l.company_name, l.mobile as lead_phone, l.status_id as lead_status_id, ls.name as status_name
         FROM active_calls ac
         JOIN leads l ON ac.lead_id = l.id
         LEFT JOIN lead_statuses ls ON l.status_id = ls.id
@@ -120,6 +120,9 @@ if ($action === 'get_active_call') {
     $activeCall = $stmt->fetch();
 
     if ($activeCall) {
+        $statuses = $pdo->query("SELECT id, name FROM lead_statuses ORDER BY display_order ASC")->fetchAll();
+        $outcomes = $pdo->query("SELECT id, name FROM call_outcomes ORDER BY id ASC")->fetchAll();
+
         echo json_encode([
             'success' => true,
             'active_call' => true,
@@ -131,7 +134,10 @@ if ($action === 'get_active_call') {
                 'phone' => $activeCall['lead_phone'],
                 'status' => $activeCall['status'],
                 'started_at' => $activeCall['started_at'],
-                'lead_status' => $activeCall['status_name']
+                'lead_status_id' => (int)$activeCall['lead_status_id'],
+                'lead_status' => $activeCall['status_name'],
+                'statuses' => $statuses,
+                'outcomes' => $outcomes
             ]
         ]);
     } else {
@@ -187,14 +193,17 @@ if ($action === 'log') {
     $pdo->prepare("UPDATE active_calls SET status = 'ended', ended_at = NOW() WHERE user_id = :uid AND lead_id = :lid")
         ->execute(['uid' => $userId, 'lid' => $leadId]);
 
-    // Update Lead last_contacted_at & Status based on outcome
-    $leadStatusUpdate = 5; // Contacted by default
-    if (in_array($callOutcomeId, [3, 9])) { // Qualified or Meeting Scheduled
-        $leadStatusUpdate = 7;
-    } elseif ($callOutcomeId == 10) { // Converted
-        $leadStatusUpdate = 11;
-    } elseif ($callOutcomeId == 11) { // Lost
-        $leadStatusUpdate = 12;
+    // Update Lead last_contacted_at & Status based on outcome or explicit selection
+    $explicitStatusId = (int)($_POST['lead_status_id'] ?? 0);
+    $leadStatusUpdate = $explicitStatusId > 0 ? $explicitStatusId : 5; // Contacted by default
+    if (!$explicitStatusId) {
+        if (in_array($callOutcomeId, [3, 9])) { // Qualified or Meeting Scheduled
+            $leadStatusUpdate = 7;
+        } elseif ($callOutcomeId == 10) { // Converted
+            $leadStatusUpdate = 11;
+        } elseif ($callOutcomeId == 11) { // Lost
+            $leadStatusUpdate = 12;
+        }
     }
 
     $leadUpdate = $pdo->prepare("UPDATE leads SET status_id = :st, last_contacted_at = NOW() WHERE id = :lid");
@@ -272,5 +281,63 @@ if ($action === 'list') {
     $calls = $stmt->fetchAll();
 
     echo json_encode(['success' => true, 'data' => $calls]);
+    exit;
+}
+
+// 6. LOG BACKGROUND MATCHED CALL (Mobile Broadcast / Native Dialer Sync)
+if ($action === 'log_background_call') {
+    $phone = trim($_POST['phone'] ?? $_GET['phone'] ?? '');
+    $duration = (int)($_POST['duration_seconds'] ?? $_GET['duration_seconds'] ?? 0);
+    $callType = $_POST['call_type'] ?? 'outgoing';
+
+    if (empty($phone)) {
+        echo json_encode(['success' => false, 'message' => 'Phone number required']);
+        exit;
+    }
+
+    $cleanPhone = preg_replace('/[^\d]/', '', $phone);
+    if (strlen($cleanPhone) < 10) {
+        echo json_encode(['success' => false, 'message' => 'Invalid phone length']);
+        exit;
+    }
+
+    $searchPattern = substr($cleanPhone, -10);
+
+    $stmt = $pdo->prepare("
+        SELECT id, name FROM leads 
+        WHERE RIGHT(REGEXP_REPLACE(mobile, '[^0-9]', ''), 10) = :phone
+        LIMIT 1
+    ");
+    $stmt->execute(['phone' => $searchPattern]);
+    $lead = $stmt->fetch();
+
+    if ($lead) {
+        $pdo->prepare("
+            INSERT INTO call_logs (lead_id, user_id, call_outcome_id, call_duration_seconds, remarks, called_at)
+            VALUES (:lid, :uid, 1, :dur, :rem, NOW())
+        ")->execute([
+            'lid' => $lead['id'],
+            'uid' => $userId,
+            'dur' => $duration,
+            'rem' => "Background Auto-Sync (" . ucfirst($callType) . " Call via Device Dialer)"
+        ]);
+
+        $pdo->prepare("UPDATE leads SET last_contacted_at = NOW() WHERE id = :lid")
+            ->execute(['lid' => $lead['id']]);
+
+        echo json_encode([
+            'success' => true,
+            'matched' => true,
+            'lead_id' => (int)$lead['id'],
+            'lead_name' => $lead['name'],
+            'message' => 'Call matched with Lead #' . $lead['id'] . ' (' . $lead['name'] . ') and logged in CRM.'
+        ]);
+    } else {
+        echo json_encode([
+            'success' => true,
+            'matched' => false,
+            'message' => 'Phone number not present in lead database.'
+        ]);
+    }
     exit;
 }

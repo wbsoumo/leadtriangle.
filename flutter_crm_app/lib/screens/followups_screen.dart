@@ -37,7 +37,7 @@ class _FollowupsScreenState extends State<FollowupsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Today\'s Follow-ups Queue', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.extrabold)),
+        title: const Text('Today\'s Follow-ups Queue', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
       ),
       body: RefreshIndicator(
         onRefresh: _loadFollowups,

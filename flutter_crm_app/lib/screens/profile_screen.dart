@@ -14,7 +14,7 @@ class ProfileScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Executive Profile & Settings', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.extrabold)),
+        title: const Text('Executive Profile & Settings', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),

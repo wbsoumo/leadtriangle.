@@ -149,7 +149,7 @@ class _HomeCallingTabState extends State<HomeCallingTab> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
-            Text('LeadTriangle Ops', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.extrabold, fontSize: 18)),
+            Text('LeadTriangle Ops', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 18)),
             Text('Today\'s Workload Queue', style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5, fontWeight: FontWeight.w500)),
           ],
         ),
@@ -246,7 +246,7 @@ class _HomeCallingTabState extends State<HomeCallingTab> {
                                       children: [
                                         Text(
                                           lead.leadCode,
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.extrabold, color: Color(0xFF2563EB)),
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF2563EB)),
                                         ),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

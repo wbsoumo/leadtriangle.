@@ -5,6 +5,7 @@ session_start();
 
 $message = '';
 $status = '';
+$verificationSummary = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $db_host = trim($_POST['db_host'] ?? 'localhost');
@@ -87,7 +88,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             file_put_contents(__DIR__ . '/config/database.php', $configContent);
 
-            $message = "Installation successful! Database tables & demo records have been populated.";
+            // Automated Post-Installation Verification Check
+            $tableCount = $pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$db_name'")->fetchColumn();
+            $userCount = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+            $leadCount = $pdo->query("SELECT COUNT(*) FROM leads")->fetchColumn();
+            $callCount = $pdo->query("SELECT COUNT(*) FROM call_logs")->fetchColumn();
+            $projectCount = $pdo->query("SELECT COUNT(*) FROM projects")->fetchColumn();
+
+            $verificationSummary = [
+                'tables'   => (int)$tableCount,
+                'users'    => (int)$userCount,
+                'leads'    => (int)$leadCount,
+                'calls'    => (int)$callCount,
+                'projects' => (int)$projectCount
+            ];
+
+            $message = "Database installation & seed verification completed successfully!";
             $status = "success";
 
         } catch (Exception $e) {
@@ -118,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
         body { background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 500px; padding: 36px; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08); }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 520px; padding: 36px; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08); }
         .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
         .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #4f46e5, #6366f1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #ffffff; box-shadow: 0 4px 12px rgba(79,70,229,0.25); }
         .logo-text { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.4px; }
@@ -129,17 +145,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
         .btn { width: 100%; padding: 13px; background: var(--primary); color: #ffffff; border: none; border-radius: 8px; font-size: 14.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
-        .btn:active { transform: scale(0.98); }
+        .btn:active { transform: scale(0.97); }
         .btn:disabled { opacity: 0.7; cursor: not-allowed; }
         .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .alert { padding: 14px; border-radius: 8px; margin-bottom: 20px; font-size: 13.5px; line-height: 1.4; }
         .alert-success { background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; }
         .alert-danger { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
-        .credentials-box { background: #f8fafc; padding: 18px; border-radius: 10px; border: 1px solid var(--border); margin-top: 20px; }
+        .credentials-box { background: #f8fafc; padding: 18px; border-radius: 10px; border: 1px solid var(--border); margin-top: 16px; }
         .credentials-title { font-size: 12px; font-weight: 700; color: #047857; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
         .cred-item { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
         .cred-item span { color: var(--text); font-weight: 600; font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; }
+        .verification-badge { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; margin-top: 14px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
         .login-btn { display: inline-flex; text-decoration: none; margin-top: 20px; }
     </style>
 </head>
@@ -160,11 +177,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php if ($status === 'success'): ?>
         <div class="credentials-box">
-            <div class="credentials-title">✅ Database Initialized & Seeded Successfully</div>
-            <div class="cred-item">Super Admin: <span>admin@leadstriangle.com</span></div>
-            <div class="cred-item">Manager: <span>amit.manager@leadstriangle.com</span></div>
-            <div class="cred-item">Executive: <span>rahul.op@leadstriangle.com</span></div>
-            <div class="cred-item">Password for All: <span>Admin@123</span></div>
+            <div class="credentials-title">✅ Database Initialized & Verified</div>
+            
+            <?php if ($verificationSummary): ?>
+                <div class="verification-badge">
+                    <span>📁 Tables: <?= $verificationSummary['tables'] ?></span>
+                    <span>👥 Users: <?= $verificationSummary['users'] ?></span>
+                    <span>📋 Leads: <?= $verificationSummary['leads'] ?></span>
+                    <span>📞 Calls: <?= $verificationSummary['calls'] ?></span>
+                </div>
+            <?php endif; ?>
+
+            <div style="margin-top:14px;">
+                <div class="cred-item">Super Admin: <span>admin@leadstriangle.com</span></div>
+                <div class="cred-item">Manager: <span>amit.manager@leadstriangle.com</span></div>
+                <div class="cred-item">Executive: <span>rahul.op@leadstriangle.com</span></div>
+                <div class="cred-item">Password for All: <span>Admin@123</span></div>
+            </div>
         </div>
         <a href="index.php" class="btn login-btn">Proceed to Login & Application →</a>
     <?php else: ?>

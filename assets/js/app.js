@@ -1972,15 +1972,18 @@ const App = {
                 leads: chunk
             };
 
+            let data;
             try {
                 const res = await fetch('api/leads.php?action=import_csv', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
                     body: JSON.stringify(payload)
                 });
                 
                 const responseText = await res.text();
-                let data;
                 try {
                     data = JSON.parse(responseText);
                 } catch (jsonErr) {
@@ -2006,6 +2009,9 @@ const App = {
             barEl.style.width = pct + '%';
             percentEl.innerText = pct + '%';
             countsEl.innerHTML = `<span>Processed: ${processedCount} / ${validLeads.length} leads</span><span>Imported: ${totalImported} | Duplicates: ${totalDuplicates}</span>`;
+            
+            // Short 50ms pause to ensure browser repaints progress bar smoothly
+            await new Promise(r => setTimeout(r, 50));
         }
 
         // Final Success Box

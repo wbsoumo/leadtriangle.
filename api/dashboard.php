@@ -217,6 +217,27 @@ try {
     }
 } catch (Exception $e) {}
 
+// 11. Real Recent Activities (Latest call logs, lead status updates & call outcomes)
+$recentActivities = [];
+try {
+    $actStmt = $pdo->prepare("
+        SELECT 
+            cl.id,
+            cl.called_at as activity_time,
+            'call' as type,
+            COALESCE(co.name, 'Call Outcome Logged') as title,
+            CONCAT(l.name, ' (', l.mobile, ') - ', COALESCE(NULLIF(cl.remarks, ''), 'No remarks')) as description,
+            TIMESTAMPDIFF(MINUTE, cl.called_at, NOW()) as mins_ago
+        FROM call_logs cl
+        JOIN leads l ON cl.lead_id = l.id
+        LEFT JOIN call_outcomes co ON cl.call_outcome_id = co.id
+        ORDER BY cl.called_at DESC
+        LIMIT 6
+    ");
+    $actStmt->execute();
+    $recentActivities = $actStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
+
 // Conversion Rates
 $contactRate = $totalLeads > 0 ? round(($leadStats['contacted'] / $totalLeads) * 100, 1) : 0;
 $qualificationRate = $totalLeads > 0 ? round(($leadStats['qualified'] / $totalLeads) * 100, 1) : 0;
@@ -261,6 +282,7 @@ echo json_encode([
             'qualification_rate' => $qualificationRate,
             'conversion_rate' => $conversionRate
         ],
-        'employee_performance' => $employeePerformance
+        'employee_performance' => $employeePerformance,
+        'recent_activities' => $recentActivities
     ]
 ]);

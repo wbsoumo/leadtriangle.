@@ -364,8 +364,8 @@ const App = {
                     </div>
                     <div>
                         <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Total Sales / Revenue</div>
-                        <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">₹${d.total_project_value ? d.total_project_value.toLocaleString() : '2,45,670'}</div>
-                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+12% from last month →</div>
+                        <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">₹${parseFloat(d.total_project_value || 0).toLocaleString('en-IN')}</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">${d.completed_projects || 0} completed projects →</div>
                     </div>
                 </div>
 
@@ -432,55 +432,22 @@ const App = {
                     <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 24px; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
                             <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Recent Activity</div>
-                            <a onclick="App.navigate('leads')" style="color: #2563eb; font-size: 13.5px; font-weight: 700; text-decoration: none; cursor: pointer;">View all</a>
+                            <a onclick="App.navigate('calling_queue')" style="color: #2563eb; font-size: 13.5px; font-weight: 700; text-decoration: none; cursor: pointer;">View log</a>
                         </div>
 
-                        <div style="display: flex; flex-direction: column; gap: 18px;">
-                            
-                            <div onclick="App.navigate('projects')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                                <div style="width: 40px; height: 40px; border-radius: 12px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
-                                    $
+                        <div style="display: flex; flex-direction: column; gap: 14px;">
+                            ${d.recent_activities && d.recent_activities.length > 0 ? d.recent_activities.map(act => `
+                                <div onclick="App.navigate('calling_queue')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 8px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
+                                    <div style="width: 40px; height: 40px; border-radius: 12px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
+                                        📞
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${act.title}</div>
+                                        <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">${act.description}</div>
+                                    </div>
+                                    <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">${act.mins_ago < 60 ? (act.mins_ago <= 1 ? 'Just now' : act.mins_ago + ' min ago') : Math.floor(act.mins_ago / 60) + ' hrs ago'}</div>
                                 </div>
-                                <div style="flex: 1;">
-                                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">New deal closed & project converted</div>
-                                    <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">Lead #L-1094 converted to Project Workspace</div>
-                                </div>
-                                <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">2 min ago</div>
-                            </div>
-
-                            <div onclick="App.navigate('leads')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                                <div style="width: 40px; height: 40px; border-radius: 12px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                </div>
-                                <div style="flex: 1;">
-                                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">New prospect assigned</div>
-                                    <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">Rahul Sharma (+91 98765 43210) auto-assigned</div>
-                                </div>
-                                <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">5 min ago</div>
-                            </div>
-
-                            <div onclick="App.navigate('calling_queue')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                                <div style="width: 40px; height: 40px; border-radius: 12px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                                </div>
-                                <div style="flex: 1;">
-                                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">Call outcome logged</div>
-                                    <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">Interested in Enterprise BPO Package</div>
-                                </div>
-                                <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">10 min ago</div>
-                            </div>
-
-                            <div onclick="App.navigate('followups')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                                <div style="width: 40px; height: 40px; border-radius: 12px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                                </div>
-                                <div style="flex: 1;">
-                                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">Follow-up reminder set</div>
-                                    <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">Scheduled product demo call for tomorrow</div>
-                                </div>
-                                <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">1 hour ago</div>
-                            </div>
-
+                            `).join('') : '<div style="color:#64748b; font-size:13px; text-align:center; padding:16px;">No recent call activity logged today yet.</div>'}
                         </div>
                     </div>
 
@@ -1206,7 +1173,7 @@ const App = {
 
     // 5. FOLLOWUPS MODULE
     renderFollowups: async function() {
-        const res = await fetch('api/followups?action=list&filter=today');
+        const res = await fetch('api/followups?action=list&filter=all');
         const data = await res.json();
         if (!data.success) return;
 
@@ -1263,7 +1230,7 @@ const App = {
 
     // 6. MEETINGS MODULE
     renderMeetings: async function() {
-        const res = await fetch('api/meetings?action=list&filter=today');
+        const res = await fetch('api/meetings?action=list&filter=all');
         const data = await res.json();
         if (!data.success) return;
 

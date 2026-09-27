@@ -58,21 +58,11 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 40),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Center(
-                  child: Text(
-                    '▲',
-                    style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w800),
-                  ),
-                ),
+              Image.asset(
+                'assets/images/logo.png',
+                width: 72,
+                height: 72,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 20),
               const Text(

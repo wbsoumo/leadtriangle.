@@ -630,9 +630,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top Header Row
+                    // Top Header Row: Icon, Avatar, Lead Name & Company, Chevron Arrow
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Icon Circle
                         Container(
@@ -645,48 +645,63 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
                         // Initials Avatar
                         CircleAvatar(
-                          radius: 16,
+                          radius: 14,
                           backgroundColor: iconBg.withOpacity(0.8),
-                          child: Text(_getInitials(name), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: iconColor)),
+                          child: Text(_getInitials(name), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: iconColor)),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
 
-                        // Lead Info
+                        // Lead Name & Company (Fully Expanded without being squished)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(name, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                              const SizedBox(height: 1),
-                              Text(company, style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                              Text(
+                                name,
+                                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (company.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  company,
+                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ],
                           ),
                         ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 20),
+                      ],
+                    ),
 
-                        // Outcome Badge Tag
+                    // Badges Row: Outcome Status Badge + Priority Tag Pill
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        // Outcome Status Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                           decoration: BoxDecoration(
                             color: outcomeBg,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             outcome,
-                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: outcomeColor),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: outcomeColor),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 18),
-                      ],
-                    ),
 
-                    // Priority Tag Pill
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      children: [
+                        // Priority Tag
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: priority.toLowerCase().contains('high')
                                 ? const Color(0xFFDBEAFE)
@@ -696,7 +711,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           child: Text(
                             '$priority Priority',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 10.5,
                               fontWeight: FontWeight.w700,
                               color: priority.toLowerCase().contains('high')
                                   ? const Color(0xFF1D4ED8)

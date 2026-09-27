@@ -136,7 +136,7 @@ const App = {
             <div style="width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
                 <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 36px; width: 100%; max-width: 440px; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.08);">
                     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-                        <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #4f46e5, #6366f1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #ffffff; box-shadow: 0 4px 12px rgba(79,70,229,0.25);">▲</div>
+                        <img src="assets/images/logo.png" alt="LeadTriangle Logo" style="width: 44px; height: 44px; object-fit: contain; border-radius: 10px;">
                         <div>
                             <div style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.4px;">Leadstriangle CRM</div>
                             <div style="font-size: 12px; color: #64748b;">Internal Operations Portal</div>

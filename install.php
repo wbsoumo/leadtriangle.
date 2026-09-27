@@ -119,6 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leadstriangle CRM - One-Click Installer</title>
+    <link rel="icon" type="image/png" href="assets/images/logo.png">
+    <link rel="shortcut icon" type="image/png" href="assets/images/logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -164,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="card">
     <div class="logo">
-        <div class="logo-icon">▲</div>
+        <img src="assets/images/logo.png" alt="LeadTriangle Logo" style="width: 44px; height: 44px; object-fit: contain; border-radius: 10px;">
         <div class="logo-text">Leadstriangle CRM</div>
     </div>
     <div class="subtitle">One-Click cPanel Database Installer & Initializer</div>

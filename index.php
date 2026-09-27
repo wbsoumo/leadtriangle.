@@ -8,6 +8,8 @@ session_start();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leadstriangle CRM & BPO Calling Operations</title>
+    <link rel="icon" type="image/png" href="assets/images/logo.png">
+    <link rel="shortcut icon" type="image/png" href="assets/images/logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/main.css">
 </head>
@@ -18,7 +20,7 @@ session_start();
     <aside class="sidebar" id="main-sidebar">
         <div class="sidebar-header">
             <div class="brand-wrapper">
-                <div class="brand-logo">▲</div>
+                <img src="assets/images/logo.png" alt="LeadTriangle Logo" style="width: 32px; height: 32px; object-fit: contain; border-radius: 6px;">
                 <div class="brand-title">Leadstriangle</div>
             </div>
             <button class="collapse-toggle" onclick="App.toggleSidebar()" title="Toggle Sidebar">

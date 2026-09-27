@@ -1624,19 +1624,23 @@ const App = {
     parsedCsvLeads: [],
 
     renderImport: async function() {
-        // Fetch users to populate assignment dropdowns
-        let managers = [];
-        let executives = [];
+        // Fetch all system users for assignment dropdowns
+        let allUsers = [];
         try {
             const res = await fetch('api/users?action=list');
             const data = await res.json();
             if (data.success && data.data) {
-                managers = data.data.filter(u => u.role_name === 'sales_manager' || u.role_name === 'super_admin' || u.role_name === 'admin');
-                executives = data.data.filter(u => u.role_name === 'telecalling_executive' || u.role_name === 'sales_manager' || u.role_name === 'super_admin');
+                allUsers = data.data;
             }
         } catch(err) {
             console.error(err);
         }
+
+        const icons = {
+            download: `<svg style="width:16px;height:16px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+            file: `<svg style="width:18px;height:18px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+            analytics: `<svg style="width:16px;height:16px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`
+        };
 
         let html = `
             <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
@@ -1646,21 +1650,22 @@ const App = {
                 </div>
                 <div class="header-actions">
                     <a href="api/leads?action=sample_csv" class="btn btn-secondary" style="background:#ffffff; border:1px solid #cbd5e1; font-weight:700; color:#0f172a; text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
-                        📥 Download Sample CSV Template
+                        ${icons.download} Download Sample CSV Template
                     </a>
                 </div>
             </div>
 
             <!-- STEP 1: UPLOAD & ANALYZE CARD -->
             <div class="card" style="background:var(--card-bg); border:1px solid var(--card-border); padding:24px; border-radius:14px; margin-bottom:24px; box-shadow:var(--shadow-xs);">
-                <div style="font-size:15px; font-weight:800; color:#0f172a; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                    <span>1️⃣ Select CSV File to Analyze</span>
-                    <span style="font-size:12px; color:#64748b; font-weight:500;">(Required Columns: Full Name, Mobile Number, Email Address, Company Name, City, Priority, Service Requested, Lead Source, Initial Requirement)</span>
+                <div style="font-size:15px; font-weight:800; color:#0f172a; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+                    <span style="background:#eff6ff; color:#2563eb; font-size:12px; padding:4px 10px; border-radius:20px; font-weight:800; border:1px solid #bfdbfe;">STEP 1</span>
+                    <span style="font-weight:800; color:#0f172a;">Select CSV File to Analyze</span>
+                    <span style="font-size:12px; color:#64748b; font-weight:500;">(Columns: Full Name, Mobile Number, Email Address, Company Name, City, Priority, Service Requested, Lead Source, Initial Requirement)</span>
                 </div>
                 <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
                     <input type="file" id="csv-file-input" accept=".csv" onchange="App.handleCsvAnalysis(event)" style="flex:1; min-width:280px; padding:12px; background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; color:#0f172a; font-size:14px;">
-                    <button type="button" onclick="document.getElementById('csv-file-input').click()" class="btn btn-primary" style="font-weight:700; padding:12px 20px;">
-                        📊 Analyze & Preview File
+                    <button type="button" onclick="document.getElementById('csv-file-input').click()" class="btn btn-primary" style="font-weight:700; padding:12px 20px; display:inline-flex; align-items:center; gap:8px;">
+                        ${icons.analytics} Analyze & Preview File
                     </button>
                 </div>
             </div>
@@ -1668,19 +1673,19 @@ const App = {
             <!-- CONTAINER FOR PARSED CSV PREVIEW & ASSIGNMENT -->
             <div id="csv-preview-container">
                 <div style="text-align:center; padding:48px 20px; background:#f8fafc; border:2px dashed #cbd5e1; border-radius:14px; color:#64748b;">
-                    <div style="font-size:36px; margin-bottom:12px;">📄</div>
+                    <div style="width:48px; height:48px; margin:0 auto 12px auto; background:#eff6ff; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#2563eb;">
+                        ${icons.file}
+                    </div>
                     <div style="font-size:16px; font-weight:700; color:#334155;">No CSV File Analyzed Yet</div>
                     <div style="font-size:13px; color:#94a3b8; margin-top:4px;">Upload a CSV file above or download the sample template to inspect rows before importing.</div>
                 </div>
             </div>
         `;
         document.getElementById('content-viewport').innerHTML = html;
-        this.managersListCache = managers;
-        this.executivesListCache = executives;
+        this.allUsersListCache = allUsers;
     },
 
-    managersListCache: [],
-    executivesListCache: [],
+    allUsersListCache: [],
 
     handleCsvAnalysis: function(e) {
         const file = e.target.files[0];
@@ -1766,8 +1771,19 @@ const App = {
     },
 
     renderCsvPreviewTable: function(rows, headers, validCount, duplicateCount, invalidCount) {
-        const managersOptions = this.managersListCache.map(m => `<option value="${m.id}">${m.name} (${m.email})</option>`).join('');
-        const execOptions = this.executivesListCache.map(e => `<option value="${e.id}">${e.name} (${e.email})</option>`).join('');
+        // Show ALL system users in both manager and executive dropdowns
+        const userOptions = this.allUsersListCache.map(u => {
+            const roleLabel = u.display_name || u.role_name || 'Member';
+            return `<option value="${u.id}">${u.name} — ${roleLabel} (${u.email})</option>`;
+        }).join('');
+
+        const icons = {
+            check: `<svg style="width:16px;height:16px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2.5;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`,
+            user: `<svg style="width:15px;height:15px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+            phone: `<svg style="width:15px;height:15px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
+            flame: `<svg style="width:15px;height:15px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3.5z"/></svg>`,
+            send: `<svg style="width:16px;height:16px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`
+        };
 
         const previewHtml = `
             <!-- ANALYSIS SUMMARY BAR -->
@@ -1793,7 +1809,10 @@ const App = {
             <!-- 2. FULL PREVIEW TABLE -->
             <div class="table-card" style="margin-bottom:24px; border-radius:14px;">
                 <div style="padding:16px 20px; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="font-size:15px; font-weight:800; color:#0f172a;">📋 Step 2: Full Analyzed Data Table Preview</div>
+                    <div style="font-size:15px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                        <span style="background:#eff6ff; color:#2563eb; font-size:12px; padding:4px 10px; border-radius:20px; font-weight:800; border:1px solid #bfdbfe;">STEP 2</span>
+                        <span>Full Analyzed Data Table Preview</span>
+                    </div>
                     <span class="badge badge-blue">${rows.length} Rows</span>
                 </div>
                 <div class="table-responsive" style="max-height:420px; overflow-y:auto;">
@@ -1841,34 +1860,35 @@ const App = {
             </div>
 
             <!-- STEP 3: ASSIGNMENT & FINAL IMPORT CONTROL PANEL -->
-            <div class="card" style="background:#f8fafc; border:2px solid #3b82f6; border-radius:14px; padding:24px; box-shadow:0 10px 25px -5px rgba(59, 130, 246, 0.1);">
-                <div style="font-size:16px; font-weight:800; color:#1e3a8a; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
-                    <span>3️⃣ Assign Team Members & Trigger Final Import</span>
+            <div class="card" style="background:#ffffff; border:1px solid #cbd5e1; border-top:4px solid #2563eb; border-radius:14px; padding:24px; box-shadow:0 10px 25px -5px rgba(37, 99, 235, 0.1);">
+                <div style="font-size:16px; font-weight:800; color:#0f172a; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
+                    <span style="background:#eff6ff; color:#2563eb; font-size:12px; padding:4px 10px; border-radius:20px; font-weight:800; border:1px solid #bfdbfe;">STEP 3</span>
+                    <span>Assign Team Members & Trigger Final Import</span>
                 </div>
                 
                 <form onsubmit="App.submitParsedCsvImport(event)">
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:18px; margin-bottom:20px;">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px; margin-bottom:20px;">
                         <div>
-                            <label style="display:block; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
-                                👤 Assign Sales Manager
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
+                                ${icons.user} Assign Sales Manager / Owner
                             </label>
                             <select id="import-assign-manager" class="form-control" style="width:100%; padding:11px; border:1px solid #cbd5e1; border-radius:10px; font-size:13.5px; font-weight:600; background:#ffffff;">
                                 <option value="">Auto-Assign / No Manager Selected</option>
-                                ${managersOptions}
+                                ${userOptions}
                             </select>
                         </div>
                         <div>
-                            <label style="display:block; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
-                                📞 Assign Calling / Telecalling Executive
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
+                                ${icons.phone} Assign Telecalling / Executive Member
                             </label>
                             <select id="import-assign-executive" class="form-control" style="width:100%; padding:11px; border:1px solid #cbd5e1; border-radius:10px; font-size:13.5px; font-weight:600; background:#ffffff;">
                                 <option value="">Auto-Assign / Unassigned Queue</option>
-                                ${execOptions}
+                                ${userOptions}
                             </select>
                         </div>
                         <div>
-                            <label style="display:block; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
-                                🔥 Priority Batch Override
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
+                                ${icons.flame} Priority Batch Override
                             </label>
                             <select id="import-priority" class="form-control" style="width:100%; padding:11px; border:1px solid #cbd5e1; border-radius:10px; font-size:13.5px; font-weight:600; background:#ffffff;">
                                 <option value="Keep CSV Value">Keep CSV Row Priority</option>
@@ -1883,8 +1903,8 @@ const App = {
                         <div style="font-size:13px; color:#475569; font-weight:600;">
                             Target Leads: <strong style="color:#2563eb;">${validCount} Valid Leads</strong> will be created in Database
                         </div>
-                        <button type="submit" class="btn btn-primary" style="padding:13px 28px; font-size:15px; font-weight:800; border-radius:10px; box-shadow:0 4px 12px rgba(37,99,235,0.3);">
-                            🚀 Import & Assign ${validCount} Verified Leads Now →
+                        <button type="submit" class="btn btn-primary" style="padding:13px 28px; font-size:15px; font-weight:800; border-radius:10px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 12px rgba(37,99,235,0.3);">
+                            ${icons.send} Import & Assign ${validCount} Verified Leads Now
                         </button>
                     </div>
                 </form>
@@ -1908,7 +1928,7 @@ const App = {
         const priorityOverride = document.getElementById('import-priority').value;
 
         const outputDiv = document.getElementById('import-execution-output');
-        outputDiv.innerHTML = '<div style="color:#2563eb; font-weight:700;">🔄 Processing lead batch insertion & system assignment...</div>';
+        outputDiv.innerHTML = '<div style="color:#2563eb; font-weight:700;">Processing lead batch insertion & system assignment...</div>';
 
         const payload = {
             action: 'import_csv',
@@ -1929,7 +1949,7 @@ const App = {
                 const s = data.summary;
                 outputDiv.innerHTML = `
                     <div style="background:#f0fdf4; border:1px solid #86efac; padding:18px; border-radius:12px; color:#166534; margin-top:12px;">
-                        <div style="font-size:16px; font-weight:800; margin-bottom:6px;">🎉 Bulk Lead Import & Assignment Successful!</div>
+                        <div style="font-size:16px; font-weight:800; margin-bottom:6px;">Bulk Lead Import & Assignment Successful!</div>
                         <div style="font-size:13.5px; font-weight:600;">${data.message}</div>
                         <div style="margin-top:10px; font-size:13px; display:flex; gap:16px; flex-wrap:wrap;">
                             <span>Total Submitted: <strong>${s.total_submitted}</strong></span>
@@ -1939,10 +1959,10 @@ const App = {
                     </div>
                 `;
             } else {
-                outputDiv.innerHTML = `<div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:10px; color:#991b1b; margin-top:12px; font-weight:700;">❌ ${data.message}</div>`;
+                outputDiv.innerHTML = `<div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:10px; color:#991b1b; margin-top:12px; font-weight:700;">${data.message}</div>`;
             }
         } catch(err) {
-            outputDiv.innerHTML = `<div style="color:#dc2626; font-weight:700;">❌ Error communicating with server: ${err.message}</div>`;
+            outputDiv.innerHTML = `<div style="color:#dc2626; font-weight:700;">Error communicating with server: ${err.message}</div>`;
         }
     },
 

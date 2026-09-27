@@ -82,6 +82,7 @@ CREATE TABLE users (
     status ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
     profile_photo VARCHAR(255) DEFAULT NULL,
     joining_date DATE DEFAULT NULL,
+    allowed_pages TEXT DEFAULT NULL,
     last_login DATETIME DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

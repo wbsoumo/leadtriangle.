@@ -13,6 +13,10 @@ function jsonResponse($success, $message, $data = [], $code = 200) {
 try {
     require_once __DIR__ . '/../config/database.php';
     $pdo = Database::getInstance();
+    // Auto-migration: ensure allowed_pages column exists
+    try {
+        $pdo->exec("ALTER TABLE users ADD COLUMN allowed_pages TEXT NULL");
+    } catch (Exception $e) {}
 } catch (Exception $e) {
     jsonResponse(false, 'Database connection error: ' . $e->getMessage(), ['need_install' => true], 200);
 }
@@ -177,8 +181,21 @@ if ($action === 'check') {
         jsonResponse(true, 'Authenticated', ['user' => $user, 'is_logged_in' => true]);
 
     } catch (PDOException $e) {
-        session_destroy();
-        jsonResponse(false, 'Database tables missing. Please run installer at /install.', ['need_install' => true], 200);
+        // Check if users table actually exists
+        $tableCheck = false;
+        try {
+            $res = $pdo->query("SHOW TABLES LIKE 'users'");
+            if ($res && $res->rowCount() > 0) {
+                $tableCheck = true;
+            }
+        } catch (Exception $ex) {}
+
+        if (!$tableCheck) {
+            session_destroy();
+            jsonResponse(false, 'Database tables missing. Please run installer at /install.', ['need_install' => true], 200);
+        } else {
+            jsonResponse(false, 'Database query error: ' . $e->getMessage(), [], 500);
+        }
     }
 }
 

@@ -16,7 +16,17 @@ $pdo = Database::getInstance();
 $userId = $_SESSION['user_id'];
 $roleName = $_SESSION['role_name'];
 $teamId = $_SESSION['team_id'];
-$action = $_GET['action'] ?? $_POST['action'] ?? 'list';
+
+// Check raw JSON body if $_GET or $_POST action is empty
+$rawInputData = null;
+if (empty($_GET['action']) && empty($_POST['action'])) {
+    $bodyContent = file_get_contents('php://input');
+    if (!empty($bodyContent)) {
+        $rawInputData = json_decode($bodyContent, true);
+    }
+}
+
+$action = $_GET['action'] ?? $_POST['action'] ?? ($rawInputData['action'] ?? 'list');
 
 function logActivity($pdo, $module, $action, $recordId, $oldVal = null, $newVal = null) {
     try {
@@ -644,11 +654,7 @@ if ($action === 'import_csv') {
     // Clean any prior output buffer to ensure pure JSON
     if (ob_get_length()) ob_clean();
 
-    $rawInput = file_get_contents('php://input');
-    $inputData = json_decode($rawInput, true);
-    if (!$inputData) {
-        $inputData = $_POST;
-    }
+    $inputData = $rawInputData ?? json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
     $leads = $inputData['leads'] ?? [];
     if (is_string($leads)) {

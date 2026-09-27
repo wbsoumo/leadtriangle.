@@ -1928,52 +1928,106 @@ const App = {
         const priorityOverride = document.getElementById('import-priority').value;
 
         const outputDiv = document.getElementById('import-execution-output');
-        outputDiv.innerHTML = '<div style="color:#2563eb; font-weight:700;">Processing lead batch insertion & system assignment...</div>';
+        
+        // Render Progress Bar UI
+        outputDiv.innerHTML = `
+            <div style="background:#f8fafc; border:1px solid #cbd5e1; padding:20px; border-radius:12px; margin-top:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:14px; font-weight:800; color:#1e293b;" id="import-progress-status">🚀 Initializing Batch Import...</span>
+                    <span style="font-size:13px; font-weight:700; color:#2563eb;" id="import-progress-percent">0%</span>
+                </div>
+                <div style="width:100%; height:10px; background:#e2e8f0; border-radius:5px; overflow:hidden; margin-bottom:8px;">
+                    <div id="import-progress-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #2563eb, #3b82f6); transition:width 0.2s ease;"></div>
+                </div>
+                <div style="font-size:12px; color:#64748b; display:flex; justify-content:space-between;" id="import-progress-counts">
+                    <span>Processed: 0 / ${validLeads.length} leads</span>
+                    <span>Imported: 0 | Duplicates: 0</span>
+                </div>
+            </div>
+        `;
 
-        const payload = {
-            action: 'import_csv',
-            assigned_manager_id: managerId,
-            assigned_executive_id: executiveId,
-            priority_override: priorityOverride,
-            leads: validLeads
-        };
+        const statusEl = document.getElementById('import-progress-status');
+        const percentEl = document.getElementById('import-progress-percent');
+        const barEl = document.getElementById('import-progress-bar');
+        const countsEl = document.getElementById('import-progress-counts');
 
-        try {
-            const res = await fetch('api/leads.php?action=import_csv', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            
-            const responseText = await res.text();
-            let data;
+        // Chunk size of 20 leads per request for smooth execution and progress updates
+        const CHUNK_SIZE = 20;
+        let totalImported = 0;
+        let totalDuplicates = 0;
+        let processedCount = 0;
+
+        for (let i = 0; i < validLeads.length; i += CHUNK_SIZE) {
+            const chunk = validLeads.slice(i, i + CHUNK_SIZE);
+            const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
+            const totalChunks = Math.ceil(validLeads.length / CHUNK_SIZE);
+
+            statusEl.innerText = `🔄 Importing Batch ${chunkNumber} of ${totalChunks}...`;
+
+            const payload = {
+                action: 'import_csv',
+                assigned_manager_id: managerId,
+                assigned_executive_id: executiveId,
+                priority_override: priorityOverride,
+                leads: chunk
+            };
+
             try {
-                data = JSON.parse(responseText);
-            } catch (jsonErr) {
-                console.error('Non-JSON response from server:', responseText);
-                outputDiv.innerHTML = `<div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:10px; color:#991b1b; margin-top:12px; font-weight:700;">Server Error: ${responseText.substring(0, 300)}</div>`;
+                const res = await fetch('api/leads.php?action=import_csv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const responseText = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (jsonErr) {
+                    console.error('Non-JSON response from server:', responseText);
+                    outputDiv.innerHTML = `<div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:10px; color:#991b1b; margin-top:12px; font-weight:700;">Server Error on Batch ${chunkNumber}: ${responseText.substring(0, 300)}</div>`;
+                    return;
+                }
+
+                if (data.success && data.summary) {
+                    totalImported += data.summary.imported || 0;
+                    totalDuplicates += data.summary.duplicates_skipped || 0;
+                } else if (!data.success) {
+                    outputDiv.innerHTML = `<div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:10px; color:#991b1b; margin-top:12px; font-weight:700;">Error on Batch ${chunkNumber}: ${data.message}</div>`;
+                    return;
+                }
+            } catch(err) {
+                outputDiv.innerHTML = `<div style="color:#dc2626; font-weight:700; margin-top:12px;">Network Error on Batch ${chunkNumber}: ${err.message}</div>`;
                 return;
             }
 
-            if (data.success) {
-                const s = data.summary;
-                outputDiv.innerHTML = `
-                    <div style="background:#f0fdf4; border:1px solid #86efac; padding:18px; border-radius:12px; color:#166534; margin-top:12px;">
-                        <div style="font-size:16px; font-weight:800; margin-bottom:6px;">Bulk Lead Import & Assignment Successful!</div>
-                        <div style="font-size:13.5px; font-weight:600;">${data.message}</div>
-                        <div style="margin-top:10px; font-size:13px; display:flex; gap:16px; flex-wrap:wrap;">
-                            <span>Total Submitted: <strong>${s.total_submitted}</strong></span>
-                            <span>Successfully Imported: <strong style="color:#15803d;">${s.imported}</strong></span>
-                            <span>Database Duplicates Skipped: <strong style="color:#c2410c;">${s.duplicates_skipped}</strong></span>
-                        </div>
-                    </div>
-                `;
-            } else {
-                outputDiv.innerHTML = `<div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:10px; color:#991b1b; margin-top:12px; font-weight:700;">${data.message}</div>`;
-            }
-        } catch(err) {
-            outputDiv.innerHTML = `<div style="color:#dc2626; font-weight:700;">Error communicating with server: ${err.message}</div>`;
+            processedCount += chunk.length;
+            const pct = Math.min(100, Math.round((processedCount / validLeads.length) * 100));
+            barEl.style.width = pct + '%';
+            percentEl.innerText = pct + '%';
+            countsEl.innerHTML = `<span>Processed: ${processedCount} / ${validLeads.length} leads</span><span>Imported: ${totalImported} | Duplicates: ${totalDuplicates}</span>`;
         }
+
+        // Final Success Box
+        outputDiv.innerHTML = `
+            <div style="background:#f0fdf4; border:1px solid #86efac; padding:20px; border-radius:12px; color:#166534; margin-top:12px;">
+                <div style="font-size:16px; font-weight:800; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+                    <svg style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.5;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Bulk Lead Import & Team Assignment Complete!</span>
+                </div>
+                <div style="font-size:13.5px; font-weight:600; margin-bottom:12px;">All ${validLeads.length} leads processed successfully.</div>
+                
+                <div style="width:100%; height:8px; background:#bbf7d0; border-radius:4px; overflow:hidden; margin-bottom:14px;">
+                    <div style="width:100%; height:100%; background:#16a34a;"></div>
+                </div>
+
+                <div style="font-size:13px; display:flex; gap:20px; flex-wrap:wrap;">
+                    <span>Total Submitted: <strong>${validLeads.length}</strong></span>
+                    <span>Successfully Created: <strong style="color:#15803d;">${totalImported}</strong></span>
+                    <span>Database Duplicates Skipped: <strong style="color:#c2410c;">${totalDuplicates}</strong></span>
+                </div>
+            </div>
+        `;
     },
 
     showNotifications: function() {

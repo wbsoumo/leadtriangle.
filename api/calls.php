@@ -106,17 +106,27 @@ if ($action === 'end_call') {
 
 // 3. GET ACTIVE CALL (Web CRM Polling & Mobile check)
 if ($action === 'get_active_call') {
-    $stmt = $pdo->prepare("
+    $isManagement = in_array($roleName, ['super_admin', 'admin', 'manager']);
+    
+    $query = "
         SELECT ac.*, l.name as lead_name, l.company_name, l.mobile as lead_phone, l.status_id as lead_status_id, ls.name as status_name
         FROM active_calls ac
         JOIN leads l ON ac.lead_id = l.id
         LEFT JOIN lead_statuses ls ON l.status_id = ls.id
-        WHERE ac.user_id = :uid 
-          AND ac.status IN ('calling', 'connected')
-          AND ac.started_at >= NOW() - INTERVAL 10 MINUTE
-        ORDER BY ac.id DESC LIMIT 1
-    ");
-    $stmt->execute(['uid' => $userId]);
+        WHERE ac.status IN ('calling', 'connected')
+          AND ac.started_at >= NOW() - INTERVAL 15 MINUTE
+    ";
+    
+    $params = [];
+    if (!$isManagement) {
+        $query .= " AND ac.user_id = :uid";
+        $params['uid'] = $userId;
+    }
+    
+    $query .= " ORDER BY ac.id DESC LIMIT 1";
+
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
     $activeCall = $stmt->fetch();
 
     if ($activeCall) {

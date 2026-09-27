@@ -1,6 +1,9 @@
 <?php
 // config/database.php - Production cPanel MySQL Configuration
 
+// Set PHP default timezone to Indian Standard Time (IST - Asia/Kolkata)
+date_default_timezone_set('Asia/Kolkata');
+
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'helnovexaa_leadtriangle');
 define('DB_USER', 'helnovexaa_leadtriangle');
@@ -21,6 +24,8 @@ class Database {
 
         try {
             $this->pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+            // Synchronize MySQL session timezone to IST (+05:30)
+            $this->pdo->exec("SET time_zone = '+05:30'");
         } catch (PDOException $e) {
             error_log("Database Connection Error: " . $e->getMessage());
             throw $e;

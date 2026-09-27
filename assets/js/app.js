@@ -635,8 +635,8 @@ const App = {
                                     <td><span class="badge" style="background:${l.status_color}22; color:${l.status_color}; border:1px solid ${l.status_color}55;">${l.status_name}</span></td>
                                     <td><span class="badge badge-amber">${l.priority}</span></td>
                                     <td>
-                                        <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${l.id}, '${l.name}', '${l.mobile}')">Call Now</button>
-                                        <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">Timeline</button>
+                                        <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">Call Now</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">Details</button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -647,6 +647,220 @@ const App = {
         `;
 
         document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    viewLeadDetail: async function(leadId) {
+        const res = await fetch(`api/leads?action=detail&id=${leadId}`);
+        const data = await res.json();
+        if (!data.success || !data.data) {
+            alert('Failed to load lead details');
+            return;
+        }
+
+        const l = data.data.lead;
+        const calls = data.data.calls || [];
+        const followups = data.data.followups || [];
+        const notes = data.data.notes || [];
+        const documents = data.data.documents || [];
+
+        const html = `
+            <div class="page-header" style="margin-bottom: 16px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <button class="btn btn-secondary btn-sm" onclick="App.navigate('${this.currentView}')">← Back to List</button>
+                    <div>
+                        <div style="font-size:12px; font-weight:800; color:var(--primary);">${l.lead_code}</div>
+                        <div class="page-title" style="font-size:22px;">${l.name}</div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">📞 Call Now</button>
+                    <button class="btn btn-success" style="background:#16a34a; color:#fff;" onclick="window.open('https://wa.me/91${l.mobile.replace(/[^0-9]/g,'')}', '_blank')">💬 WhatsApp</button>
+                </div>
+            </div>
+
+            <!-- TAB HEADER BAR -->
+            <div style="background:#ffffff; border:1px solid var(--card-border); border-radius:14px; padding:6px; display:flex; gap:6px; margin-bottom:20px; overflow-x:auto;">
+                <button class="btn lead-tab-btn active" id="tab-btn-about" style="font-weight:700;" onclick="App.switchLeadTab('about')">About</button>
+                <button class="btn lead-tab-btn" id="tab-btn-activity" style="font-weight:700;" onclick="App.switchLeadTab('activity')">Activity History (${calls.length})</button>
+                <button class="btn lead-tab-btn" id="tab-btn-tasks" style="font-weight:700;" onclick="App.switchLeadTab('tasks')">Tasks (${followups.length})</button>
+                <button class="btn lead-tab-btn" id="tab-btn-notes" style="font-weight:700;" onclick="App.switchLeadTab('notes')">Notes (${notes.length})</button>
+                <button class="btn lead-tab-btn" id="tab-btn-documents" style="font-weight:700;" onclick="App.switchLeadTab('documents')">Documents (${documents.length})</button>
+            </div>
+
+            <!-- TAB CONTENTS -->
+            <!-- 1. ABOUT TAB -->
+            <div id="lead-tab-about" class="lead-tab-content">
+                <div style="background:#283593; color:#ffffff; padding:16px 20px; border-radius:14px; font-weight:800; font-size:15px; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
+                    <span>📍</span> STATUS: ${l.status_name ? l.status_name.toUpperCase() : 'NEW'}
+                </div>
+
+                <div class="kpi-grid" style="margin-bottom:20px;">
+                    <div class="kpi-card">
+                        <div class="kpi-header">Lead Score</div>
+                        <div class="kpi-val">85</div>
+                        <div class="kpi-sub">High Intent</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">Engagement Score</div>
+                        <div class="kpi-val">12</div>
+                        <div class="kpi-sub">Active Interactions</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">Lead Quality</div>
+                        <div class="kpi-val" style="color:var(--success-text);">Hot</div>
+                        <div class="kpi-sub">Verified Mobile</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">Created</div>
+                        <div class="kpi-val" style="font-size:18px;">${l.created_at ? l.created_at.substring(0,10) : 'Recent'}</div>
+                        <div class="kpi-sub">Lead Age</div>
+                    </div>
+                </div>
+
+                <div style="background:#ffffff; border:1px solid var(--card-border); border-radius:16px; padding:22px;">
+                    <h3 style="font-size:16px; font-weight:800; color:var(--text-primary); margin-bottom:16px;">Key Details</h3>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:18px;">
+                        <div>
+                            <div style="font-size:12px; color:var(--text-muted); font-weight:600;">Phone Number</div>
+                            <div style="font-size:15px; font-weight:700; color:var(--primary); margin-top:4px;">🇮🇳 +91-${l.mobile}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:12px; color:var(--text-muted); font-weight:600;">Email Address</div>
+                            <div style="font-size:15px; font-weight:700; color:${l.email ? 'var(--primary)' : 'var(--text-muted)'}; margin-top:4px;">${l.email || 'Not Provided'}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:12px; color:var(--text-muted); font-weight:600;">Service Requested</div>
+                            <div style="font-size:15px; font-weight:700; color:var(--text-primary); margin-top:4px;">${l.service_name || 'BPO Telecalling'}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:12px; color:var(--text-muted); font-weight:600;">Company / Location</div>
+                            <div style="font-size:15px; font-weight:700; color:var(--text-primary); margin-top:4px;">${l.company_name || l.city || 'Individual'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. ACTIVITY HISTORY TAB -->
+            <div id="lead-tab-activity" class="lead-tab-content" style="display:none;">
+                <div style="background:#ffffff; border:1px solid var(--card-border); border-radius:16px; padding:22px;">
+                    <h3 style="font-size:16px; font-weight:800; color:var(--text-primary); margin-bottom:16px;">Call History & Activity Timeline</h3>
+                    ${calls.length === 0 ? '<p style="color:var(--text-muted)">No prior call activities recorded.</p>' : `
+                        <div style="display:flex; flex-direction:column; gap:12px;">
+                            ${calls.map(c => `
+                                <div style="padding:14px; background:#f8fafc; border:1px solid var(--card-border); border-radius:12px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <div style="font-size:13.5px; font-weight:700; color:var(--text-primary);">📞 Call Logged by ${c.agent_name}</div>
+                                        <span class="badge" style="background:${c.outcome_color || '#2563eb'}22; color:${c.outcome_color || '#2563eb'};">${c.outcome_name}</span>
+                                    </div>
+                                    <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Date: ${c.called_at} • Duration: ${c.call_duration_seconds} sec</div>
+                                    ${c.remarks ? `<div style="font-size:13px; color:var(--text-secondary); margin-top:6px;">Remark: ${c.remarks}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+
+            <!-- 3. TASKS TAB -->
+            <div id="lead-tab-tasks" class="lead-tab-content" style="display:none;">
+                <div style="background:#ffffff; border:1px solid var(--card-border); border-radius:16px; padding:22px;">
+                    <h3 style="font-size:16px; font-weight:800; color:var(--text-primary); margin-bottom:16px;">Tasks & Scheduled Follow-ups</h3>
+                    ${followups.length === 0 ? '<p style="color:var(--text-muted)">No scheduled tasks found.</p>' : `
+                        <div style="display:flex; flex-direction:column; gap:12px;">
+                            ${followups.map(f => `
+                                <div style="padding:14px; background:#f8fafc; border:1px solid var(--card-border); border-radius:12px;">
+                                    <div style="font-size:14px; font-weight:700; color:var(--text-primary);">📅 ${f.purpose || 'Follow-up Call'}</div>
+                                    <div style="font-size:12.5px; color:var(--primary); font-weight:600; margin-top:2px;">Due: ${f.followup_date} at ${f.followup_time}</div>
+                                    <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Assigned to: ${f.agent_name} • Status: ${f.status}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+
+            <!-- 4. NOTES TAB -->
+            <div id="lead-tab-notes" class="lead-tab-content" style="display:none;">
+                <div style="background:#ffffff; border:1px solid var(--card-border); border-radius:16px; padding:22px;">
+                    <h3 style="font-size:16px; font-weight:800; color:var(--text-primary); margin-bottom:16px;">Internal Notes</h3>
+                    <form onsubmit="App.saveLeadNote(event, ${l.id})" style="margin-bottom:20px;">
+                        <textarea id="note-input-text" required style="width:100%; height:80px; padding:12px; border:1px solid var(--card-border); border-radius:10px; font-size:13px; outline:none;" placeholder="Write a note about this lead..."></textarea>
+                        <button type="submit" class="btn btn-primary" style="margin-top:8px;">Save Note</button>
+                    </form>
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                        ${notes.length === 0 ? '<p style="color:var(--text-muted)">No notes added yet.</p>' : notes.map(n => `
+                            <div style="padding:14px; background:#f8fafc; border:1px solid var(--card-border); border-radius:12px;">
+                                <div style="font-size:13.5px; color:var(--text-primary); font-weight:600;">${n.note_text}</div>
+                                <div style="font-size:11.5px; color:var(--text-muted); margin-top:6px;">By ${n.author_name} on ${n.created_at}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. DOCUMENTS TAB -->
+            <div id="lead-tab-documents" class="lead-tab-content" style="display:none;">
+                <div style="background:#ffffff; border:1px solid var(--card-border); border-radius:16px; padding:22px;">
+                    <h3 style="font-size:16px; font-weight:800; color:var(--text-primary); margin-bottom:16px;">Attached Documents & Files</h3>
+                    <form onsubmit="App.uploadLeadDocument(event, ${l.id})" style="margin-bottom:20px; display:flex; gap:10px; align-items:center;">
+                        <input type="file" id="doc-file-input" required style="font-size:13px;">
+                        <button type="submit" class="btn btn-primary">Upload Document</button>
+                    </form>
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                        ${documents.length === 0 ? '<p style="color:var(--text-muted)">No documents uploaded yet.</p>' : documents.map(d => `
+                            <div style="padding:14px; background:#f8fafc; border:1px solid var(--card-border); border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <div style="font-size:13.5px; font-weight:700; color:var(--primary);">📄 ${d.file_name}</div>
+                                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Uploaded by ${d.author_name} on ${d.uploaded_at}</div>
+                                </div>
+                                <a href="${d.file_path}" target="_blank" class="btn btn-secondary btn-sm">Download</a>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    switchLeadTab: function(tabName) {
+        document.querySelectorAll('.lead-tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.lead-tab-btn').forEach(el => el.classList.remove('active', 'btn-primary'));
+        
+        const targetTab = document.getElementById(`lead-tab-${tabName}`);
+        const targetBtn = document.getElementById(`tab-btn-${tabName}`);
+        if (targetTab) targetTab.style.display = 'block';
+        if (targetBtn) targetBtn.classList.add('active');
+    },
+
+    saveLeadNote: async function(e, leadId) {
+        e.preventDefault();
+        const text = document.getElementById('note-input-text').value;
+        const formData = new FormData();
+        formData.append('action', 'add_note');
+        formData.append('lead_id', leadId);
+        formData.append('note_text', text);
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message);
+        if (data.success) this.viewLeadDetail(leadId);
+    },
+
+    uploadLeadDocument: async function(e, leadId) {
+        e.preventDefault();
+        const fileInput = document.getElementById('doc-file-input');
+        if (!fileInput.files || fileInput.files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('action', 'upload_document');
+        formData.append('lead_id', leadId);
+        formData.append('document', fileInput.files[0]);
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message);
+        if (data.success) this.viewLeadDetail(leadId);
     },
 
     autoAssignSelectedLeads: async function() {
@@ -708,11 +922,25 @@ const App = {
     },
 
     // 4. CALL LOG MODAL
-    openCallModal: function(leadId, name, mobile, currentStatusId = null, customStatuses = null, customOutcomes = null) {
+    openCallModal: async function(leadId, name, mobile, currentStatusId = null, customStatuses = null, customOutcomes = null) {
         if (document.getElementById('call-modal')) return;
 
-        const statusesList = customStatuses || this.dropdowns.statuses || [];
-        const outcomesList = customOutcomes || this.dropdowns.outcomes || [];
+        // Register active call session immediately on backend
+        try {
+            const formData = new FormData();
+            formData.append('action', 'start_call');
+            formData.append('lead_id', leadId);
+            formData.append('phone', mobile);
+            fetch('api/calls', { method: 'POST', body: formData });
+        } catch(e) {}
+
+        // Ensure dropdown options are loaded
+        if (!this.dropdowns || !this.dropdowns.statuses || !this.dropdowns.outcomes) {
+            await this.loadDropdowns();
+        }
+
+        const statusesList = (customStatuses && customStatuses.length > 0) ? customStatuses : (this.dropdowns.statuses || []);
+        const outcomesList = (customOutcomes && customOutcomes.length > 0) ? customOutcomes : (this.dropdowns.outcomes || []);
 
         let statusesHtml = statusesList.map(s => 
             `<option value="${s.id}" ${currentStatusId && s.id == currentStatusId ? 'selected' : ''}>${s.name}</option>`

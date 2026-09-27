@@ -317,13 +317,42 @@ if ($action === 'detail') {
     $meetings = $mtStmt->fetchAll();
 
     // Opportunities & Projects
-    $oppStmt = $pdo->prepare("SELECT o.*, fs.name as stage_name FROM opportunities o JOIN funnel_stages fs ON o.stage_id = fs.id WHERE o.lead_id = :id");
-    $oppStmt->execute(['id' => $leadId]);
-    $opportunities = $oppStmt->fetchAll();
+    // Notes
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS lead_notes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                lead_id INT NOT NULL,
+                user_id INT NOT NULL,
+                note_text TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_note_lead (lead_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+    } catch (Exception $e) {}
 
-    $prjStmt = $pdo->prepare("SELECT p.*, ps.name as stage_name FROM projects p JOIN project_stages ps ON p.stage_id = ps.id WHERE p.lead_id = :id");
-    $prjStmt->execute(['id' => $leadId]);
-    $projects = $prjStmt->fetchAll();
+    // Documents
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS lead_documents (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                lead_id INT NOT NULL,
+                user_id INT NOT NULL,
+                file_name VARCHAR(255) NOT NULL,
+                file_path VARCHAR(255) NOT NULL,
+                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_doc_lead (lead_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+    } catch (Exception $e) {}
+
+    $notesStmt = $pdo->prepare("SELECT n.*, u.name as author_name FROM lead_notes n JOIN users u ON n.user_id = u.id WHERE n.lead_id = :id ORDER BY n.created_at DESC");
+    $notesStmt->execute(['id' => $leadId]);
+    $notes = $notesStmt->fetchAll();
+
+    $docsStmt = $pdo->prepare("SELECT d.*, u.name as author_name FROM lead_documents d JOIN users u ON d.user_id = u.id WHERE d.lead_id = :id ORDER BY d.uploaded_at DESC");
+    $docsStmt->execute(['id' => $leadId]);
+    $documents = $docsStmt->fetchAll();
 
     echo json_encode([
         'success' => true,
@@ -333,9 +362,61 @@ if ($action === 'detail') {
             'followups' => $followups,
             'meetings' => $meetings,
             'opportunities' => $opportunities,
-            'projects' => $projects
+            'projects' => $projects,
+            'notes' => $notes,
+            'documents' => $documents
         ]
     ]);
+    exit;
+}
+
+// 4b. ADD NOTE
+if ($action === 'add_note') {
+    $leadId = (int)($_POST['lead_id'] ?? 0);
+    $noteText = trim($_POST['note_text'] ?? '');
+    if (!$leadId || empty($noteText)) {
+        echo json_encode(['success' => false, 'message' => 'Lead ID and Note text required']);
+        exit;
+    }
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS lead_notes (id INT AUTO_INCREMENT PRIMARY KEY, lead_id INT NOT NULL, user_id INT NOT NULL, note_text TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+    } catch(Exception $e) {}
+
+    $stmt = $pdo->prepare("INSERT INTO lead_notes (lead_id, user_id, note_text, created_at) VALUES (:lid, :uid, :txt, NOW())");
+    $stmt->execute(['lid' => $leadId, 'uid' => $userId, 'txt' => $noteText]);
+
+    echo json_encode(['success' => true, 'message' => 'Note saved successfully!']);
+    exit;
+}
+
+// 4c. UPLOAD DOCUMENT
+if ($action === 'upload_document') {
+    $leadId = (int)($_POST['lead_id'] ?? 0);
+    if (!$leadId || empty($_FILES['document'])) {
+        echo json_encode(['success' => false, 'message' => 'Lead ID and File required']);
+        exit;
+    }
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS lead_documents (id INT AUTO_INCREMENT PRIMARY KEY, lead_id INT NOT NULL, user_id INT NOT NULL, file_name VARCHAR(255) NOT NULL, file_path VARCHAR(255) NOT NULL, uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+    } catch(Exception $e) {}
+
+    $uploadDir = __DIR__ . '/../uploads/lead_docs/';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+
+    $fileName = basename($_FILES['document']['name']);
+    $targetPath = $uploadDir . time() . '_' . $fileName;
+    $relPath = 'uploads/lead_docs/' . time() . '_' . $fileName;
+
+    if (move_uploaded_file($_FILES['document']['tmp_name'], $targetPath)) {
+        $stmt = $pdo->prepare("INSERT INTO lead_documents (lead_id, user_id, file_name, file_path, uploaded_at) VALUES (:lid, :uid, :fname, :fpath, NOW())");
+        $stmt->execute(['lid' => $leadId, 'uid' => $userId, 'fname' => $fileName, 'fpath' => $relPath]);
+
+        echo json_encode(['success' => true, 'message' => 'Document uploaded successfully!', 'file_name' => $fileName]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Failed to save uploaded file']);
+    }
     exit;
 }
 

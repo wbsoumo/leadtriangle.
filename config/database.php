@@ -1,14 +1,30 @@
 <?php
-// config/database.php - Production cPanel MySQL Configuration
+// config/database.php - Centralized Database Configuration with IST & Environment Support
 
 // Set PHP default timezone to Indian Standard Time (IST - Asia/Kolkata)
 date_default_timezone_set('Asia/Kolkata');
 
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'helnovexaa_leadtriangle');
-define('DB_USER', 'helnovexaa_leadtriangle');
-define('DB_PASS', 'Soumojit1234@');
-define('DB_CHARSET', 'utf8mb4');
+// Load production-specific local credentials if present (untracked database.local.php)
+if (file_exists(__DIR__ . '/database.local.php')) {
+    require_once __DIR__ . '/database.local.php';
+}
+
+// Define database configuration constants if not already defined by database.local.php or environment
+if (!defined('DB_HOST')) {
+    define('DB_HOST', getenv('DB_HOST') !== false ? getenv('DB_HOST') : 'localhost');
+}
+if (!defined('DB_NAME')) {
+    define('DB_NAME', getenv('DB_NAME') !== false ? getenv('DB_NAME') : 'helnovexaa_leadtriangle');
+}
+if (!defined('DB_USER')) {
+    define('DB_USER', getenv('DB_USER') !== false ? getenv('DB_USER') : 'helnovexaa_leadtriangle');
+}
+if (!defined('DB_PASS')) {
+    define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : 'Soumojit1234@');
+}
+if (!defined('DB_CHARSET')) {
+    define('DB_CHARSET', getenv('DB_CHARSET') !== false ? getenv('DB_CHARSET') : 'utf8mb4');
+}
 
 class Database {
     private static $instance = null;

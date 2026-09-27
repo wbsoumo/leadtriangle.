@@ -674,8 +674,8 @@ if ($action === 'import_csv') {
     $skipped = 0;
 
     $stmt = $pdo->prepare("
-        INSERT INTO leads (lead_code, name, mobile, email, company_name, city, priority, initial_requirement, assigned_manager_id, assigned_executive_id, status_id, created_at)
-        VALUES (:code, :name, :mobile, :email, :company, :city, :priority, :req, :mgr, :exec, 1, NOW())
+        INSERT INTO leads (lead_code, name, mobile, email, company_name, city, priority, initial_requirement, assigned_manager_id, assigned_executive_id, status_id, created_by, created_at)
+        VALUES (:code, :name, :mobile, :email, :company, :city, :priority, :req, :mgr, :exec, 1, :cby, NOW())
     ");
 
     $checkStmt = $pdo->prepare("SELECT id FROM leads WHERE mobile = :mobile LIMIT 1");
@@ -717,10 +717,12 @@ if ($action === 'import_csv') {
                 'priority' => $prio,
                 'req'      => $req,
                 'mgr'      => $assignedManagerId,
-                'exec'     => $assignedExecutiveId
+                'exec'     => $assignedExecutiveId,
+                'cby'      => $userId
             ]);
             $inserted++;
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
+            error_log("Bulk CSV Insert Lead Exception: " . $e->getMessage());
             $skipped++;
         }
     }

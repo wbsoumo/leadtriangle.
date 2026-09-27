@@ -14,13 +14,13 @@ if (!defined('DB_HOST')) {
     define('DB_HOST', getenv('DB_HOST') !== false ? getenv('DB_HOST') : 'localhost');
 }
 if (!defined('DB_NAME')) {
-    define('DB_NAME', getenv('DB_NAME') !== false ? getenv('DB_NAME') : 'helnovexaa_leadtriangle');
+    define('DB_NAME', getenv('DB_NAME') !== false ? getenv('DB_NAME') : '');
 }
 if (!defined('DB_USER')) {
-    define('DB_USER', getenv('DB_USER') !== false ? getenv('DB_USER') : 'helnovexaa_leadtriangle');
+    define('DB_USER', getenv('DB_USER') !== false ? getenv('DB_USER') : '');
 }
 if (!defined('DB_PASS')) {
-    define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : 'Soumojit1234@');
+    define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : '');
 }
 if (!defined('DB_CHARSET')) {
     define('DB_CHARSET', getenv('DB_CHARSET') !== false ? getenv('DB_CHARSET') : 'utf8mb4');

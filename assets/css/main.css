@@ -45,6 +45,48 @@
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
 html, body { background: var(--bg-main) !important; color: var(--text-primary) !important; height: 100%; overflow: hidden; }
 
+/* GLOBAL SVG ICON SIZING FIXES */
+svg {
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+.menu-item svg {
+    width: 18px !important;
+    height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+}
+
+.global-search svg {
+    width: 16px !important;
+    height: 16px !important;
+    max-width: 16px !important;
+    max-height: 16px !important;
+}
+
+.notif-bell svg {
+    width: 18px !important;
+    height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+}
+
+.kpi-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
+}
+
+.collapse-toggle svg {
+    width: 14px !important;
+    height: 14px !important;
+    max-width: 14px !important;
+    max-height: 14px !important;
+}
+
 /* APP CONTAINER */
 #app { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-main); }
 
@@ -206,14 +248,6 @@ html, body { background: var(--bg-main) !important; color: var(--text-primary) !
     border-radius: 0 4px 4px 0;
 }
 
-.menu-item svg {
-    width: 18px;
-    height: 18px;
-    stroke: currentColor;
-    stroke-width: 2;
-    flex-shrink: 0;
-}
-
 .sidebar.collapsed .menu-item .label {
     opacity: 0;
     width: 0;
@@ -261,12 +295,6 @@ html, body { background: var(--bg-main) !important; color: var(--text-primary) !
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
-.global-search svg {
-    width: 16px;
-    height: 16px;
-    stroke: var(--text-muted);
-}
-
 .global-search input {
     background: transparent;
     border: none;
@@ -310,12 +338,6 @@ html, body { background: var(--bg-main) !important; color: var(--text-primary) !
 .notif-bell:hover {
     background: #f8fafc;
     color: var(--primary);
-}
-
-.notif-bell svg {
-    width: 18px;
-    height: 18px;
-    stroke: currentColor;
 }
 
 .notif-dot {
@@ -449,13 +471,6 @@ html, body { background: var(--bg-main) !important; color: var(--text-primary) !
     justify-content: center;
     background: var(--primary-light);
     color: var(--primary);
-}
-
-.kpi-icon svg {
-    width: 20px;
-    height: 20px;
-    stroke: currentColor;
-    stroke-width: 2;
 }
 
 .kpi-val {

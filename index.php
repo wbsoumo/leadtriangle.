@@ -105,9 +105,16 @@ session_start();
         </div>
     </aside>
 
+    <!-- MOBILE SIDEBAR OVERLAY -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="App.toggleSidebar()"></div>
+
     <!-- MAIN CONTENT WRAPPER -->
     <main class="main-wrapper">
         <header class="top-bar">
+            <button class="mobile-menu-toggle" onclick="App.toggleSidebar()" title="Toggle Menu">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+
             <div class="global-search">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 <input type="text" placeholder="Search leads, phone, project code..." onkeyup="if(event.key==='Enter'){ App.navigate('leads'); }">

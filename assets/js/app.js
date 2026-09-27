@@ -112,12 +112,17 @@ const App = {
 
     toggleSidebar: function() {
         const sidebar = document.getElementById('main-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
         const icon = document.getElementById('collapse-icon');
-        sidebar.classList.toggle('collapsed');
-        if (sidebar.classList.contains('collapsed')) {
-            icon.innerText = '▶';
+
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle('open');
+            if (overlay) overlay.classList.toggle('show');
         } else {
-            icon.innerText = '◀';
+            sidebar.classList.toggle('collapsed');
+            if (icon) {
+                icon.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+            }
         }
     },
 
@@ -288,6 +293,15 @@ const App = {
 
     navigate: function(view, updateHistory = true) {
         this.currentView = view;
+
+        // Auto close mobile sidebar when navigating
+        if (window.innerWidth <= 768) {
+            const sidebar = document.getElementById('main-sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (sidebar) sidebar.classList.remove('open');
+            if (overlay) overlay.classList.remove('show');
+        }
+
         document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
         const activeItem = document.querySelector(`.menu-item[data-view="${view}"]`);
         if (activeItem) activeItem.classList.add('active');
@@ -336,7 +350,7 @@ const App = {
             </div>
 
             <!-- TOP 4 KPI CARDS MATCHING REFERENCE DESIGN -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px;">
+            <div class="kpi-grid">
                 
                 <!-- CARD 1: TOTAL SALES -->
                 <div onclick="App.navigate('projects')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
@@ -409,7 +423,7 @@ const App = {
             </div>
 
             <!-- MAIN DUAL COLUMN DASHBOARD GRID -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-top: 24px;">
+            <div class="dashboard-grid">
                 
                 <!-- LEFT COLUMN: RECENT ACTIVITY & LEADERBOARD -->
                 <div style="display: flex; flex-direction: column; gap: 24px;">

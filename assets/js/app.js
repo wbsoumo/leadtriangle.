@@ -578,6 +578,148 @@ const App = {
         }
     },
 
+    openCreateLeadModal: async function() {
+        if (document.getElementById('create-lead-modal')) return;
+
+        if (!this.dropdowns || !this.dropdowns.sources || !this.dropdowns.services) {
+            await this.loadDropdowns();
+        }
+
+        const sources = this.dropdowns?.sources || [];
+        const services = this.dropdowns?.services || [];
+        const executives = this.dropdowns?.executives || [];
+        const managers = this.dropdowns?.managers || [];
+
+        const modalHtml = `
+            <div class="modal-backdrop show" id="create-lead-modal">
+                <div class="modal-box" style="max-width: 620px; border-radius: 18px; border-top: 4px solid var(--primary); padding: 24px;">
+                    <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:14px;">
+                        <div class="modal-title" style="font-size:18px; font-weight:800; color:#0f172a;">✨ Create New Lead</div>
+                        <button class="close-modal" onclick="App.closeModal('create-lead-modal')">✕</button>
+                    </div>
+                    <form onsubmit="App.submitCreateLead(event)" style="margin-top:16px;">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Lead Full Name *</label>
+                                <input type="text" id="new-lead-name" required class="filter-input" style="width:100%;" placeholder="e.g. Rajesh Kumar">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Mobile Number *</label>
+                                <input type="tel" id="new-lead-mobile" required class="filter-input" style="width:100%;" placeholder="10-digit mobile number">
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">Email Address</label>
+                                <input type="email" id="new-lead-email" class="filter-input" style="width:100%;" placeholder="client@example.com">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">Company Name</label>
+                                <input type="text" id="new-lead-company" class="filter-input" style="width:100%;" placeholder="e.g. Apex Enterprises">
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">City / Location</label>
+                                <input type="text" id="new-lead-city" class="filter-input" style="width:100%;" placeholder="e.g. Mumbai">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">Priority</label>
+                                <select id="new-lead-priority" class="filter-select" style="width:100%;">
+                                    <option value="High">High Priority</option>
+                                    <option value="Medium" selected>Medium Priority</option>
+                                    <option value="Low">Low Priority</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">Service Requested</label>
+                                <select id="new-lead-service" class="filter-select" style="width:100%;">
+                                    <option value="">Select Service...</option>
+                                    ${services.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">Lead Source</label>
+                                <select id="new-lead-source" class="filter-select" style="width:100%;">
+                                    <option value="">Select Source...</option>
+                                    ${sources.map(src => `<option value="${src.id}">${src.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">Assign Manager</label>
+                                <select id="new-lead-manager" class="filter-select" style="width:100%;">
+                                    <option value="">Unassigned</option>
+                                    ${managers.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">Assign Calling Executive</label>
+                                <select id="new-lead-executive" class="filter-select" style="width:100%;">
+                                    <option value="">Unassigned</option>
+                                    ${executives.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:18px;">
+                            <label style="display:block; font-size:12px; font-weight:600; color:#64748b; margin-bottom:4px;">Initial Remark / Requirements</label>
+                            <textarea id="new-lead-remark" class="filter-input" style="width:100%; height:60px; padding:10px;" placeholder="Brief details about client needs..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px; font-weight:800; border-radius:10px;">Create Lead Record</button>
+                    </form>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+
+    submitCreateLead: async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('new-lead-name').value;
+        const mobile = document.getElementById('new-lead-mobile').value;
+        const email = document.getElementById('new-lead-email').value;
+        const company = document.getElementById('new-lead-company').value;
+        const city = document.getElementById('new-lead-city').value;
+        const priority = document.getElementById('new-lead-priority').value;
+        const serviceId = document.getElementById('new-lead-service').value;
+        const sourceId = document.getElementById('new-lead-source').value;
+        const managerId = document.getElementById('new-lead-manager').value;
+        const executiveId = document.getElementById('new-lead-executive').value;
+        const remark = document.getElementById('new-lead-remark').value;
+
+        const formData = new FormData();
+        formData.append('action', 'create');
+        formData.append('name', name);
+        formData.append('mobile', mobile);
+        formData.append('email', email);
+        formData.append('company_name', company);
+        formData.append('city', city);
+        formData.append('priority', priority);
+        formData.append('service_id', serviceId);
+        formData.append('lead_source_id', sourceId);
+        formData.append('assigned_manager_id', managerId);
+        formData.append('assigned_executive_id', executiveId);
+        formData.append('initial_remark', remark);
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message);
+
+        if (data.success) {
+            this.closeModal('create-lead-modal');
+            this.navigate(this.currentView || 'leads');
+        }
+    },
+
     // 2. LEADS MODULE
     renderLeads: async function(page = 1) {
         const search = document.getElementById('lead-search-input')?.value || '';

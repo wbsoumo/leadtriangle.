@@ -278,7 +278,7 @@ const App = {
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px;">
                 
                 <!-- CARD 1: TOTAL SALES -->
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                <div onclick="App.navigate('projects')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                         <div style="width: 44px; height: 44px; border-radius: 12px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center;">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
@@ -290,12 +290,12 @@ const App = {
                     <div>
                         <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Total Sales / Revenue</div>
                         <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">₹${d.total_project_value ? d.total_project_value.toLocaleString() : '2,45,670'}</div>
-                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+12% from last month</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+12% from last month →</div>
                     </div>
                 </div>
 
                 <!-- CARD 2: TOTAL LEADS / ACTIVE USERS -->
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                <div onclick="App.navigate('leads')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                         <div style="width: 44px; height: 44px; border-radius: 12px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center;">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
@@ -307,12 +307,12 @@ const App = {
                     <div>
                         <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Active Prospects / Leads</div>
                         <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">${d.total_leads.toLocaleString()}</div>
-                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+${d.new_leads_today} new today</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+${d.new_leads_today} new today →</div>
                     </div>
                 </div>
 
                 <!-- CARD 3: CALLS MADE TODAY -->
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                <div onclick="App.navigate('calling_queue')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                         <div style="width: 44px; height: 44px; border-radius: 12px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center;">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
@@ -324,12 +324,12 @@ const App = {
                     <div>
                         <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Calls Made Today</div>
                         <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">${d.calls_today}</div>
-                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">${d.connected_calls} connected calls</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">${d.connected_calls} connected calls →</div>
                     </div>
                 </div>
 
                 <!-- CARD 4: QUALIFIED LEADS / ACTIVE PROJECTS -->
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                <div onclick="App.navigate('funnel')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                         <div style="width: 44px; height: 44px; border-radius: 12px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center;">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
@@ -341,7 +341,7 @@ const App = {
                     <div>
                         <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Qualified / Ongoing Projects</div>
                         <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">${d.qualified_leads || d.ongoing_projects}</div>
-                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">${d.rates.qualification_rate}% conversion rate</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">${d.rates.qualification_rate}% conversion rate →</div>
                     </div>
                 </div>
 
@@ -362,7 +362,7 @@ const App = {
 
                         <div style="display: flex; flex-direction: column; gap: 18px;">
                             
-                            <div style="display: flex; align-items: center; gap: 14px;">
+                            <div onclick="App.navigate('projects')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
                                 <div style="width: 40px; height: 40px; border-radius: 12px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
                                     $
                                 </div>
@@ -373,7 +373,7 @@ const App = {
                                 <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">2 min ago</div>
                             </div>
 
-                            <div style="display: flex; align-items: center; gap: 14px;">
+                            <div onclick="App.navigate('leads')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
                                 <div style="width: 40px; height: 40px; border-radius: 12px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                                 </div>
@@ -384,7 +384,7 @@ const App = {
                                 <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">5 min ago</div>
                             </div>
 
-                            <div style="display: flex; align-items: center; gap: 14px;">
+                            <div onclick="App.navigate('calling_queue')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
                                 <div style="width: 40px; height: 40px; border-radius: 12px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                                 </div>
@@ -395,7 +395,7 @@ const App = {
                                 <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">10 min ago</div>
                             </div>
 
-                            <div style="display: flex; align-items: center; gap: 14px;">
+                            <div onclick="App.navigate('followups')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
                                 <div style="width: 40px; height: 40px; border-radius: 12px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                                 </div>
@@ -427,7 +427,7 @@ const App = {
                                     </thead>
                                     <tbody>
                                         ${d.employee_performance.map(emp => `
-                                            <tr>
+                                            <tr onclick="App.navigate('calling_queue')" style="cursor: pointer;">
                                                 <td>
                                                     <div style="display:flex; align-items:center; gap:10px;">
                                                         <div style="width:32px; height:32px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">${emp.name.charAt(0)}</div>
@@ -461,7 +461,7 @@ const App = {
                         
                         <div style="display: flex; flex-direction: column; gap: 20px;">
                             
-                            <div>
+                            <div onclick="App.navigate('funnel')" style="cursor: pointer;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: #475569; margin-bottom: 8px;">
                                     <span>Conversion Rate</span>
                                     <span style="font-weight: 800; color: #0f172a;">${d.rates.qualification_rate}%</span>
@@ -471,7 +471,7 @@ const App = {
                                 </div>
                             </div>
 
-                            <div>
+                            <div onclick="App.navigate('calling_queue')" style="cursor: pointer;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: #475569; margin-bottom: 8px;">
                                     <span>Connected Call Ratio</span>
                                     <span style="font-weight: 800; color: #0f172a;">${d.calls_today > 0 ? Math.round((d.connected_calls/d.calls_today)*100) : 45}%</span>
@@ -481,7 +481,7 @@ const App = {
                                 </div>
                             </div>
 
-                            <div>
+                            <div onclick="App.navigate('followups')" style="cursor: pointer;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: #475569; margin-bottom: 8px;">
                                     <span>Follow-up Completion</span>
                                     <span style="font-weight: 800; color: #0f172a;">87%</span>
@@ -499,15 +499,15 @@ const App = {
                         <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 16px;">Top Services</div>
                         
                         <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px;">
+                            <div onclick="App.navigate('leads')" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px; cursor: pointer;">
                                 <span style="font-size: 13.5px; font-weight: 600; color: #0f172a;">BPO Telecalling Service</span>
                                 <span class="badge badge-blue">42 Leads</span>
                             </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px;">
+                            <div onclick="App.navigate('leads')" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px; cursor: pointer;">
                                 <span style="font-size: 13.5px; font-weight: 600; color: #0f172a;">Lead Generation Campaign</span>
                                 <span class="badge badge-green">28 Leads</span>
                             </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px;">
+                            <div onclick="App.navigate('leads')" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px; cursor: pointer;">
                                 <span style="font-size: 13.5px; font-weight: 600; color: #0f172a;">Customer Support Process</span>
                                 <span class="badge badge-amber">19 Leads</span>
                             </div>
@@ -1084,10 +1084,56 @@ const App = {
         }
     },
 
+    showNotifications: function() {
+        const modal = document.createElement('div');
+        modal.id = 'notif-modal';
+        modal.className = 'modal-backdrop show';
+        modal.innerHTML = `
+            <div class="modal-box" style="max-width: 440px;">
+                <div class="modal-header">
+                    <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
+                        <span>🔔 Operations Center Alerts</span>
+                    </div>
+                    <button class="close-modal" onclick="App.closeModal('notif-modal')">✕</button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div style="padding:12px; background:#eff6ff; border-radius:10px; border:1px solid #bfdbfe;">
+                        <div style="font-weight:700; font-size:13.5px; color:#1e40af;">System Auto-Assignment</div>
+                        <div style="font-size:12.5px; color:#3b82f6; margin-top:2px;">3 new leads imported and auto-assigned to active callers</div>
+                        <small style="color:#64748b; font-size:11px;">10 minutes ago</small>
+                    </div>
+                    <div style="padding:12px; background:#f0fdf4; border-radius:10px; border:1px solid #a7f3d0;">
+                        <div style="font-weight:700; font-size:13.5px; color:#166534;">Follow-up Reminder</div>
+                        <div style="font-size:12.5px; color:#15803d; margin-top:2px;">Product demonstration scheduled for Vijay Malhotra today</div>
+                        <small style="color:#64748b; font-size:11px;">30 minutes ago</small>
+                    </div>
+                    <div style="padding:12px; background:#fff7ed; border-radius:10px; border:1px solid #fed7aa;">
+                        <div style="font-weight:700; font-size:13.5px; color:#9a3412;">Project Conversion</div>
+                        <div style="font-size:12.5px; color:#c2410c; margin-top:2px;">Lead #L-1094 successfully moved to Sales Funnel Stage 4</div>
+                        <small style="color:#64748b; font-size:11px;">1 hour ago</small>
+                    </div>
+                </div>
+                <div style="margin-top:18px; text-align:right;">
+                    <button class="btn btn-secondary btn-sm" onclick="App.closeModal('notif-modal')">Close</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
     closeModal: function(id) {
         const el = document.getElementById(id);
         if (el) el.remove();
     }
 };
 
+window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.querySelector('.global-search input');
+        if (searchInput) searchInput.focus();
+    }
+});
+
 window.addEventListener('DOMContentLoaded', () => App.init());
+

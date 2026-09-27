@@ -16,10 +16,12 @@
     # Handle Install page (/install -> /install.php)
     RewriteRule ^install$ install.php [QSA,L]
 
-    # Remove .php extension ONLY for GET requests (Do NOT redirect POST requests)
-    RewriteCond %{REQUEST_METHOD} !POST
-    RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /([^/]+/)*([^.]+)\.php\ HTTP/
-    RewriteRule ^(([^/]+/)*[^.]+)\.php$ /$1 [R=301,L]
+    # Handle Deploy page (/deploy -> /deploy.php)
+    RewriteRule ^deploy$ deploy.php [QSA,L]
+
+    # Allow actual physical PHP files to run directly
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule \.php$ - [L]
 
     # If requested file or directory does not exist, route to index.php for SPA HTML5 History API Routing
     RewriteCond %{REQUEST_FILENAME} !-f

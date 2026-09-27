@@ -187,21 +187,56 @@ if ($roleName !== 'operation_executive') {
     $employeePerformance = $empStmt->fetchAll();
 }
 
+// 9. Detailed Call Outcomes Breakdown (Today)
+$outcomeStmt = $pdo->prepare("
+    SELECT 
+        SUM(CASE WHEN call_outcome_id IN (1, 2) THEN 1 ELSE 0 END) as connected,
+        SUM(CASE WHEN call_outcome_id = 4 THEN 1 ELSE 0 END) as no_answer,
+        SUM(CASE WHEN call_outcome_id = 5 THEN 1 ELSE 0 END) as busy,
+        SUM(CASE WHEN call_outcome_id = 6 THEN 1 ELSE 0 END) as switched_off,
+        SUM(CASE WHEN call_outcome_id = 7 THEN 1 ELSE 0 END) as wrong_number
+    FROM call_logs $callWhere AND DATE(called_at) = CURDATE()
+");
+$outcomeStmt->execute($callParams);
+$outcomesBreakdown = $outcomeStmt->fetch();
+
+// 10. Weekly Calls History (Mon - Sun)
+$weeklyCalls = ['Mon' => 0, 'Tue' => 0, 'Wed' => 0, 'Thu' => 0, 'Fri' => 0, 'Sat' => 0, 'Sun' => 0];
+try {
+    $weekStmt = $pdo->prepare("
+        SELECT DATE_FORMAT(called_at, '%a') as day_name, COUNT(*) as call_count
+        FROM call_logs $callWhere AND called_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        GROUP BY DATE_FORMAT(called_at, '%a')
+    ");
+    $weekStmt->execute($callParams);
+    $rows = $weekStmt->fetchAll();
+    foreach ($rows as $r) {
+        if (isset($weeklyCalls[$r['day_name']])) {
+            $weeklyCalls[$r['day_name']] = (int)$r['call_count'];
+        }
+    }
+} catch (Exception $e) {}
+
 // Conversion Rates
 $contactRate = $totalLeads > 0 ? round(($leadStats['contacted'] / $totalLeads) * 100, 1) : 0;
 $qualificationRate = $totalLeads > 0 ? round(($leadStats['qualified'] / $totalLeads) * 100, 1) : 0;
 $conversionRate = $totalLeads > 0 ? round(($leadStats['converted'] / $totalLeads) * 100, 1) : 0;
 
+$calledTodayCount = (int)($callStats['calls_today'] ?? 0);
+$remainingCount = max(0, (int)$totalLeads - $calledTodayCount);
+
 echo json_encode([
     'success' => true,
     'data' => [
         'total_leads' => (int)$totalLeads,
+        'total_assigned' => (int)$totalLeads,
         'new_leads_today' => (int)$newLeadsToday,
         'contacted_leads' => (int)($leadStats['contacted'] ?? 0),
         'qualified_leads' => (int)($leadStats['qualified'] ?? 0),
         'converted_leads' => (int)($leadStats['converted'] ?? 0),
         'lost_leads' => (int)($leadStats['lost'] ?? 0),
-        'calls_today' => (int)($callStats['calls_today'] ?? 0),
+        'calls_today' => $calledTodayCount,
+        'remaining_calls' => $remainingCount,
         'connected_calls' => (int)($callStats['connected_calls'] ?? 0),
         'no_answer_busy' => (int)($callStats['no_answer_busy'] ?? 0),
         'followups_today' => (int)($fuStats['followups_today'] ?? 0),
@@ -213,6 +248,14 @@ echo json_encode([
         'completed_projects' => (int)($projectStats['completed_projects'] ?? 0),
         'total_project_value' => (float)($projectStats['total_project_value'] ?? 0),
         'total_collected_amount' => (float)($projectStats['total_collected_amount'] ?? 0),
+        'outcomes_breakdown' => [
+            'connected' => (int)($outcomesBreakdown['connected'] ?? 0),
+            'no_answer' => (int)($outcomesBreakdown['no_answer'] ?? 0),
+            'busy' => (int)($outcomesBreakdown['busy'] ?? 0),
+            'switched_off' => (int)($outcomesBreakdown['switched_off'] ?? 0),
+            'wrong_number' => (int)($outcomesBreakdown['wrong_number'] ?? 0),
+        ],
+        'weekly_calls' => $weeklyCalls,
         'rates' => [
             'contact_rate' => $contactRate,
             'qualification_rate' => $qualificationRate,

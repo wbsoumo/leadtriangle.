@@ -163,6 +163,19 @@ class ApiService {
     return [];
   }
 
+  // Fetch Dashboard Metrics
+  Future<Map<String, dynamic>> fetchDashboardMetrics() async {
+    try {
+      final headers = await _getHeaders();
+      final res = await http.get(Uri.parse('$baseUrl/dashboard.php'), headers: headers);
+      final data = jsonDecode(res.body);
+      if (data['success'] == true && data['data'] != null) {
+        return data['data'];
+      }
+    } catch (e) {}
+    return {};
+  }
+
   // Logout
   Future<void> logout() async {
     try {

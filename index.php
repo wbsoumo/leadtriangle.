@@ -1,5 +1,5 @@
 <?php
-// index.php - Main Single Page Application Shell
+// index.php - Main Single Page Application Shell (Light Mode SaaS CRM)
 session_start();
 ?>
 <!DOCTYPE html>
@@ -14,42 +14,47 @@ session_start();
 <body>
 
 <div id="app">
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <!-- COLLAPSIBLE SIDEBAR -->
+    <aside class="sidebar" id="main-sidebar">
         <div class="sidebar-header">
-            <div class="brand-logo">▲</div>
-            <div class="brand-title">Leadstriangle</div>
+            <div class="brand-wrapper">
+                <div class="brand-logo">▲</div>
+                <div class="brand-title">Leadstriangle</div>
+            </div>
+            <button class="collapse-toggle" onclick="App.toggleSidebar()" title="Toggle Sidebar">
+                <span id="collapse-icon">◀</span>
+            </button>
         </div>
 
         <div class="sidebar-menu">
             <div class="menu-group">
                 <div class="group-title">Dashboard</div>
-                <a class="menu-item active" data-view="dashboard"><span class="icon">📊</span> Overview</a>
+                <a class="menu-item active" data-view="dashboard"><span class="icon">📊</span><span class="label">Overview</span></a>
             </div>
 
             <div class="menu-group">
                 <div class="group-title">Lead Management</div>
-                <a class="menu-item" data-view="leads"><span class="icon">📋</span> All Leads</a>
-                <a class="menu-item admin-only" data-view="import"><span class="icon">📥</span> Bulk CSV Import</a>
+                <a class="menu-item" data-view="leads"><span class="icon">📋</span><span class="label">All Leads</span></a>
+                <a class="menu-item admin-only" data-view="import"><span class="icon">📥</span><span class="label">Bulk CSV Import</span></a>
             </div>
 
             <div class="menu-group">
                 <div class="group-title">Calling Operations</div>
-                <a class="menu-item" data-view="calling_queue"><span class="icon">📞</span> Calling Queue</a>
-                <a class="menu-item" data-view="followups"><span class="icon">⏰</span> Follow-ups</a>
-                <a class="menu-item" data-view="meetings"><span class="icon">📅</span> Meetings</a>
+                <a class="menu-item" data-view="calling_queue"><span class="icon">📞</span><span class="label">Calling Queue</span></a>
+                <a class="menu-item" data-view="followups"><span class="icon">⏰</span><span class="label">Follow-ups</span></a>
+                <a class="menu-item" data-view="meetings"><span class="icon">📅</span><span class="label">Meetings</span></a>
             </div>
 
             <div class="menu-group">
                 <div class="group-title">Sales & Projects</div>
-                <a class="menu-item" data-view="funnel"><span class="icon">🎯</span> Sales Funnel</a>
-                <a class="menu-item" data-view="projects"><span class="icon">🚀</span> Projects Workspace</a>
+                <a class="menu-item" data-view="funnel"><span class="icon">🎯</span><span class="label">Sales Funnel</span></a>
+                <a class="menu-item" data-view="projects"><span class="icon">🚀</span><span class="label">Projects Workspace</span></a>
             </div>
 
             <div class="menu-group admin-only">
                 <div class="group-title">Administration</div>
-                <a class="menu-item" data-view="reports"><span class="icon">📈</span> Analytics & Reports</a>
-                <a class="menu-item" data-view="users"><span class="icon">👥</span> Users & Roles</a>
+                <a class="menu-item" data-view="reports"><span class="icon">📈</span><span class="label">Analytics & Reports</span></a>
+                <a class="menu-item" data-view="users"><span class="icon">👥</span><span class="label">Users & Roles</span></a>
             </div>
         </div>
     </aside>
@@ -59,16 +64,24 @@ session_start();
         <header class="top-bar">
             <div class="global-search">
                 <span>🔍</span>
-                <input type="text" placeholder="Global search leads, phone, project code..." onkeyup="if(event.key==='Enter'){ App.navigate('leads'); }">
+                <input type="text" placeholder="Search leads, phone, project code..." onkeyup="if(event.key==='Enter'){ App.navigate('leads'); }">
+                <span class="search-shortcut">⌘K</span>
             </div>
 
-            <div class="top-user">
-                <div class="user-info">
-                    <div class="user-name" id="user-name-display">Loading...</div>
-                    <div class="user-role" id="user-role-display">System Role</div>
+            <div class="top-right">
+                <div class="notif-bell" title="Notifications">
+                    🔔
+                    <div class="notif-dot"></div>
                 </div>
-                <div class="avatar" id="user-avatar">U</div>
-                <button class="btn btn-secondary btn-sm" onclick="App.logout()" style="margin-left:8px;">Logout</button>
+
+                <div class="top-user">
+                    <div class="user-info">
+                        <div class="user-name" id="user-name-display">Loading...</div>
+                        <div class="user-role" id="user-role-display">System Role</div>
+                    </div>
+                    <div class="avatar" id="user-avatar">U</div>
+                    <button class="btn btn-secondary btn-sm" onclick="App.logout()" style="margin-left:4px;">Logout</button>
+                </div>
             </div>
         </header>
 

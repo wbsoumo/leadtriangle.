@@ -48,27 +48,41 @@ const App = {
         }
     },
 
+    toggleSidebar: function() {
+        const sidebar = document.getElementById('main-sidebar');
+        const icon = document.getElementById('collapse-icon');
+        sidebar.classList.toggle('collapsed');
+        if (sidebar.classList.contains('collapsed')) {
+            icon.innerText = '▶';
+        } else {
+            icon.innerText = '◀';
+        }
+    },
+
     renderLogin: function() {
         document.getElementById('app').innerHTML = `
-            <div style="width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #0b0f19;">
-                <div style="background: #151c2c; border: 1px solid #232d42; border-radius: 12px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+            <div style="width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 36px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.08);">
                     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-                        <div style="width: 38px; height: 38px; background: #2563eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #fff;">▲</div>
-                        <div style="font-size: 22px; font-weight: 700; color: #fff;">Leadstriangle CRM</div>
+                        <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #4f46e5, #6366f1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #ffffff; box-shadow: 0 4px 12px rgba(79,70,229,0.25);">▲</div>
+                        <div>
+                            <div style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.4px;">Leadstriangle CRM</div>
+                            <div style="font-size: 12px; color: #64748b;">Internal Operations Portal</div>
+                        </div>
                     </div>
-                    <div style="color: #94a3b8; font-size: 14px; margin-bottom: 24px;">Enter your credentials to access CRM Operations</div>
+                    <div style="color: #475569; font-size: 13.5px; margin-bottom: 24px;">Sign in to your CRM telecalling account</div>
                     <form id="login-form" onsubmit="App.handleLogin(event)">
                         <div style="margin-bottom: 16px;">
-                            <label style="display: block; font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 6px;">Email Address</label>
-                            <input type="email" id="login-email" required placeholder="admin@leadstriangle.com" style="width: 100%; padding: 12px; background: #0b0f19; border: 1px solid #232d42; border-radius: 8px; color: #fff; outline: none;">
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Email Address</label>
+                            <input type="email" id="login-email" required placeholder="admin@leadstriangle.com" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13.5px; outline: none;">
                         </div>
                         <div style="margin-bottom: 24px;">
-                            <label style="display: block; font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 6px;">Password</label>
-                            <input type="password" id="login-pass" required placeholder="••••••••" style="width: 100%; padding: 12px; background: #0b0f19; border: 1px solid #232d42; border-radius: 8px; color: #fff; outline: none;">
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Password</label>
+                            <input type="password" id="login-pass" required placeholder="••••••••" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 13.5px; outline: none;">
                         </div>
-                        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; justify-content: center; font-size: 15px;">Sign In to Dashboard →</button>
+                        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; justify-content: center; font-size: 14.5px;">Sign In to Dashboard →</button>
                     </form>
-                    <div style="margin-top: 20px; font-size: 12px; color: #64748b; text-align: center;">Default password: <strong style="color: #38bdf8;">Admin@123</strong></div>
+                    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center;">Default demo password: <strong style="color: #4f46e5;">Admin@123</strong></div>
                 </div>
             </div>
         `;

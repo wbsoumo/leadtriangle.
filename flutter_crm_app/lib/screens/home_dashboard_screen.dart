@@ -3,9 +3,9 @@ import '../models/lead_model.dart';
 import '../services/api_service.dart';
 import '../services/telephony_service.dart';
 import 'lead_detail_screen.dart';
+import 'leads_list_screen.dart';
 import 'call_outcome_modal.dart';
 import 'followups_screen.dart';
-import 'fresh_leads_screen.dart';
 import 'profile_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
@@ -20,8 +20,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   final List<Widget> _tabs = [
     const HomeCallingTab(),
+    const LeadsListScreen(),
     const FollowupsScreen(),
-    const FreshLeadsScreen(),
     const ProfileScreen(),
   ];
 
@@ -47,10 +47,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11.5),
           items: const [
-            BottomNavigationBarViewItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-            BottomNavigationBarViewItem(icon: Icon(Icons.alarm_rounded), label: 'Follow-ups'),
-            BottomNavigationBarViewItem(icon: Icon(Icons.fiber_new_rounded), label: 'Fresh Leads'),
-            BottomNavigationBarViewItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
+            BottomNavigationBarViewItem(icon: Icon(Icons.home_outlined), label: 'Home'),
+            BottomNavigationBarViewItem(icon: Icon(Icons.people_alt_outlined), label: 'Leads'),
+            BottomNavigationBarViewItem(icon: Icon(Icons.calendar_today_outlined), label: 'Follow-ups'),
+            BottomNavigationBarViewItem(icon: Icon(Icons.person_outline_rounded), label: 'Profile'),
           ],
         ),
       ),

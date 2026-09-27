@@ -206,6 +206,19 @@ class ApiService {
     }
   }
 
+  // Fetch Activity Timeline
+  Future<Map<String, dynamic>> fetchActivities({String type = 'all'}) async {
+    try {
+      final headers = await _getHeaders();
+      final res = await http.get(Uri.parse('$baseUrl/activities.php?type=$type'), headers: headers);
+      final data = jsonDecode(res.body);
+      if (data['success'] == true && data['data'] != null) {
+        return data['data'];
+      }
+    } catch (e) {}
+    return {};
+  }
+
   // Logout
   Future<void> logout() async {
     try {

@@ -16,7 +16,10 @@ $userId = $_SESSION['user_id'];
 $roleName = $_SESSION['role_name'];
 
 $filterType = $_GET['type'] ?? 'all'; // all, calls, followups, status_updates, remarks
+$search = trim($_GET['search'] ?? '');
+$dateFilter = $_GET['date'] ?? ''; // YYYY-MM-DD
 
+// 1. Fetch Call Logs Activity
 $callWhere = "WHERE 1=1";
 $callParams = [];
 
@@ -25,14 +28,13 @@ if ($roleName === 'operation_executive') {
     $callParams['uid'] = $userId;
 }
 
-// Fetch Call Logs & Remarks Activity
-$sql = "
+$sqlCalls = "
     SELECT 
-        cl.id as activity_id,
+        CONCAT('call_', cl.id) as activity_id,
         'call' as activity_type,
         cl.lead_id,
         l.name as lead_name,
-        l.company_name,
+        COALESCE(l.company_name, 'ABC Private Limited') as company_name,
         l.mobile,
         l.priority,
         co.name as outcome_name,
@@ -40,6 +42,7 @@ $sql = "
         cl.call_duration_seconds,
         cl.remarks,
         cl.called_at as activity_time,
+        DATE_FORMAT(cl.called_at, '%Y-%m-%d') as date_key,
         DATE_FORMAT(cl.called_at, '%d %b %Y') as date_group,
         TIME_FORMAT(cl.called_at, '%h:%i %p') as time_formatted,
         (SELECT CONCAT(f.followup_date, ' ', f.followup_time) FROM followups f WHERE f.lead_id = l.id ORDER BY f.id DESC LIMIT 1) as followup_schedule
@@ -51,11 +54,47 @@ $sql = "
     LIMIT 100
 ";
 
-$stmt = $pdo->prepare($sql);
+$stmt = $pdo->prepare($sqlCalls);
 $stmt->execute($callParams);
-$activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$callActivities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Also fetch recently assigned leads as activity
+// 2. Fetch Followups Activity
+$fuWhere = "WHERE 1=1";
+$fuParams = [];
+if ($roleName === 'operation_executive') {
+    $fuWhere .= " AND f.user_id = :fu_uid";
+    $fuParams['fu_uid'] = $userId;
+}
+
+$sqlFollowups = "
+    SELECT 
+        CONCAT('fu_', f.id) as activity_id,
+        'followup' as activity_type,
+        f.lead_id,
+        l.name as lead_name,
+        COALESCE(l.company_name, 'Client Lead') as company_name,
+        l.mobile,
+        l.priority,
+        'Follow-up Scheduled' as outcome_name,
+        '#9333ea' as outcome_color,
+        0 as call_duration_seconds,
+        f.purpose as remarks,
+        f.created_at as activity_time,
+        DATE_FORMAT(f.created_at, '%Y-%m-%d') as date_key,
+        DATE_FORMAT(f.created_at, '%d %b %Y') as date_group,
+        TIME_FORMAT(f.created_at, '%h:%i %p') as time_formatted,
+        CONCAT(f.followup_date, ' ', f.followup_time) as followup_schedule
+    FROM followups f
+    JOIN leads l ON f.lead_id = l.id
+    $fuWhere
+    ORDER BY f.id DESC
+    LIMIT 50
+";
+$fuStmt = $pdo->prepare($sqlFollowups);
+$fuStmt->execute($fuParams);
+$followupActivities = $fuStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// 3. Fetch Recently Assigned Leads
 $leadWhere = "WHERE 1=1";
 $leadParams = [];
 if ($roleName === 'operation_executive') {
@@ -63,13 +102,13 @@ if ($roleName === 'operation_executive') {
     $leadParams['l_uid'] = $userId;
 }
 
-$leadSql = "
+$sqlLeads = "
     SELECT 
-        l.id as activity_id,
+        CONCAT('lead_', l.id) as activity_id,
         'assignment' as activity_type,
         l.id as lead_id,
         l.name as lead_name,
-        l.company_name,
+        COALESCE(l.company_name, 'Client Lead') as company_name,
         l.mobile,
         l.priority,
         'New Lead Assigned' as outcome_name,
@@ -77,6 +116,7 @@ $leadSql = "
         0 as call_duration_seconds,
         l.initial_remark as remarks,
         l.created_at as activity_time,
+        DATE_FORMAT(l.created_at, '%Y-%m-%d') as date_key,
         DATE_FORMAT(l.created_at, '%d %b %Y') as date_group,
         TIME_FORMAT(l.created_at, '%h:%i %p') as time_formatted,
         NULL as followup_schedule
@@ -85,45 +125,54 @@ $leadSql = "
     ORDER BY l.id DESC
     LIMIT 30
 ";
-
-$lStmt = $pdo->prepare($leadSql);
+$lStmt = $pdo->prepare($sqlLeads);
 $lStmt->execute($leadParams);
 $leadActivities = $lStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Merge activities
-$allList = array_merge($activities, $leadActivities);
+// Merge all activities
+$allList = array_merge($callActivities, $followupActivities, $leadActivities);
 
-// Sort by activity_time DESC
-usort($allList, function($a, b) {
-    return strtotime($b['activity_time']) - strtotime($a['activity_time']);
+// Sort by activity_time DESC safely
+usort($allList, function($a, $b) {
+    return strtotime($b['activity_time'] ?? '1970-01-01') - strtotime($a['activity_time'] ?? '1970-01-01');
 });
 
 // Calculate Filter Counts
-$callsCount = 0;
-$followupsCount = 0;
-$statusUpdatesCount = 0;
+$callsCount = count($callActivities);
+$followupsCount = count($followupActivities);
+$statusUpdatesCount = count($leadActivities);
 $remarksCount = 0;
 
 foreach ($allList as $act) {
-    if ($act['activity_type'] === 'call') {
-        $callsCount++;
-        $outcome = strtolower($act['outcome_name'] ?? '');
-        if (strpos($outcome, 'follow') !== false || !empty($act['followup_schedule'])) {
-            $followupsCount++;
-        }
-        if (!empty($act['remarks'])) {
-            $remarksCount++;
-        }
-    } else if ($act['activity_type'] === 'assignment') {
-        $statusUpdatesCount++;
+    if (!empty($act['remarks'])) {
+        $remarksCount++;
     }
 }
 
-// Client filtering by type
+// Search Filter
+if (!empty($search)) {
+    $q = strtolower($search);
+    $allList = array_values(array_filter($allList, function($x) use ($q) {
+        return strpos(strtolower($x['lead_name'] ?? ''), $q) !== false ||
+               strpos(strtolower($x['company_name'] ?? ''), $q) !== false ||
+               strpos(strtolower($x['mobile'] ?? ''), $q) !== false ||
+               strpos(strtolower($x['remarks'] ?? ''), $q) !== false ||
+               strpos(strtolower($x['outcome_name'] ?? ''), $q) !== false;
+    }));
+}
+
+// Date Filter
+if (!empty($dateFilter)) {
+    $allList = array_values(array_filter($allList, function($x) use ($dateFilter) {
+        return ($x['date_key'] ?? '') === $dateFilter;
+    }));
+}
+
+// Type Filter
 if ($filterType === 'calls') {
     $allList = array_values(array_filter($allList, fn($x) => $x['activity_type'] === 'call'));
 } else if ($filterType === 'followups') {
-    $allList = array_values(array_filter($allList, fn($x) => !empty($x['followup_schedule']) || strpos(strtolower($x['outcome_name'] ?? ''), 'follow') !== false));
+    $allList = array_values(array_filter($allList, fn($x) => $x['activity_type'] === 'followup' || !empty($x['followup_schedule'])));
 } else if ($filterType === 'status_updates') {
     $allList = array_values(array_filter($allList, fn($x) => $x['activity_type'] === 'assignment'));
 } else if ($filterType === 'remarks') {
@@ -135,7 +184,7 @@ echo json_encode([
     'data' => [
         'activities' => $allList,
         'counts' => [
-            'all' => count($activities) + count($leadActivities),
+            'all' => count($callActivities) + count($followupActivities) + count($leadActivities),
             'calls' => $callsCount,
             'followups' => $followupsCount,
             'status_updates' => $statusUpdatesCount,
@@ -143,3 +192,4 @@ echo json_encode([
         ]
     ]
 ]);
+

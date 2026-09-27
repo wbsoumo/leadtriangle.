@@ -14,14 +14,23 @@ class _ActivityScreenState extends State<ActivityScreen> {
   final ApiService _apiService = ApiService();
 
   bool _isLoading = true;
+  bool _isSearching = false;
+  String _searchQuery = '';
   String _selectedFilter = 'all'; // 'all', 'calls', 'followups', 'status_updates', 'remarks'
+  DateTime? _selectedDate;
 
-  List<dynamic> _activities = [];
-  int _allCount = 28;
-  int _callsCount = 16;
-  int _followupsCount = 5;
-  int _statusUpdatesCount = 4;
-  int _remarksCount = 3;
+  // Additional Filter Modal States
+  String _selectedPriority = 'All';
+  String _selectedOutcome = 'All';
+
+  List<dynamic> _rawActivities = [];
+  List<dynamic> _displayActivities = [];
+
+  int _allCount = 0;
+  int _callsCount = 0;
+  int _followupsCount = 0;
+  int _statusUpdatesCount = 0;
+  int _remarksCount = 0;
 
   @override
   void initState() {
@@ -35,24 +44,209 @@ class _ActivityScreenState extends State<ActivityScreen> {
       final res = await _apiService.fetchActivities(type: _selectedFilter);
       if (res.isNotEmpty) {
         if (res['activities'] != null) {
-          _activities = res['activities'] as List;
+          _rawActivities = res['activities'] as List;
         }
         if (res['counts'] != null) {
           final c = res['counts'];
-          _allCount = (c['all'] ?? 28) as int;
-          _callsCount = (c['calls'] ?? 16) as int;
-          _followupsCount = (c['followups'] ?? 5) as int;
-          _statusUpdatesCount = (c['status_updates'] ?? 4) as int;
-          _remarksCount = (c['remarks'] ?? 3) as int;
+          _allCount = (c['all'] ?? 0) as int;
+          _callsCount = (c['calls'] ?? 0) as int;
+          _followupsCount = (c['followups'] ?? 0) as int;
+          _statusUpdatesCount = (c['status_updates'] ?? 0) as int;
+          _remarksCount = (c['remarks'] ?? 0) as int;
         }
       }
     } catch (e) {
       debugPrint('Error loading activities: $e');
     } finally {
       if (mounted) {
+        _applyLocalFilters();
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _applyLocalFilters() {
+    List<dynamic> temp = List.from(_rawActivities);
+
+    // Search query filter
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      temp = temp.where((item) {
+        final name = (item['lead_name'] ?? '').toString().toLowerCase();
+        final company = (item['company_name'] ?? '').toString().toLowerCase();
+        final mobile = (item['mobile'] ?? '').toString().toLowerCase();
+        final remarks = (item['remarks'] ?? '').toString().toLowerCase();
+        final outcome = (item['outcome_name'] ?? '').toString().toLowerCase();
+        return name.contains(q) || company.contains(q) || mobile.contains(q) || remarks.contains(q) || outcome.contains(q);
+      }).toList();
+    }
+
+    // Date Picker Filter
+    if (_selectedDate != null) {
+      final dateStr = "${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}";
+      temp = temp.where((item) => (item['date_key'] ?? '').toString() == dateStr).toList();
+    }
+
+    // Priority Filter
+    if (_selectedPriority != 'All') {
+      temp = temp.where((item) => (item['priority'] ?? '').toString().toLowerCase() == _selectedPriority.toLowerCase()).toList();
+    }
+
+    // Outcome Filter
+    if (_selectedOutcome != 'All') {
+      temp = temp.where((item) => (item['outcome_name'] ?? '').toString().toLowerCase().contains(_selectedOutcome.toLowerCase())).toList();
+    }
+
+    setState(() {
+      _displayActivities = temp;
+    });
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2025),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2563EB),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _applyLocalFilters();
+      });
+    }
+  }
+
+  void _openFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.6,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Filter Activities', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                      IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Priority
+                  const Text('Priority Level', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: ['All', 'High', 'Medium', 'Low'].map((pr) {
+                      final sel = _selectedPriority == pr;
+                      return ChoiceChip(
+                        label: Text(pr),
+                        selected: sel,
+                        selectedColor: const Color(0xFFEFF6FF),
+                        labelStyle: TextStyle(color: sel ? const Color(0xFF2563EB) : const Color(0xFF475569), fontWeight: FontWeight.w700),
+                        onSelected: (val) {
+                          setModalState(() => _selectedPriority = pr);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Call Outcome
+                  const Text('Call Outcome / Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ['All', 'Connected', 'No Answer', 'Busy', 'Follow-up', 'New Lead'].map((oc) {
+                      final sel = _selectedOutcome == oc;
+                      return ChoiceChip(
+                        label: Text(oc),
+                        selected: sel,
+                        selectedColor: const Color(0xFFEFF6FF),
+                        labelStyle: TextStyle(color: sel ? const Color(0xFF2563EB) : const Color(0xFF475569), fontWeight: FontWeight.w700),
+                        onSelected: (val) {
+                          setModalState(() => _selectedOutcome = oc);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const Spacer(),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              _selectedPriority = 'All';
+                              _selectedOutcome = 'All';
+                            });
+                            setState(() {
+                              _selectedPriority = 'All';
+                              _selectedOutcome = 'All';
+                              _applyLocalFilters();
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                          child: const Text('Reset', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _applyLocalFilters();
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), padding: const EdgeInsets.symmetric(vertical: 14)),
+                          child: const Text('Apply', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -71,36 +265,107 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Activity',
-                          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    if (!_isSearching)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Activity',
+                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Your recent calls, updates and actions',
+                            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      )
+                    else
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: TextField(
+                            autofocus: true,
+                            onChanged: (val) {
+                              _searchQuery = val;
+                              _applyLocalFilters();
+                            },
+                            decoration: const InputDecoration(
+                              hintText: 'Search activity, lead name, remarks...',
+                              hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                              border: InputBorder.none,
+                              prefixIcon: Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+                              contentPadding: EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
                         ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Your recent calls, updates and actions',
-                          style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
+                      ),
+
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.search_rounded, color: Color(0xFF0F172A), size: 24),
-                          onPressed: () {},
+                          icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded, color: const Color(0xFF0F172A), size: 24),
+                          onPressed: () {
+                            setState(() {
+                              _isSearching = !_isSearching;
+                              if (!_isSearching) {
+                                _searchQuery = '';
+                                _applyLocalFilters();
+                              }
+                            });
+                          },
                         ),
                         IconButton(
                           icon: const Icon(Icons.tune_rounded, color: Color(0xFF0F172A), size: 22),
-                          onPressed: () {},
+                          onPressed: _openFilterBottomSheet,
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
+
+              // Active Date Filter Badge if selected
+              if (_selectedDate != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Date: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _selectedDate = null;
+                                  _applyLocalFilters();
+                                });
+                              },
+                              child: const Icon(Icons.cancel_rounded, size: 16, color: Color(0xFF2563EB)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
               // 2. Filter Pills Row (All, Calls, Follow-ups, Status Updates, Remarks)
               SingleChildScrollView(
@@ -108,7 +373,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Row(
                   children: [
-                    _buildFilterPill('All', _allCount, 'all'),
+                    _buildFilterPill('All', _allCount > 0 ? _allCount : _rawActivities.length, 'all'),
                     const SizedBox(width: 8),
                     _buildFilterPill('Calls', _callsCount, 'calls'),
                     const SizedBox(width: 8),
@@ -120,15 +385,54 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // 3. Activity Timeline List
               Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
-                    : _activities.isEmpty
-                        ? _buildMockActivityTimelineList()
-                        : _buildLiveActivityTimelineList(),
+                    : _displayActivities.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.history_rounded, size: 48, color: Color(0xFFCBD5E1)),
+                                SizedBox(height: 10),
+                                Text(
+                                  'No activities found matching filters',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 8.0),
+                            itemCount: _displayActivities.length,
+                            itemBuilder: (context, index) {
+                              final item = _displayActivities[index];
+                              final showDateHeader = index == 0 || item['date_group'] != _displayActivities[index - 1]['date_group'];
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (showDateHeader) _buildDateHeader(item['date_group'] ?? 'Today, 27 Sep 2026'),
+                                  _buildTimelineItemRow(
+                                    time: item['time_formatted'] ?? '10:42 AM',
+                                    type: item['activity_type'] ?? 'call',
+                                    name: item['lead_name'] ?? 'Prospect Lead',
+                                    company: item['company_name'] ?? 'ABC Private Limited',
+                                    outcome: item['outcome_name'] ?? 'Connected',
+                                    priority: item['priority'] ?? 'High Priority',
+                                    remarks: item['remarks'],
+                                    followup: item['followup_schedule'],
+                                    leadId: item['lead_id'] is int ? item['lead_id'] : int.tryParse(item['lead_id'].toString()) ?? 1,
+                                    phone: item['mobile'] ?? '',
+                                    isLast: index == _displayActivities.length - 1,
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
               ),
             ],
           ),
@@ -179,137 +483,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
-  // Live Activity Timeline List
-  Widget _buildLiveActivityTimelineList() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 8.0),
-      itemCount: _activities.length,
-      itemBuilder: (context, index) {
-        final item = _activities[index];
-        final showDateHeader = index == 0 || item['date_group'] != _activities[index - 1]['date_group'];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showDateHeader) _buildDateHeader(item['date_group'] ?? 'Today, 27 Sep 2026'),
-            _buildTimelineItemRow(
-              time: item['time_formatted'] ?? '10:42 AM',
-              type: item['activity_type'] ?? 'call',
-              name: item['lead_name'] ?? 'Prospect Lead',
-              company: item['company_name'] ?? 'ABC Private Limited',
-              outcome: item['outcome_name'] ?? 'Connected',
-              priority: item['priority'] ?? 'High Priority',
-              remarks: item['remarks'],
-              followup: item['followup_schedule'],
-              leadId: item['lead_id'] is int ? item['lead_id'] : int.tryParse(item['lead_id'].toString()) ?? 1,
-              phone: item['mobile'] ?? '',
-              isLast: index == _activities.length - 1,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Fallback Mock Activity Timeline (matching screenshot reference)
-  Widget _buildMockActivityTimelineList() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 8.0),
-      children: [
-        _buildDateHeader('Today, 27 Sep 2026'),
-        _buildTimelineItemRow(
-          time: '10:42 AM',
-          type: 'call',
-          name: 'Mark',
-          company: 'ABC Private Limited',
-          outcome: 'Connected',
-          priority: 'High Priority',
-          subTags: ['Interested', 'High Priority'],
-          remarks: 'Client is interested. Will share proposal tomorrow.',
-          followup: 'Follow-up: 28 Sep 2026, 11:00 AM',
-          leadId: 1,
-          phone: '9876543210',
-        ),
-        _buildTimelineItemRow(
-          time: '10:18 AM',
-          type: 'no_answer',
-          name: 'Rahul Sharma',
-          company: 'Sharma Enterprises',
-          outcome: 'No Answer',
-          priority: 'Medium Priority',
-          subTags: ['Retry Required', 'Medium Priority'],
-          remarks: 'Called 2 times. No response.',
-          followup: 'Follow-up: Today, 04:00 PM',
-          leadId: 2,
-          phone: '9876543211',
-        ),
-        _buildTimelineItemRow(
-          time: '09:52 AM',
-          type: 'busy',
-          name: 'Anita Patel',
-          company: 'Patel & Co',
-          outcome: 'Busy',
-          priority: 'Medium Priority',
-          subTags: ['Follow-up Today', 'Medium Priority'],
-          remarks: 'Discussed requirements. Will share brochure.',
-          followup: 'Follow-up: Today, 04:30 PM',
-          leadId: 3,
-          phone: '9876543212',
-        ),
-        _buildTimelineItemRow(
-          time: '09:35 AM',
-          type: 'remark',
-          name: 'Sandeep Kumar',
-          company: 'Kumar Solutions',
-          outcome: 'Remark Added',
-          priority: 'Low Priority',
-          subTags: ['Low Priority'],
-          remarks: 'Client asked for pricing details. Will share tomorrow.',
-          leadId: 4,
-          phone: '9876543213',
-        ),
-        _buildTimelineItemRow(
-          time: '09:20 AM',
-          type: 'assignment',
-          name: 'New Lead Assigned',
-          company: 'Priya Mehta • Mehta Group',
-          outcome: 'New Lead',
-          priority: 'Medium Priority',
-          subTags: ['New Lead', 'SEO Services'],
-          leadId: 5,
-          phone: '9876543214',
-        ),
-        const SizedBox(height: 12),
-        _buildDateHeader('Yesterday, 26 Sep 2026'),
-        _buildTimelineItemRow(
-          time: '05:20 PM',
-          type: 'call',
-          name: 'Vikram Das',
-          company: 'Das Technologies',
-          outcome: 'Connected',
-          priority: 'High Priority',
-          subTags: ['Interested', 'Follow-up'],
-          remarks: 'Discussed website requirements.',
-          followup: 'Follow-up: 27 Sep 2026, 10:00 AM',
-          leadId: 6,
-          phone: '9876543215',
-        ),
-        _buildTimelineItemRow(
-          time: '04:15 PM',
-          type: 'not_interested',
-          name: 'Pritam Roy',
-          company: 'Roy & Associates',
-          outcome: 'Not Interested',
-          priority: 'Low Priority',
-          remarks: 'Not interested in current services.',
-          leadId: 7,
-          phone: '9876543216',
-          isLast: true,
-        ),
-      ],
-    );
-  }
-
   Widget _buildDateHeader(String dateText) {
     return Padding(
       padding: const EdgeInsets.only(top: 8.0, bottom: 12.0),
@@ -320,19 +493,23 @@ class _ActivityScreenState extends State<ActivityScreen> {
             dateText,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: const [
-                Icon(Icons.calendar_month_outlined, size: 14, color: Color(0xFF2563EB)),
-                SizedBox(width: 4),
-                Text('Calendar', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-              ],
+          InkWell(
+            onTap: _pickDate,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.calendar_month_outlined, size: 14, color: Color(0xFF2563EB)),
+                  SizedBox(width: 4),
+                  Text('Calendar', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                ],
+              ),
             ),
           ),
         ],
@@ -347,7 +524,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
     required String company,
     required String outcome,
     required String priority,
-    List<String>? subTags,
     String? remarks,
     String? followup,
     required int leadId,
@@ -373,7 +549,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       iconColor = const Color(0xFFD97706);
       outcomeBg = const Color(0xFFFEF3C7);
       outcomeColor = const Color(0xFFD97706);
-    } else if (lowerOutcome.contains('remark')) {
+    } else if (lowerOutcome.contains('remark') || type == 'followup') {
       iconData = Icons.article_outlined;
       iconBg = const Color(0xFFF3E8FF);
       iconColor = const Color(0xFF9333EA);
@@ -504,39 +680,32 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       ],
                     ),
 
-                    // Sub-tag Pills Row
-                    if (subTags != null && subTags.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: subTags.map((t) {
-                          Color tagBg = const Color(0xFFEFF6FF);
-                          Color tagText = const Color(0xFF2563EB);
-                          if (t.contains('High')) {
-                            tagBg = const Color(0xFFDBEAFE);
-                            tagText = const Color(0xFF1D4ED8);
-                          } else if (t.contains('Medium')) {
-                            tagBg = const Color(0xFFFEF3C7);
-                            tagText = const Color(0xFFD97706);
-                          } else if (t.contains('Low')) {
-                            tagBg = const Color(0xFFEFF6FF);
-                            tagText = const Color(0xFF2563EB);
-                          } else if (t.contains('Interested')) {
-                            tagBg = const Color(0xFFDCFCE7);
-                            tagText = const Color(0xFF16A34A);
-                          } else if (t.contains('Retry')) {
-                            tagBg = const Color(0xFFFEE2E2);
-                            tagText = const Color(0xFFDC2626);
-                          }
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(color: tagBg, borderRadius: BorderRadius.circular(6)),
-                            child: Text(t, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: tagText)),
-                          );
-                        }).toList(),
-                      ),
-                    ],
+                    // Priority Tag Pill
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: priority.toLowerCase().contains('high')
+                                ? const Color(0xFFDBEAFE)
+                                : (priority.toLowerCase().contains('medium') ? const Color(0xFFFEF3C7) : const Color(0xFFEFF6FF)),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$priority Priority',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: priority.toLowerCase().contains('high')
+                                  ? const Color(0xFF1D4ED8)
+                                  : (priority.toLowerCase().contains('medium') ? const Color(0xFFD97706) : const Color(0xFF2563EB)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
 
                     // Remarks Line
                     if (remarks != null && remarks.isNotEmpty) ...[
@@ -564,7 +733,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           const Icon(Icons.calendar_today_outlined, size: 12, color: Color(0xFF64748B)),
                           const SizedBox(width: 6),
                           Text(
-                            followup,
+                            'Follow-up: $followup',
                             style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                           ),
                         ],

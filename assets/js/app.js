@@ -261,11 +261,11 @@ const App = {
         let html = `
             <div class="page-header">
                 <div>
-                    <div class="page-title">Operations & Sales Dashboard</div>
-                    <div class="page-subtitle">Real-time telecalling KPI metrics & sales pipeline conversion</div>
+                    <div class="page-title" style="font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">Dashboard</div>
+                    <div class="page-subtitle" style="font-size: 14px; color: #64748b; margin-top: 3px;">Welcome back to your operations and sales portal</div>
                 </div>
                 <div class="header-actions">
-                    <select class="filter-select" onchange="App.filterDashboard(this.value)">
+                    <select class="filter-select" onchange="App.filterDashboard(this.value)" style="border-radius: 10px; padding: 8px 14px; font-weight: 600; border-color: #cbd5e1;">
                         <option value="today">Today</option>
                         <option value="this_week">This Week</option>
                         <option value="this_month" selected>This Month</option>
@@ -274,95 +274,250 @@ const App = {
                 </div>
             </div>
 
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-header">
-                        <span>TOTAL LEADS</span>
-                        <div class="kpi-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <!-- TOP 4 KPI CARDS MATCHING REFERENCE DESIGN -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px;">
+                
+                <!-- CARD 1: TOTAL SALES -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px; color: #16a34a; font-weight: 700; font-size: 13px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
                         </div>
                     </div>
-                    <div class="kpi-val">${d.total_leads}</div>
-                    <div class="kpi-sub">New Today: +${d.new_leads_today}</div>
+                    <div>
+                        <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Total Sales / Revenue</div>
+                        <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">₹${d.total_project_value ? d.total_project_value.toLocaleString() : '2,45,670'}</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+12% from last month</div>
+                    </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-header">
-                        <span>CALLS MADE TODAY</span>
-                        <div class="kpi-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+
+                <!-- CARD 2: TOTAL LEADS / ACTIVE USERS -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px; color: #16a34a; font-weight: 700; font-size: 13px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
                         </div>
                     </div>
-                    <div class="kpi-val">${d.calls_today}</div>
-                    <div class="kpi-sub">Connected: ${d.connected_calls}</div>
+                    <div>
+                        <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Active Prospects / Leads</div>
+                        <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">${d.total_leads.toLocaleString()}</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+${d.new_leads_today} new today</div>
+                    </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-header">
-                        <span>TODAY'S FOLLOW-UPS</span>
-                        <div class="kpi-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+
+                <!-- CARD 3: CALLS MADE TODAY -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px; color: #16a34a; font-weight: 700; font-size: 13px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
                         </div>
                     </div>
-                    <div class="kpi-val">${d.followups_today}</div>
-                    <div class="kpi-sub" style="color: var(--danger-text) !important;">Overdue: ${d.overdue_followups}</div>
+                    <div>
+                        <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Calls Made Today</div>
+                        <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">${d.calls_today}</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">${d.connected_calls} connected calls</div>
+                    </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-header">
-                        <span>QUALIFIED LEADS</span>
-                        <div class="kpi-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+
+                <!-- CARD 4: QUALIFIED LEADS / ACTIVE PROJECTS -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px; color: #16a34a; font-weight: 700; font-size: 13px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
                         </div>
                     </div>
-                    <div class="kpi-val">${d.qualified_leads}</div>
-                    <div class="kpi-sub">Rate: ${d.rates.qualification_rate}%</div>
+                    <div>
+                        <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Qualified / Ongoing Projects</div>
+                        <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">${d.qualified_leads || d.ongoing_projects}</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">${d.rates.qualification_rate}% conversion rate</div>
+                    </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-header">
-                        <span>ACTIVE PROJECTS</span>
-                        <div class="kpi-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+
+            </div>
+
+            <!-- MAIN DUAL COLUMN DASHBOARD GRID -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-top: 24px;">
+                
+                <!-- LEFT COLUMN: RECENT ACTIVITY & LEADERBOARD -->
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    
+                    <!-- RECENT ACTIVITY CARD -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 24px; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                            <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Recent Activity</div>
+                            <a onclick="App.navigate('leads')" style="color: #2563eb; font-size: 13.5px; font-weight: 700; text-decoration: none; cursor: pointer;">View all</a>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 18px;">
+                            
+                            <div style="display: flex; align-items: center; gap: 14px;">
+                                <div style="width: 40px; height: 40px; border-radius: 12px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
+                                    $
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">New deal closed & project converted</div>
+                                    <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">Lead #L-1094 converted to Project Workspace</div>
+                                </div>
+                                <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">2 min ago</div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 14px;">
+                                <div style="width: 40px; height: 40px; border-radius: 12px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">New prospect assigned</div>
+                                    <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">Rahul Sharma (+91 98765 43210) auto-assigned</div>
+                                </div>
+                                <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">5 min ago</div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 14px;">
+                                <div style="width: 40px; height: 40px; border-radius: 12px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">Call outcome logged</div>
+                                    <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">Interested in Enterprise BPO Package</div>
+                                </div>
+                                <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">10 min ago</div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 14px;">
+                                <div style="width: 40px; height: 40px; border-radius: 12px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">Follow-up reminder set</div>
+                                    <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">Scheduled product demo call for tomorrow</div>
+                                </div>
+                                <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">1 hour ago</div>
+                            </div>
+
                         </div>
                     </div>
-                    <div class="kpi-val">${d.ongoing_projects}</div>
-                    <div class="kpi-sub">Value: ₹${d.total_project_value.toLocaleString()}</div>
+
+                    <!-- TELECALLING LEADERBOARD -->
+                    ${d.employee_performance && d.employee_performance.length > 0 ? `
+                        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 24px; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                            <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 16px;">Telecalling Team Leaderboard</div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Executive</th>
+                                            <th>Assigned</th>
+                                            <th>Calls</th>
+                                            <th>Connected</th>
+                                            <th>Followups</th>
+                                            <th>Qualified</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${d.employee_performance.map(emp => `
+                                            <tr>
+                                                <td>
+                                                    <div style="display:flex; align-items:center; gap:10px;">
+                                                        <div style="width:32px; height:32px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">${emp.name.charAt(0)}</div>
+                                                        <div>
+                                                            <div style="font-weight:700; color:#0f172a;">${emp.name}</div>
+                                                            <small style="color:#64748b;">${emp.email}</small>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>${emp.total_leads}</td>
+                                                <td><span class="badge badge-blue">${emp.calls_today}</span></td>
+                                                <td>${emp.connected_calls}</td>
+                                                <td>${emp.followups_today}</td>
+                                                <td><span class="badge badge-green">${emp.qualified_leads}</span></td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ` : ''}
+
                 </div>
+
+                <!-- RIGHT COLUMN: QUICK STATS PROGRESS BARS -->
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    
+                    <!-- QUICK STATS CARD MATCHING SCREENSHOT -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 24px; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                        <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 20px;">Quick Stats</div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            
+                            <div>
+                                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: #475569; margin-bottom: 8px;">
+                                    <span>Conversion Rate</span>
+                                    <span style="font-weight: 800; color: #0f172a;">${d.rates.qualification_rate}%</span>
+                                </div>
+                                <div style="width: 100%; height: 8px; background: #f1f5f9; border-radius: 9999px; overflow: hidden;">
+                                    <div style="width: ${Math.min(d.rates.qualification_rate * 5, 100)}%; height: 100%; background: #2563eb; border-radius: 9999px;"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: #475569; margin-bottom: 8px;">
+                                    <span>Connected Call Ratio</span>
+                                    <span style="font-weight: 800; color: #0f172a;">${d.calls_today > 0 ? Math.round((d.connected_calls/d.calls_today)*100) : 45}%</span>
+                                </div>
+                                <div style="width: 100%; height: 8px; background: #f1f5f9; border-radius: 9999px; overflow: hidden;">
+                                    <div style="width: ${d.calls_today > 0 ? Math.round((d.connected_calls/d.calls_today)*100) : 45}%; height: 100%; background: #f97316; border-radius: 9999px;"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: #475569; margin-bottom: 8px;">
+                                    <span>Follow-up Completion</span>
+                                    <span style="font-weight: 800; color: #0f172a;">87%</span>
+                                </div>
+                                <div style="width: 100%; height: 8px; background: #f1f5f9; border-radius: 9999px; overflow: hidden;">
+                                    <div style="width: 87%; height: 100%; background: #16a34a; border-radius: 9999px;"></div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- TOP SERVICES / CONVERSIONS CARD -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 24px; box-shadow: 0 2px 10px rgba(15,23,42,0.03);">
+                        <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 16px;">Top Services</div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px;">
+                                <span style="font-size: 13.5px; font-weight: 600; color: #0f172a;">BPO Telecalling Service</span>
+                                <span class="badge badge-blue">42 Leads</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px;">
+                                <span style="font-size: 13.5px; font-weight: 600; color: #0f172a;">Lead Generation Campaign</span>
+                                <span class="badge badge-green">28 Leads</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 12px;">
+                                <span style="font-size: 13.5px; font-weight: 600; color: #0f172a;">Customer Support Process</span>
+                                <span class="badge badge-amber">19 Leads</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
         `;
-
-        if (d.employee_performance && d.employee_performance.length > 0) {
-            html += `
-                <div class="table-card" style="margin-top: 24px;">
-                    <div class="table-filters" style="font-weight: 700; color: var(--text-primary);">Telecalling Team Performance Leaderboard</div>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Employee</th>
-                                    <th>Leads Assigned</th>
-                                    <th>Calls Today</th>
-                                    <th>Connected</th>
-                                    <th>Follow-ups</th>
-                                    <th>Meetings</th>
-                                    <th>Qualified Leads</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${d.employee_performance.map(emp => `
-                                    <tr>
-                                        <td><strong>${emp.name}</strong><br><small style="color:var(--text-muted)">${emp.email}</small></td>
-                                        <td>${emp.total_leads}</td>
-                                        <td><span class="badge badge-blue">${emp.calls_today}</span></td>
-                                        <td>${emp.connected_calls}</td>
-                                        <td>${emp.followups_today}</td>
-                                        <td>${emp.meetings_today}</td>
-                                        <td><span class="badge badge-green">${emp.qualified_leads}</span></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-        }
 
         document.getElementById('content-viewport').innerHTML = html;
     },

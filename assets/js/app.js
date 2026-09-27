@@ -1621,55 +1621,328 @@ const App = {
     },
 
     // 11. BULK CSV IMPORT UI
-    renderImport: function() {
+    parsedCsvLeads: [],
+
+    renderImport: async function() {
+        // Fetch users to populate assignment dropdowns
+        let managers = [];
+        let executives = [];
+        try {
+            const res = await fetch('api/users?action=list');
+            const data = await res.json();
+            if (data.success && data.data) {
+                managers = data.data.filter(u => u.role_name === 'sales_manager' || u.role_name === 'super_admin' || u.role_name === 'admin');
+                executives = data.data.filter(u => u.role_name === 'telecalling_executive' || u.role_name === 'sales_manager' || u.role_name === 'super_admin');
+            }
+        } catch(err) {
+            console.error(err);
+        }
+
         let html = `
-            <div class="page-header">
+            <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
                 <div>
-                    <div class="page-title">Bulk CSV Lead Importer</div>
-                    <div class="page-subtitle">Upload CSV lists with automatic phone number duplicate check</div>
+                    <div class="page-title">Bulk CSV Lead Importer & Assignment</div>
+                    <div class="page-subtitle">Analyze full CSV table, inspect data rows, and assign leads to team members before final insertion</div>
+                </div>
+                <div class="header-actions">
+                    <a href="api/leads?action=sample_csv" class="btn btn-secondary" style="background:#ffffff; border:1px solid #cbd5e1; font-weight:700; color:#0f172a; text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
+                        📥 Download Sample CSV Template
+                    </a>
                 </div>
             </div>
 
-            <div class="card" style="background:var(--card-bg); border:1px solid var(--card-border); padding:32px; border-radius:12px; max-width:600px; box-shadow:var(--shadow-xs);">
-                <form onsubmit="App.handleCsvUpload(event)">
-                    <div style="margin-bottom:20px;">
-                        <label style="display:block; font-size:13px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">Select CSV File (.csv)</label>
-                        <input type="file" id="csv-file-input" accept=".csv" required style="width:100%; padding:12px; background:#ffffff; border:1px solid var(--card-border); border-radius:8px; color:var(--text-primary);">
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">🚀 Process & Import Leads</button>
-                </form>
-                <div id="import-report-box" style="margin-top:24px;"></div>
+            <!-- STEP 1: UPLOAD & ANALYZE CARD -->
+            <div class="card" style="background:var(--card-bg); border:1px solid var(--card-border); padding:24px; border-radius:14px; margin-bottom:24px; box-shadow:var(--shadow-xs);">
+                <div style="font-size:15px; font-weight:800; color:#0f172a; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                    <span>1️⃣ Select CSV File to Analyze</span>
+                    <span style="font-size:12px; color:#64748b; font-weight:500;">(Required Columns: Full Name, Mobile Number, Email Address, Company Name, City, Priority, Service Requested, Lead Source, Initial Requirement)</span>
+                </div>
+                <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" id="csv-file-input" accept=".csv" onchange="App.handleCsvAnalysis(event)" style="flex:1; min-width:280px; padding:12px; background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; color:#0f172a; font-size:14px;">
+                    <button type="button" onclick="document.getElementById('csv-file-input').click()" class="btn btn-primary" style="font-weight:700; padding:12px 20px;">
+                        📊 Analyze & Preview File
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONTAINER FOR PARSED CSV PREVIEW & ASSIGNMENT -->
+            <div id="csv-preview-container">
+                <div style="text-align:center; padding:48px 20px; background:#f8fafc; border:2px dashed #cbd5e1; border-radius:14px; color:#64748b;">
+                    <div style="font-size:36px; margin-bottom:12px;">📄</div>
+                    <div style="font-size:16px; font-weight:700; color:#334155;">No CSV File Analyzed Yet</div>
+                    <div style="font-size:13px; color:#94a3b8; margin-top:4px;">Upload a CSV file above or download the sample template to inspect rows before importing.</div>
+                </div>
             </div>
         `;
         document.getElementById('content-viewport').innerHTML = html;
+        this.managersListCache = managers;
+        this.executivesListCache = executives;
     },
 
-    handleCsvUpload: async function(e) {
-        e.preventDefault();
-        const fileInput = document.getElementById('csv-file-input');
-        if (!fileInput.files[0]) return;
+    managersListCache: [],
+    executivesListCache: [],
 
-        const formData = new FormData();
-        formData.append('csv_file', fileInput.files[0]);
+    handleCsvAnalysis: function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
 
-        document.getElementById('import-report-box').innerHTML = '<div style="color:var(--primary);">Parsing CSV and validating phone numbers...</div>';
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const text = evt.target.result;
+            const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
+            if (lines.length <= 1) {
+                alert('CSV file appears empty or missing header row.');
+                return;
+            }
 
-        const res = await fetch('api/import', { method: 'POST', body: formData });
-        const data = await res.json();
+            // Parse header line
+            const parseCsvLine = (line) => {
+                const result = [];
+                let cell = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(cell.trim().replace(/^"|"$/g, ''));
+                        cell = '';
+                    } else {
+                        cell += char;
+                    }
+                }
+                result.push(cell.trim().replace(/^"|"$/g, ''));
+                return result;
+            };
 
-        if (data.success) {
-            const s = data.summary;
-            document.getElementById('import-report-box').innerHTML = `
-                <div style="background:var(--success-light); border:1px solid #a7f3d0; padding:16px; border-radius:8px; color:var(--success-text);">
-                    <div style="font-size:16px; font-weight:700; margin-bottom:8px;">Import Complete!</div>
-                    <div>Total Rows: ${s.total_rows}</div>
-                    <div>Successfully Imported: <strong>${s.imported}</strong></div>
-                    <div>Duplicates Skipped: ${s.duplicates}</div>
-                    <div>Invalid Rows: ${s.invalid}</div>
+            const headers = parseCsvLine(lines[0]).map(h => h.trim());
+            const rows = [];
+            const mobileSeen = new Set();
+            let validCount = 0;
+            let duplicateCount = 0;
+            let invalidCount = 0;
+
+            for (let i = 1; i < lines.length; i++) {
+                const cols = parseCsvLine(lines[i]);
+                if (cols.length === 0 || cols.every(c => c === '')) continue;
+
+                // Create lead object mapped by header or index fallback
+                const rowObj = {
+                    full_name: cols[0] || '',
+                    mobile: cols[1] || '',
+                    email: cols[2] || '',
+                    company_name: cols[3] || '',
+                    city: cols[4] || '',
+                    priority: cols[5] || 'Medium',
+                    service_requested: cols[6] || '',
+                    lead_source: cols[7] || '',
+                    requirement: cols[8] || ''
+                };
+
+                let status = 'Valid';
+                let reason = '';
+                const cleanMobile = rowObj.mobile.replace(/\D/g, '');
+
+                if (!rowObj.full_name || !rowObj.mobile) {
+                    status = 'Invalid';
+                    reason = 'Missing Name or Mobile';
+                    invalidCount++;
+                } else if (mobileSeen.has(cleanMobile)) {
+                    status = 'Duplicate';
+                    reason = 'Duplicate in file';
+                    duplicateCount++;
+                } else {
+                    mobileSeen.add(cleanMobile);
+                    validCount++;
+                }
+
+                rows.push({ ...rowObj, status, reason });
+            }
+
+            this.parsedCsvLeads = rows;
+            this.renderCsvPreviewTable(rows, headers, validCount, duplicateCount, invalidCount);
+        };
+        reader.readAsText(file);
+    },
+
+    renderCsvPreviewTable: function(rows, headers, validCount, duplicateCount, invalidCount) {
+        const managersOptions = this.managersListCache.map(m => `<option value="${m.id}">${m.name} (${m.email})</option>`).join('');
+        const execOptions = this.executivesListCache.map(e => `<option value="${e.id}">${e.name} (${e.email})</option>`).join('');
+
+        const previewHtml = `
+            <!-- ANALYSIS SUMMARY BAR -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin-bottom:20px;">
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; padding:14px; border-radius:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">Total Parsed Rows</div>
+                    <div style="font-size:22px; font-weight:800; color:#1e3a8a; margin-top:2px;">${rows.length}</div>
                 </div>
-            `;
-        } else {
-            document.getElementById('import-report-box').innerHTML = `<div style="color:var(--danger);">${data.message}</div>`;
+                <div style="background:#f0fdf4; border:1px solid #a7f3d0; padding:14px; border-radius:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase;">Ready to Import</div>
+                    <div style="font-size:22px; font-weight:800; color:#14532d; margin-top:2px;">${validCount}</div>
+                </div>
+                <div style="background:#fff7ed; border:1px solid #fed7aa; padding:14px; border-radius:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#9a3412; text-transform:uppercase;">File Duplicates</div>
+                    <div style="font-size:22px; font-weight:800; color:#7c2d12; margin-top:2px;">${duplicateCount}</div>
+                </div>
+                <div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#991b1b; text-transform:uppercase;">Invalid Rows</div>
+                    <div style="font-size:22px; font-weight:800; color:#7f1d1d; margin-top:2px;">${invalidCount}</div>
+                </div>
+            </div>
+
+            <!-- 2. FULL PREVIEW TABLE -->
+            <div class="table-card" style="margin-bottom:24px; border-radius:14px;">
+                <div style="padding:16px 20px; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:15px; font-weight:800; color:#0f172a;">📋 Step 2: Full Analyzed Data Table Preview</div>
+                    <span class="badge badge-blue">${rows.length} Rows</span>
+                </div>
+                <div class="table-responsive" style="max-height:420px; overflow-y:auto;">
+                    <table class="data-table" style="font-size:13px;">
+                        <thead>
+                            <tr style="position:sticky; top:0; background:#f8fafc; z-index:2;">
+                                <th>#</th>
+                                <th>Status</th>
+                                <th>Full Name</th>
+                                <th>Mobile Number</th>
+                                <th>Email</th>
+                                <th>Company</th>
+                                <th>City</th>
+                                <th>Priority</th>
+                                <th>Service Requested</th>
+                                <th>Lead Source</th>
+                                <th>Initial Requirement</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows.map((r, idx) => {
+                                let badgeClass = r.status === 'Valid' ? 'badge-green' : (r.status === 'Duplicate' ? 'badge-orange' : 'badge-red');
+                                return `
+                                    <tr>
+                                        <td>${idx + 1}</td>
+                                        <td>
+                                            <span class="badge ${badgeClass}">${r.status}</span>
+                                            ${r.reason ? `<br><small style="color:#ef4444; font-size:10.5px;">${r.reason}</small>` : ''}
+                                        </td>
+                                        <td><strong>${r.full_name || '—'}</strong></td>
+                                        <td><code>${r.mobile || '—'}</code></td>
+                                        <td>${r.email || '—'}</td>
+                                        <td>${r.company_name || '—'}</td>
+                                        <td>${r.city || '—'}</td>
+                                        <td><span class="badge ${r.priority === 'High' ? 'badge-red' : (r.priority === 'Low' ? 'badge-blue' : 'badge-orange')}">${r.priority}</span></td>
+                                        <td>${r.service_requested || '—'}</td>
+                                        <td>${r.lead_source || '—'}</td>
+                                        <td><small style="color:#64748b;">${r.requirement || '—'}</small></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- STEP 3: ASSIGNMENT & FINAL IMPORT CONTROL PANEL -->
+            <div class="card" style="background:#f8fafc; border:2px solid #3b82f6; border-radius:14px; padding:24px; box-shadow:0 10px 25px -5px rgba(59, 130, 246, 0.1);">
+                <div style="font-size:16px; font-weight:800; color:#1e3a8a; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+                    <span>3️⃣ Assign Team Members & Trigger Final Import</span>
+                </div>
+                
+                <form onsubmit="App.submitParsedCsvImport(event)">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:18px; margin-bottom:20px;">
+                        <div>
+                            <label style="display:block; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
+                                👤 Assign Sales Manager
+                            </label>
+                            <select id="import-assign-manager" class="form-control" style="width:100%; padding:11px; border:1px solid #cbd5e1; border-radius:10px; font-size:13.5px; font-weight:600; background:#ffffff;">
+                                <option value="">Auto-Assign / No Manager Selected</option>
+                                ${managersOptions}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
+                                📞 Assign Calling / Telecalling Executive
+                            </label>
+                            <select id="import-assign-executive" class="form-control" style="width:100%; padding:11px; border:1px solid #cbd5e1; border-radius:10px; font-size:13.5px; font-weight:600; background:#ffffff;">
+                                <option value="">Auto-Assign / Unassigned Queue</option>
+                                ${execOptions}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12.5px; font-weight:800; color:#334155; margin-bottom:6px;">
+                                🔥 Priority Batch Override
+                            </label>
+                            <select id="import-priority" class="form-control" style="width:100%; padding:11px; border:1px solid #cbd5e1; border-radius:10px; font-size:13.5px; font-weight:600; background:#ffffff;">
+                                <option value="Keep CSV Value">Keep CSV Row Priority</option>
+                                <option value="High">Force High Priority</option>
+                                <option value="Medium">Force Medium Priority</option>
+                                <option value="Low">Force Low Priority</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; border-top:1px solid #e2e8f0; padding-top:18px;">
+                        <div style="font-size:13px; color:#475569; font-weight:600;">
+                            Target Leads: <strong style="color:#2563eb;">${validCount} Valid Leads</strong> will be created in Database
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="padding:13px 28px; font-size:15px; font-weight:800; border-radius:10px; box-shadow:0 4px 12px rgba(37,99,235,0.3);">
+                            🚀 Import & Assign ${validCount} Verified Leads Now →
+                        </button>
+                    </div>
+                </form>
+                <div id="import-execution-output" style="margin-top:16px;"></div>
+            </div>
+        `;
+
+        document.getElementById('csv-preview-container').innerHTML = previewHtml;
+    },
+
+    submitParsedCsvImport: async function(e) {
+        e.preventDefault();
+        const validLeads = (this.parsedCsvLeads || []).filter(l => l.status === 'Valid');
+        if (validLeads.length === 0) {
+            alert('No valid leads available to import!');
+            return;
+        }
+
+        const managerId = document.getElementById('import-assign-manager').value || null;
+        const executiveId = document.getElementById('import-assign-executive').value || null;
+        const priorityOverride = document.getElementById('import-priority').value;
+
+        const outputDiv = document.getElementById('import-execution-output');
+        outputDiv.innerHTML = '<div style="color:#2563eb; font-weight:700;">🔄 Processing lead batch insertion & system assignment...</div>';
+
+        const payload = {
+            action: 'import_csv',
+            assigned_manager_id: managerId,
+            assigned_executive_id: executiveId,
+            priority_override: priorityOverride,
+            leads: validLeads
+        };
+
+        try {
+            const res = await fetch('api/leads.php?action=import_csv', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                const s = data.summary;
+                outputDiv.innerHTML = `
+                    <div style="background:#f0fdf4; border:1px solid #86efac; padding:18px; border-radius:12px; color:#166534; margin-top:12px;">
+                        <div style="font-size:16px; font-weight:800; margin-bottom:6px;">🎉 Bulk Lead Import & Assignment Successful!</div>
+                        <div style="font-size:13.5px; font-weight:600;">${data.message}</div>
+                        <div style="margin-top:10px; font-size:13px; display:flex; gap:16px; flex-wrap:wrap;">
+                            <span>Total Submitted: <strong>${s.total_submitted}</strong></span>
+                            <span>Successfully Imported: <strong style="color:#15803d;">${s.imported}</strong></span>
+                            <span>Database Duplicates Skipped: <strong style="color:#c2410c;">${s.duplicates_skipped}</strong></span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                outputDiv.innerHTML = `<div style="background:#fef2f2; border:1px solid #fecaca; padding:14px; border-radius:10px; color:#991b1b; margin-top:12px; font-weight:700;">❌ ${data.message}</div>`;
+            }
+        } catch(err) {
+            outputDiv.innerHTML = `<div style="color:#dc2626; font-weight:700;">❌ Error communicating with server: ${err.message}</div>`;
         }
     },
 

@@ -619,3 +619,112 @@ if ($action === 'export') {
     fclose($output);
     exit;
 }
+
+// 10. SAMPLE CSV TEMPLATE DOWNLOAD
+if ($action === 'sample_csv') {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="sample_lead_import_template.csv"');
+    
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['Full Name', 'Mobile Number', 'Email Address', 'Company Name', 'City', 'Priority', 'Service Requested', 'Lead Source', 'Initial Requirement']);
+    fputcsv($output, ['Soumojit Saha', '8016222991', 'wbsoumo@gmail.com', 'Taskbazi', 'Kolkata', 'High Priority', 'Mobile App Development', 'Client Referral', 'Need CRM and Calling BPO Android app']);
+    fputcsv($output, ['Amit Sharma', '9876543210', 'amit@example.com', 'Tech Corp', 'Mumbai', 'Medium Priority', 'Web Development', 'Google Ads', 'E-commerce website requirement']);
+    fputcsv($output, ['Priya Patel', '9123456789', 'priya@example.com', 'Innovate India', 'Bangalore', 'High Priority', 'SEO & Marketing', 'LinkedIn', 'SEO and digital marketing package']);
+    fclose($output);
+    exit;
+}
+
+// 11. BULK CSV IMPORT WITH ASSIGNMENT
+if ($action === 'import_csv') {
+    if ($roleName === 'operation_executive') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized to bulk import leads']);
+        exit;
+    }
+
+    $rawInput = file_get_contents('php://input');
+    $inputData = json_decode($rawInput, true);
+    if (!$inputData) {
+        $inputData = $_POST;
+    }
+
+    $leads = $inputData['leads'] ?? [];
+    if (is_string($leads)) {
+        $leads = json_decode($leads, true) ?? [];
+    }
+
+    $assignedManagerId = !empty($inputData['assigned_manager_id']) ? (int)$inputData['assigned_manager_id'] : null;
+    $assignedExecutiveId = !empty($inputData['assigned_executive_id']) ? (int)$inputData['assigned_executive_id'] : null;
+    $priorityOverride = $inputData['priority'] ?? null;
+
+    if (empty($leads) || !is_array($leads)) {
+        echo json_encode(['success' => false, 'message' => 'No valid lead rows provided for import.']);
+        exit;
+    }
+
+    $inserted = 0;
+    $skipped = 0;
+
+    $stmt = $pdo->prepare("
+        INSERT INTO leads (lead_code, name, mobile, email, company_name, city, priority, initial_requirement, assigned_manager_id, assigned_executive_id, status_id, created_at)
+        VALUES (:code, :name, :mobile, :email, :company, :city, :priority, :req, :mgr, :exec, 1, NOW())
+    ");
+
+    $checkStmt = $pdo->prepare("SELECT id FROM leads WHERE mobile = :mobile LIMIT 1");
+
+    foreach ($leads as $l) {
+        $name = trim($l['name'] ?? '');
+        $mobile = trim($l['mobile'] ?? '');
+        $email = trim($l['email'] ?? '');
+        $company = trim($l['company_name'] ?? '');
+        $city = trim($l['city'] ?? '');
+        $req = trim($l['initial_requirement'] ?? $l['requirements'] ?? '');
+        
+        $prio = (!empty($priorityOverride) && $priorityOverride !== 'keep_csv') 
+            ? $priorityOverride 
+            : (!empty($l['priority']) ? trim($l['priority']) : 'Medium Priority');
+
+        if (empty($name) || empty($mobile)) {
+            $skipped++;
+            continue;
+        }
+
+        // Check duplicates by mobile
+        $checkStmt->execute(['mobile' => $mobile]);
+        if ($checkStmt->fetch()) {
+            $skipped++;
+            continue;
+        }
+
+        $code = 'L-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 6));
+
+        try {
+            $stmt->execute([
+                'code'     => $code,
+                'name'     => $name,
+                'mobile'   => $mobile,
+                'email'    => $email,
+                'company'  => $company,
+                'city'     => $city,
+                'priority' => $prio,
+                'req'      => $req,
+                'mgr'      => $assignedManagerId,
+                'exec'     => $assignedExecutiveId
+            ]);
+            $inserted++;
+        } catch (PDOException $e) {
+            $skipped++;
+        }
+    }
+
+    logActivity($pdo, 'leads', 'bulk_imported', 0, null, ['imported' => $inserted, 'skipped' => $skipped]);
+
+    echo json_encode([
+        'success' => true,
+        'message' => "Successfully imported $inserted leads! ($skipped skipped or duplicate numbers)",
+        'summary' => [
+            'imported' => $inserted,
+            'skipped'  => $skipped
+        ]
+    ]);
+    exit;
+}

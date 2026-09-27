@@ -6,6 +6,7 @@ const App = {
     dropdowns: {},
 
     init: async function() {
+        console.log('🚀 LeadTriangle System v1.0.2 Live - Git Pipeline Test Passed');
         await this.checkAuth();
         if (this.currentUser) {
             await this.loadDropdowns();

@@ -6,7 +6,7 @@ const App = {
     dropdowns: {},
 
     init: async function() {
-        console.log('🚀 LeadTriangle System v1.0.2 Live - Git Pipeline Test Passed');
+        console.log('LeadTriangle System v1.0.2 Live - Git Pipeline Test Passed');
         await this.checkAuth();
         if (this.currentUser) {
             await this.loadDropdowns();
@@ -37,14 +37,16 @@ const App = {
                     banner.id = 'active-call-banner';
                     banner.style.cssText = 'position: fixed; bottom: 24px; right: 24px; background: #ffffff; border: 2px solid #2563eb; border-radius: 16px; padding: 16px 20px; box-shadow: 0 10px 30px rgba(37,99,235,0.25); z-index: 9999; display: flex; align-items: center; gap: 14px; animation: slideUp 0.3s ease-out;';
                     banner.innerHTML = `
-                        <div style="width: 42px; height: 42px; border-radius: 50%; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; animation: pulse 1.5s infinite;">📞</div>
+                        <div style="width: 42px; height: 42px; border-radius: 50%; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0; animation: pulse 1.5s infinite;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        </div>
                         <div>
                             <div style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px;">Live Phone Call Active</div>
                             <div style="font-size: 14.5px; font-weight: 800; color: #0f172a;" id="banner-lead-name">${call.lead_name}</div>
                             <div style="font-size: 12px; color: #64748b;" id="banner-lead-phone">${call.phone} • Status: <span style="font-weight:700; color:#2563eb;">${call.lead_status || 'In Progress'}</span></div>
                         </div>
                         <div style="display: flex; gap: 8px; margin-left: 8px;">
-                            <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${call.lead_id}, '${call.lead_name.replace(/'/g, "\\'")}', '${call.phone}', ${call.lead_status_id || 0})">✏️ Update Lead Status</button>
+                            <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${call.lead_id}, '${call.lead_name.replace(/'/g, "\\'")}', '${call.phone}', ${call.lead_status_id || 0})">Update Lead Status</button>
                         </div>
                     `;
                     document.body.appendChild(banner);
@@ -132,8 +134,8 @@ const App = {
         if (warningMsg) {
             warningBanner = `
                 <div style="background: #fffbe8; border: 1px solid #ffe58f; padding: 12px 14px; border-radius: 8px; font-size: 12.5px; color: #b45309; margin-bottom: 20px; line-height: 1.4;">
-                    ⚠️ ${warningMsg}
-                    <div style="margin-top: 6px;"><a href="install.php" style="color: #4f46e5; font-weight: 700; text-decoration: underline;">👉 Click here to run One-Click Setup Installer</a></div>
+                    ${warningMsg}
+                    <div style="margin-top: 6px;"><a href="install.php" style="color: #4f46e5; font-weight: 700; text-decoration: underline;">Click here to run One-Click Setup Installer</a></div>
                 </div>
             `;
         }
@@ -364,7 +366,7 @@ const App = {
                             ${d.recent_activities && d.recent_activities.length > 0 ? d.recent_activities.map(act => `
                                 <div onclick="App.navigate('calling_queue')" style="display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 8px; border-radius: 10px; transition: background 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
                                     <div style="width: 40px; height: 40px; border-radius: 12px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
-                                        📞
+                                        <svg style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                                     </div>
                                     <div style="flex: 1;">
                                         <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${act.title}</div>
@@ -507,13 +509,11 @@ const App = {
         const sources = this.dropdowns?.sources || [];
         const services = this.dropdowns?.services || [];
         const executives = this.dropdowns?.executives || [];
-        const managers = this.dropdowns?.managers || [];
-
-        const modalHtml = `
+        const manag        const modalHtml = `
             <div class="modal-backdrop show" id="create-lead-modal">
                 <div class="modal-box" style="max-width: 620px; border-radius: 18px; border-top: 4px solid var(--primary); padding: 24px;">
                     <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:14px;">
-                        <div class="modal-title" style="font-size:18px; font-weight:800; color:#0f172a;">✨ Create New Lead</div>
+                        <div class="modal-title" style="font-size:18px; font-weight:800; color:#0f172a;">Create New Lead</div>
                         <button class="close-modal" onclick="App.closeModal('create-lead-modal')">✕</button>
                     </div>
                     <form onsubmit="App.submitCreateLead(event)" style="margin-top:16px;">
@@ -677,8 +677,8 @@ const App = {
                     <div class="page-subtitle">Track, filter, call, assign and qualify prospect leads</div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-secondary" onclick="App.exportLeadsCsv()">📤 Export CSV</button>
-                    <button class="btn btn-secondary" onclick="App.navigate('import')">📥 Bulk CSV Import</button>
+                    <button class="btn btn-secondary" onclick="App.exportLeadsCsv()">Export CSV</button>
+                    <button class="btn btn-secondary" onclick="App.navigate('import')">Bulk CSV Import</button>
                     <button class="btn btn-primary" onclick="App.openCreateLeadModal()">+ Add New Lead</button>
                 </div>
             </div>
@@ -691,12 +691,12 @@ const App = {
                     <!-- QUICK FILTER DROPDOWN -->
                     <select class="filter-select" style="min-width:180px;" onchange="App.renderLeads(1, {filter: this.value})">
                         <option value="" ${!currentFilters.filter ? 'selected' : ''}>All Leads</option>
-                        <option value="called" ${currentFilters.filter === 'called' ? 'selected' : ''}>📞 Called Leads</option>
-                        <option value="to_call" ${currentFilters.filter === 'to_call' ? 'selected' : ''}>⏳ Pending To Call</option>
-                        <option value="followups" ${currentFilters.filter === 'followups' ? 'selected' : ''}>📅 Scheduled Follow-ups</option>
+                        <option value="called" ${currentFilters.filter === 'called' ? 'selected' : ''}>Called Leads</option>
+                        <option value="to_call" ${currentFilters.filter === 'to_call' ? 'selected' : ''}>Pending To Call</option>
+                        <option value="followups" ${currentFilters.filter === 'followups' ? 'selected' : ''}>Scheduled Follow-ups</option>
                     </select>
 
-                    <button class="btn btn-secondary btn-sm" onclick="App.autoAssignSelectedLeads()">🔄 Equal Auto Assign</button>
+                    <button class="btn btn-secondary btn-sm" onclick="App.autoAssignSelectedLeads()">Equal Auto Assign</button>
                 </div>
 
                 <div class="table-responsive">
@@ -721,7 +721,7 @@ const App = {
                                     <td><input type="checkbox" class="chk-lead" value="${l.id}"></td>
                                     <td><strong style="color:var(--primary);">${l.lead_code}</strong></td>
                                     <td><strong>${l.name}</strong><br><small style="color:var(--text-muted)">${l.company_name || l.city || 'Individual'}</small></td>
-                                    <td><a href="tel:${l.mobile}" style="color:var(--success-text); text-decoration:none; font-weight:600;">📞 ${l.mobile}</a></td>
+                                    <td><a href="tel:${l.mobile}" style="color:var(--success-text); text-decoration:none; font-weight:600;">${l.mobile}</a></td>
                                     <td>${l.service_name || 'General Query'}</td>
                                     <td>${l.executive_name || '<span style="color:var(--text-muted)">Unassigned</span>'}</td>
                                     <td><span class="badge" style="background:${l.status_color || '#3b82f6'}22; color:${l.status_color || '#3b82f6'}; border:1px solid ${l.status_color || '#3b82f6'}55;">${l.status_name}</span></td>
@@ -767,8 +767,8 @@ const App = {
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-primary" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">📞 Call Now</button>
-                    <button class="btn btn-success" style="background:#16a34a; color:#fff;" onclick="window.open('https://wa.me/91${l.mobile.replace(/[^0-9]/g,'')}', '_blank')">💬 WhatsApp</button>
+                    <button class="btn btn-primary" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">Call Now</button>
+                    <button class="btn btn-success" style="background:#16a34a; color:#fff;" onclick="window.open('https://wa.me/91${l.mobile.replace(/[^0-9]/g,'')}', '_blank')">WhatsApp</button>
                 </div>
             </div>
 
@@ -785,7 +785,7 @@ const App = {
             <!-- 1. ABOUT TAB -->
             <div id="lead-tab-about" class="lead-tab-content">
                 <div style="background:#283593; color:#ffffff; padding:16px 20px; border-radius:14px; font-weight:800; font-size:15px; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
-                    <span>📍</span> STATUS: ${l.status_name ? l.status_name.toUpperCase() : 'NEW'}
+                    STATUS: ${l.status_name ? l.status_name.toUpperCase() : 'NEW'}
                 </div>
 
                 <div class="kpi-grid" style="margin-bottom:20px;">
@@ -816,7 +816,7 @@ const App = {
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:18px;">
                         <div>
                             <div style="font-size:12px; color:var(--text-muted); font-weight:600;">Phone Number</div>
-                            <div style="font-size:15px; font-weight:700; color:var(--primary); margin-top:4px;">🇮🇳 +91-${l.mobile}</div>
+                            <div style="font-size:15px; font-weight:700; color:var(--primary); margin-top:4px;">+91-${l.mobile}</div>
                         </div>
                         <div>
                             <div style="font-size:12px; color:var(--text-muted); font-weight:600;">Email Address</div>
@@ -843,7 +843,7 @@ const App = {
                             ${calls.map(c => `
                                 <div style="padding:14px; background:#f8fafc; border:1px solid var(--card-border); border-radius:12px;">
                                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                                        <div style="font-size:13.5px; font-weight:700; color:var(--text-primary);">📞 Call Logged by ${c.agent_name}</div>
+                                        <div style="font-size:13.5px; font-weight:700; color:var(--text-primary);">Call Logged by ${c.agent_name}</div>
                                         <span class="badge" style="background:${c.outcome_color || '#2563eb'}22; color:${c.outcome_color || '#2563eb'};">${c.outcome_name}</span>
                                     </div>
                                     <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Date: ${c.called_at} • Duration: ${c.call_duration_seconds} sec</div>
@@ -863,7 +863,7 @@ const App = {
                         <div style="display:flex; flex-direction:column; gap:12px;">
                             ${followups.map(f => `
                                 <div style="padding:14px; background:#f8fafc; border:1px solid var(--card-border); border-radius:12px;">
-                                    <div style="font-size:14px; font-weight:700; color:var(--text-primary);">📅 ${f.purpose || 'Follow-up Call'}</div>
+                                    <div style="font-size:14px; font-weight:700; color:var(--text-primary);">${f.purpose || 'Follow-up Call'}</div>
                                     <div style="font-size:12.5px; color:var(--primary); font-weight:600; margin-top:2px;">Due: ${f.followup_date} at ${f.followup_time}</div>
                                     <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Assigned to: ${f.agent_name} • Status: ${f.status}</div>
                                 </div>
@@ -904,7 +904,7 @@ const App = {
                         ${documents.length === 0 ? '<p style="color:var(--text-muted)">No documents uploaded yet.</p>' : documents.map(d => `
                             <div style="padding:14px; background:#f8fafc; border:1px solid var(--card-border); border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
                                 <div>
-                                    <div style="font-size:13.5px; font-weight:700; color:var(--primary);">📄 ${d.file_name}</div>
+                                    <div style="font-size:13.5px; font-weight:700; color:var(--primary);">${d.file_name}</div>
                                     <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Uploaded by ${d.author_name} on ${d.uploaded_at}</div>
                                 </div>
                                 <a href="${d.file_path}" target="_blank" class="btn btn-secondary btn-sm">Download</a>
@@ -947,7 +947,7 @@ const App = {
         if (!fileInput.files || fileInput.files.length === 0) return;
 
         const formData = new FormData();
-        formData.append('action', 'upload_document');
+        formData.append('action', 'upload_doc');
         formData.append('lead_id', leadId);
         formData.append('document', fileInput.files[0]);
 
@@ -1033,16 +1033,16 @@ const App = {
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <span style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase;">Queue Filter:</span>
                         <button class="btn btn-sm ${state.quick_filter === 'new' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderCallingQueue({quick_filter:'new'})">
-                            🆕 New Leads ${state.quick_filter === 'new' ? '✓' : ''}
+                            New Leads ${state.quick_filter === 'new' ? '✓' : ''}
                         </button>
                         <button class="btn btn-sm ${state.quick_filter === 'followups' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderCallingQueue({quick_filter:'followups'})">
-                            📅 Pending Follow-ups ${state.quick_filter === 'followups' ? '✓' : ''}
+                            Pending Follow-ups ${state.quick_filter === 'followups' ? '✓' : ''}
                         </button>
                         <button class="btn btn-sm ${state.quick_filter === 'called' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderCallingQueue({quick_filter:'called'})">
-                            📞 Already Called ${state.quick_filter === 'called' ? '✓' : ''}
+                            Already Called ${state.quick_filter === 'called' ? '✓' : ''}
                         </button>
                         <button class="btn btn-sm ${state.quick_filter === 'all' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderCallingQueue({quick_filter:'all'})">
-                            📋 All Queue Calls ${state.quick_filter === 'all' ? '✓' : ''}
+                            All Queue Calls ${state.quick_filter === 'all' ? '✓' : ''}
                         </button>
                     </div>
 
@@ -1078,7 +1078,7 @@ const App = {
                                 <tr>
                                     <td><strong style="color:var(--primary);">${l.lead_code}</strong></td>
                                     <td><strong>${l.name}</strong><br><small style="color:var(--text-muted)">${l.company_name || l.city || 'Individual'}</small></td>
-                                    <td><a href="tel:${l.mobile}" style="color:var(--success-text); text-decoration:none; font-weight:700;">📞 ${l.mobile}</a></td>
+                                    <td><a href="tel:${l.mobile}" style="color:var(--success-text); text-decoration:none; font-weight:700;">${l.mobile}</a></td>
                                     <td>${l.service_name || 'General Query'}</td>
                                     <td>${l.executive_name || '<span style="color:#94a3b8">Unassigned</span>'}</td>
                                     <td><span class="badge badge-amber">${l.priority}</span></td>
@@ -1095,6 +1095,10 @@ const App = {
                         </tbody>
                     </table>
                 </div>
+            </div>
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },         </div>
             </div>
         `;
         document.getElementById('content-viewport').innerHTML = html;
@@ -1134,7 +1138,7 @@ const App = {
                 <div class="modal-box" style="border-top: 4px solid #2563eb; border-radius: 18px; max-width: 500px;">
                     <div class="modal-header" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 14px;">
                         <div>
-                            <div style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase;">📞 Active Call Status Manager</div>
+                            <div style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase;">Active Call Status Manager</div>
                             <div class="modal-title" style="font-size: 17px; font-weight: 800; color: #0f172a; margin-top:2px;">${name}</div>
                             <div style="font-size: 12.5px; color: #64748b; font-weight: 500;">Phone: ${mobile}</div>
                         </div>
@@ -1167,7 +1171,7 @@ const App = {
                         <!-- Followup Checkbox -->
                         <div style="background:#f8fafc; padding:14px; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:20px;">
                             <label style="font-size:13px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; cursor:pointer;">
-                                <input type="checkbox" id="chk-followup" onchange="document.getElementById('followup-sec').style.display = this.checked ? 'block' : 'none'"> 📅 Schedule Next Follow-up Call
+                                <input type="checkbox" id="chk-followup" onchange="document.getElementById('followup-sec').style.display = this.checked ? 'block' : 'none'"> Schedule Next Follow-up Call
                             </label>
                             <div id="followup-sec" style="display:none; margin-top:12px;">
                                 <div style="display:flex; gap:10px;">
@@ -1245,7 +1249,7 @@ const App = {
                             ${data.data.map(f => `
                                 <tr>
                                     <td><strong>${f.lead_name}</strong><br><small style="color:var(--text-muted)">${f.company_name || 'Lead'}</small></td>
-                                    <td><a href="tel:${f.lead_mobile}" style="color:var(--success-text); font-weight:600;">📞 ${f.lead_mobile}</a></td>
+                                    <td><a href="tel:${f.lead_mobile}" style="color:var(--success-text); font-weight:600;">${f.lead_mobile}</a></td>
                                     <td>${f.followup_date} at ${f.followup_time}</td>
                                     <td>${f.purpose || f.notes || 'Routine follow up'}</td>
                                     <td><span class="badge badge-amber">${f.status}</span></td>
@@ -1422,7 +1426,7 @@ const App = {
                                     ${this.currentUser.role_name !== 'operation_executive' ? `<td>₹${parseFloat(p.final_amount || 0).toLocaleString()}</td><td><span class="badge badge-green">₹${parseFloat(p.paid_amount || 0).toLocaleString()}</span></td>` : ''}
                                     <td>${p.expected_delivery_date || 'TBD'}</td>
                                     <td>
-                                        <button class="btn btn-secondary btn-sm" onclick="App.openEditProjectModal(App.projectsCache.find(x => x.id == ${p.id}))">✏️ Edit</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="App.openEditProjectModal(App.projectsCache.find(x => x.id == ${p.id}))">Edit</button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -1459,7 +1463,7 @@ const App = {
                 <div class="modal-box" style="max-width: 520px; border-radius: 18px; border-top: 4px solid var(--primary); padding:24px;">
                     <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:14px;">
                         <div>
-                            <div style="font-size:11px; font-weight:800; color:var(--primary); text-transform:uppercase;">✏️ EDIT PROJECT DETAILS</div>
+                            <div style="font-size:11px; font-weight:800; color:var(--primary); text-transform:uppercase;">EDIT PROJECT DETAILS</div>
                             <div class="modal-title" style="font-size:18px; font-weight:800; color:#0f172a; margin-top:2px;">${project.project_code} - ${project.client_name}</div>
                         </div>
                         <button class="close-modal" onclick="App.closeModal('edit-project-modal')">✕</button>
@@ -1610,17 +1614,17 @@ const App = {
                     <div class="page-subtitle">Comprehensive data tables, pipeline performance & executive metrics</div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-primary" onclick="window.location.href='api/reports?action=export&type=${currentTab}'">📥 Download CSV Report</button>
+                    <button class="btn btn-primary" onclick="window.location.href='api/reports?action=export&type=${currentTab}'">Download CSV Report</button>
                 </div>
             </div>
 
             <div class="table-card">
                 <!-- REPORT TAB NAVIGATION -->
                 <div style="display:flex; gap:10px; padding:16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; border-radius:18px 18px 0 0; flex-wrap:wrap;">
-                    <button class="btn btn-sm ${currentTab === 'status' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('status')">📊 Lead Pipeline Conversion</button>
-                    <button class="btn btn-sm ${currentTab === 'executives' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('executives')">📞 Telecalling Executive Metrics</button>
-                    <button class="btn btn-sm ${currentTab === 'services' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('services')">💼 Service Portfolio Revenue</button>
-                    <button class="btn btn-sm ${currentTab === 'source' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('source')">🌐 Lead Source Acquisition</button>
+                    <button class="btn btn-sm ${currentTab === 'status' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('status')">Lead Pipeline Conversion</button>
+                    <button class="btn btn-sm ${currentTab === 'executives' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('executives')">Telecalling Executive Metrics</button>
+                    <button class="btn btn-sm ${currentTab === 'services' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('services')">Service Portfolio Revenue</button>
+                    <button class="btn btn-sm ${currentTab === 'source' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('source')">Lead Source Acquisition</button>
                 </div>
 
                 <!-- DATA TABLE -->
@@ -1798,7 +1802,7 @@ const App = {
                         </div>
                         <div class="kpi-card" style="background:#ffffff; border:1px solid #e2e8f0;">
                             <div class="kpi-header"><span>System Health</span></div>
-                            <div class="kpi-val" style="font-size:22px; color:var(--success-text);">🟢 Operational</div>
+                            <div class="kpi-val" style="font-size:22px; color:var(--success-text);">Operational</div>
                             <div class="kpi-sub">All database connections active</div>
                         </div>
                     </div>
@@ -1837,10 +1841,10 @@ const App = {
             </div>
 
             <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-                <button class="btn ${currentTab === 'statuses' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('statuses')">⚙️ Lead Statuses</button>
-                <button class="btn ${currentTab === 'sources' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('sources')">🌐 Lead Sources</button>
-                <button class="btn ${currentTab === 'services' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('services')">💼 Services Portfolio</button>
-                <button class="btn ${currentTab === 'health' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('health')">🛡️ System Health & Audit Logs</button>
+                <button class="btn ${currentTab === 'statuses' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('statuses')">Lead Statuses</button>
+                <button class="btn ${currentTab === 'sources' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('sources')">Lead Sources</button>
+                <button class="btn ${currentTab === 'services' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('services')">Services Portfolio</button>
+                <button class="btn ${currentTab === 'health' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('health')">System Health & Audit Logs</button>
             </div>
 
             ${tabContentHtml}
@@ -1956,7 +1960,7 @@ const App = {
                                     <td><span class="badge ${u.status==='active'?'badge-green':'badge-red'}">${u.status}</span></td>
                                     <td>
                                         <div style="display:flex; gap:6px;">
-                                            <button class="btn btn-secondary btn-sm" onclick="App.openCreateUserModal(App.usersCache.find(x => x.id == ${u.id}))">✏️ Edit</button>
+                                            <button class="btn btn-secondary btn-sm" onclick="App.openCreateUserModal(App.usersCache.find(x => x.id == ${u.id}))">Edit</button>
                                             <button class="btn btn-secondary btn-sm" onclick="App.toggleUserStatus(${u.id}, '${u.status==='active'?'inactive':'active'}')">Status</button>
                                         </div>
                                     </td>
@@ -2008,7 +2012,7 @@ const App = {
                 <div class="modal-box" style="max-width: 640px; border-radius: 18px; border-top: 4px solid var(--primary); padding: 24px;">
                     <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:14px;">
                         <div class="modal-title" style="font-size:18px; font-weight:800; color:#0f172a;">
-                            ${isEdit ? '✏️ Edit Member & Selected Page Access' : '✨ Add New Team Member'}
+                            ${isEdit ? 'Edit Member & Selected Page Access' : 'Add New Team Member'}
                         </div>
                         <button class="close-modal" onclick="App.closeModal('create-user-modal')">✕</button>
                     </div>
@@ -2055,7 +2059,7 @@ const App = {
                         <!-- SELECT ALLOWED PAGES DROPDOWN / CHECKBOXES -->
                         <div style="margin-top:18px;">
                             <label style="font-size:13px; font-weight:800; color:#0f172a; display:block; margin-bottom:4px;">
-                                🔒 Select Allowed Pages & Modules for this User
+                                Select Allowed Pages & Modules for this User
                             </label>
                             <div style="font-size:12px; color:#64748b; margin-bottom:10px;">Check which pages will be visible to this user on their menu and dashboard:</div>
                             <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; background:#f8fafc; border:1px solid #e2e8f0; padding:14px; border-radius:12px; max-height:180px; overflow-y:auto;">
@@ -2425,7 +2429,7 @@ const App = {
         outputDiv.innerHTML = `
             <div style="background:#f8fafc; border:1px solid #cbd5e1; padding:20px; border-radius:12px; margin-top:12px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-size:14px; font-weight:800; color:#1e293b;" id="import-progress-status">🚀 Initializing Batch Import...</span>
+                    <span style="font-size:14px; font-weight:800; color:#1e293b;" id="import-progress-status">Initializing Batch Import...</span>
                     <span style="font-size:13px; font-weight:700; color:#2563eb;" id="import-progress-percent">0%</span>
                 </div>
                 <div style="width:100%; height:10px; background:#e2e8f0; border-radius:5px; overflow:hidden; margin-bottom:8px;">
@@ -2454,7 +2458,7 @@ const App = {
             const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
             const totalChunks = Math.ceil(validLeads.length / CHUNK_SIZE);
 
-            statusEl.innerText = `🔄 Importing Batch ${chunkNumber} of ${totalChunks}...`;
+            statusEl.innerText = `Importing Batch ${chunkNumber} of ${totalChunks}...`;
 
             const payload = {
                 action: 'import_csv',
@@ -2536,7 +2540,7 @@ const App = {
             <div class="modal-box" style="max-width: 440px;">
                 <div class="modal-header">
                     <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
-                        <span>🔔 Operations Center Alerts</span>
+                        <span>Operations Center Alerts</span>
                     </div>
                     <button class="close-modal" onclick="App.closeModal('notif-modal')">✕</button>
                 </div>

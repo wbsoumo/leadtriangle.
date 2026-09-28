@@ -759,8 +759,8 @@ const App = {
         const documents = data.data.documents || [];
 
         const html = `
-            <div class="page-header" style="margin-bottom: 16px;">
-                <div style="display:flex; align-items:center; gap:12px;">
+            <div class="page-header" style="margin-bottom: 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                     <button class="btn btn-secondary btn-sm" onclick="App.navigate('${this.currentView}')">← Back to List</button>
                     <div>
                         <div style="font-size:12px; font-weight:800; color:var(--primary);">${l.lead_code}</div>
@@ -774,12 +774,12 @@ const App = {
             </div>
 
             <!-- TAB HEADER BAR -->
-            <div style="background:#ffffff; border:1px solid var(--card-border); border-radius:14px; padding:6px; display:flex; gap:6px; margin-bottom:20px; overflow-x:auto;">
-                <button class="btn lead-tab-btn active" id="tab-btn-about" style="font-weight:700;" onclick="App.switchLeadTab('about')">About</button>
-                <button class="btn lead-tab-btn" id="tab-btn-activity" style="font-weight:700;" onclick="App.switchLeadTab('activity')">Activity History (${calls.length})</button>
-                <button class="btn lead-tab-btn" id="tab-btn-tasks" style="font-weight:700;" onclick="App.switchLeadTab('tasks')">Tasks (${followups.length})</button>
-                <button class="btn lead-tab-btn" id="tab-btn-notes" style="font-weight:700;" onclick="App.switchLeadTab('notes')">Notes (${notes.length})</button>
-                <button class="btn lead-tab-btn" id="tab-btn-documents" style="font-weight:700;" onclick="App.switchLeadTab('documents')">Documents (${documents.length})</button>
+            <div class="lead-tab-container" style="background:#ffffff; border:1px solid var(--card-border); border-radius:14px; padding:8px 10px; display:flex; gap:8px; margin-bottom:20px; overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch;">
+                <button class="btn lead-tab-btn active" id="tab-btn-about" onclick="App.switchLeadTab('about')">About</button>
+                <button class="btn lead-tab-btn" id="tab-btn-activity" onclick="App.switchLeadTab('activity')">Activity History (${calls.length})</button>
+                <button class="btn lead-tab-btn" id="tab-btn-tasks" onclick="App.switchLeadTab('tasks')">Tasks (${followups.length})</button>
+                <button class="btn lead-tab-btn" id="tab-btn-notes" onclick="App.switchLeadTab('notes')">Notes (${notes.length})</button>
+                <button class="btn lead-tab-btn" id="tab-btn-documents" onclick="App.switchLeadTab('documents')">Documents (${documents.length})</button>
             </div>
 
             <!-- TAB CONTENTS -->

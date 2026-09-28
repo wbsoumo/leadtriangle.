@@ -452,10 +452,20 @@ svg {
     margin-top: 2px;
 }
 
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
 .header-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
+    max-width: 100%;
 }
 
 /* KPI CARDS GRID */
@@ -530,11 +540,52 @@ svg {
     cursor: pointer;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     transition: var(--transition);
     text-decoration: none;
     box-shadow: var(--shadow-xs);
     user-select: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* TAB CONTAINER & BUTTONS */
+.lead-tab-container, .tab-bar {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px;
+    scrollbar-width: thin;
+    max-width: 100%;
+}
+
+.lead-tab-btn {
+    background: #f1f5f9;
+    color: var(--text-secondary);
+    border: 1px solid var(--card-border);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lead-tab-btn:hover {
+    background: #e2e8f0;
+    color: var(--text-primary);
+}
+
+.lead-tab-btn.active {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+    border-color: var(--primary) !important;
+    box-shadow: var(--shadow-xs);
 }
 
 .btn:hover {

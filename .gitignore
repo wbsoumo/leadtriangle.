@@ -1,6 +1,9 @@
 # Production Local Credentials & Environment Overrides
 config/database.local.php
+config/firebase-service-account.json
+config/*.json
 .env
+
 *.env
 
 # Server Error Logs & Runtime Files

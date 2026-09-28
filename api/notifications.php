@@ -68,6 +68,94 @@ function logActivity($pdo, $module, $action, $recordId, $oldVal = null, $newVal 
     } catch (Exception $e) {}
 }
 
+function sendFcmPushNotification($title, $message, $fcmTokenOrTopic = 'all_users') {
+    $serviceAccountPath = __DIR__ . '/../config/firebase-service-account.json';
+    if (!file_exists($serviceAccountPath)) {
+        return ['success' => false, 'error' => 'Firebase Service Account JSON file missing in config/firebase-service-account.json'];
+    }
+
+    $sa = json_decode(file_get_contents($serviceAccountPath), true);
+    if (empty($sa['private_key']) || empty($sa['client_email']) || empty($sa['project_id'])) {
+        return ['success' => false, 'error' => 'Invalid Firebase Service Account JSON format.'];
+    }
+
+    $now = time();
+    $header = json_encode(['alg' => 'RS256', 'typ' => 'JWT']);
+    $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
+
+    $claimSet = json_encode([
+        'iss'   => $sa['client_email'],
+        'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
+        'aud'   => 'https://oauth2.googleapis.com/token',
+        'exp'   => $now + 3600,
+        'iat'   => $now
+    ]);
+    $base64UrlClaimSet = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($claimSet));
+
+    $signatureInput = $base64UrlHeader . "." . $base64UrlClaimSet;
+    $signature = '';
+    if (!openssl_sign($signatureInput, $signature, $sa['private_key'], 'SHA256')) {
+        return ['success' => false, 'error' => 'Failed to sign JWT with Private Key.'];
+    }
+    $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+    $jwt = $signatureInput . "." . $base64UrlSignature;
+
+    $ch = curl_init('https://oauth2.googleapis.com/token');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+        'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'assertion'  => $jwt
+    ]));
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $tokenData = json_decode($response, true);
+    if (empty($tokenData['access_token'])) {
+        return ['success' => false, 'error' => 'OAuth token exchange failed: ' . ($tokenData['error_description'] ?? 'Unknown error')];
+    }
+
+    $accessToken = $tokenData['access_token'];
+    $projectId = $sa['project_id'];
+    $fcmUrl = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
+    $messagePayload = [
+        'notification' => [
+            'title' => $title,
+            'body'  => $message
+        ],
+        'data' => [
+            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'title'        => $title,
+            'message'      => $message
+        ]
+    ];
+
+    if ($fcmTokenOrTopic === 'all_users' || $fcmTokenOrTopic === 'all') {
+        $messagePayload['topic'] = 'all_users';
+    } else {
+        $messagePayload['token'] = $fcmTokenOrTopic;
+    }
+
+    $ch = curl_init($fcmUrl);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $accessToken,
+        'Content-Type: application/json'
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['message' => $messagePayload]));
+    $fcmResponse = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    return [
+        'success'   => ($httpCode === 200),
+        'http_code' => $httpCode,
+        'raw'       => json_decode($fcmResponse, true) ?? $fcmResponse
+    ];
+}
+
 try {
     // 1. SEND PUSH NOTIFICATION (ADMIN ONLY)
     if ($action === 'send') {
@@ -92,6 +180,9 @@ try {
             exit;
         }
 
+        // Send FCM Push Notification
+        $fcmResult = sendFcmPushNotification($title, $message, $targetType === 'all' ? 'all_users' : 'all_users');
+
         $stmt = $pdo->prepare("
             INSERT INTO notifications (sender_id, recipient_id, target_type, title, message)
             VALUES (:sender_id, :recipient_id, :target_type, :title, :message)
@@ -108,12 +199,14 @@ try {
         logActivity($pdo, 'Notifications', 'Send Push Notification', $notifId, null, [
             'target_type'  => $targetType,
             'recipient_id' => $recipientId,
-            'title'        => $title
+            'title'        => $title,
+            'fcm_sent'     => $fcmResult['success'] ?? false
         ]);
 
         echo json_encode([
-            'success' => true,
-            'message' => 'Push Notification dispatched successfully to ' . ($targetType === 'all' ? 'All Team Members' : 'Selected User') . '.'
+            'success'    => true,
+            'message'    => 'Push Notification dispatched successfully to ' . ($targetType === 'all' ? 'All Team Members' : 'Selected User') . '.',
+            'fcm_status' => $fcmResult
         ]);
         exit;
     }

@@ -509,7 +509,8 @@ const App = {
         const sources = this.dropdowns?.sources || [];
         const services = this.dropdowns?.services || [];
         const executives = this.dropdowns?.executives || [];
-        const manag        const modalHtml = `
+        const managers = this.dropdowns?.managers || [];
+        const modalHtml = `
             <div class="modal-backdrop show" id="create-lead-modal">
                 <div class="modal-box" style="max-width: 620px; border-radius: 18px; border-top: 4px solid var(--primary); padding: 24px;">
                     <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:14px;">
@@ -1095,10 +1096,6 @@ const App = {
                         </tbody>
                     </table>
                 </div>
-            </div>
-        `;
-        document.getElementById('content-viewport').innerHTML = html;
-    },         </div>
             </div>
         `;
         document.getElementById('content-viewport').innerHTML = html;

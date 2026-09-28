@@ -108,7 +108,7 @@ function sendFcmPushNotification($title, $message, $fcmTokenOrTopic = 'all_users
         'assertion'  => $jwt
     ]));
     $response = curl_exec($ch);
-    curl_close($ch);
+    @curl_close($ch);
 
     $tokenData = json_decode($response, true);
     if (empty($tokenData['access_token'])) {
@@ -147,7 +147,7 @@ function sendFcmPushNotification($title, $message, $fcmTokenOrTopic = 'all_users
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['message' => $messagePayload]));
     $fcmResponse = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    @curl_close($ch);
 
     return [
         'success'   => ($httpCode === 200),

@@ -241,7 +241,7 @@ const App = {
 
         if (view === 'dashboard') this.renderDashboard();
         else if (view === 'leads') this.renderLeads();
-        else if (view === 'calling_queue' || view === 'calling-queue') this.renderCallingQueue();
+        else if (view === 'calling_queue' || view === 'calling-queue') this.renderCallingQueue({ quick_filter: 'new' });
         else if (view === 'followups') this.renderFollowups();
         else if (view === 'meetings') this.renderMeetings();
         else if (view === 'funnel') this.renderFunnel();

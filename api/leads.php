@@ -114,7 +114,9 @@ if ($action === 'list') {
         $params['is_qualified'] = (int)$isQualified;
     }
     if ($callingQueue === '1') {
-        $where[] = "(DATE(l.next_followup_at) = CURDATE() OR l.status_id IN (1, 2, 3, 4, 6))";
+        if ($filter !== 'called' && $filter !== 'all' && empty($statusId)) {
+            $where[] = "(DATE(l.next_followup_at) = CURDATE() OR l.status_id IN (1, 2, 3, 4, 6))";
+        }
     }
 
     $whereClause = "WHERE " . implode(" AND ", $where);

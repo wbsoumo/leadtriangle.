@@ -46,7 +46,8 @@ try {
         $hasUserId = in_array('user_id', $colNames);
 
         if ($hasUserId) {
-            try { $pdo->exec("ALTER TABLE notifications MODIFY user_id INT NULL"); } catch (Throwable $t) {}
+            try { $pdo->exec("ALTER TABLE notifications DROP FOREIGN KEY notifications_ibfk_1"); } catch (Throwable $t) {}
+            try { $pdo->exec("ALTER TABLE notifications MODIFY user_id INT NULL DEFAULT NULL"); } catch (Throwable $t) {}
         }
         if (!in_array('sender_id', $colNames)) {
             try { $pdo->exec("ALTER TABLE notifications ADD COLUMN sender_id INT DEFAULT NULL"); } catch (Throwable $t) {}
@@ -202,7 +203,22 @@ try {
         // Dispatch FCM Push Notification
         $fcmResult = sendFcmPushNotification($title, $message, $targetType === 'all' ? 'all_users' : 'all_users');
 
-        if ($hasSenderId && $hasRecipientId && $hasTargetType) {
+        $userRefId = ($targetType === 'user' && !empty($recipientId)) ? $recipientId : $userId;
+
+        if ($hasSenderId && $hasRecipientId && $hasTargetType && $hasUserId) {
+            $stmt = $pdo->prepare("
+                INSERT INTO notifications (user_id, sender_id, recipient_id, target_type, title, message)
+                VALUES (:user_id, :sender_id, :recipient_id, :target_type, :title, :message)
+            ");
+            $stmt->execute([
+                'user_id'      => $userRefId,
+                'sender_id'    => $userId,
+                'recipient_id' => ($targetType === 'user' ? $recipientId : null),
+                'target_type'  => $targetType,
+                'title'        => $title,
+                'message'      => $message
+            ]);
+        } else if ($hasSenderId && $hasRecipientId && $hasTargetType) {
             $stmt = $pdo->prepare("
                 INSERT INTO notifications (sender_id, recipient_id, target_type, title, message)
                 VALUES (:sender_id, :recipient_id, :target_type, :title, :message)
@@ -220,7 +236,7 @@ try {
                 VALUES (:user_id, :title, :message)
             ");
             $stmt->execute([
-                'user_id' => ($targetType === 'user' ? $recipientId : $userId),
+                'user_id' => $userRefId,
                 'title'   => $title,
                 'message' => $message
             ]);

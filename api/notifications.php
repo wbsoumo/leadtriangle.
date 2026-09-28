@@ -2,8 +2,6 @@
 // api/notifications.php - Admin Push Notification Management & Dispatch Logs API
 
 header('Content-Type: application/json');
-session_start();
-
 require_once __DIR__ . '/../config/database.php';
 
 if (empty($_SESSION['user_id'])) {
@@ -17,6 +15,11 @@ $userId = (int)$_SESSION['user_id'];
 $roleName = $_SESSION['role_name'] ?? 'operation_executive';
 
 // Safely ensure notifications table & required columns exist
+$hasSenderId = false;
+$hasRecipientId = false;
+$hasTargetType = false;
+$hasUserId = false;
+
 try {
     $tableCheck = $pdo->query("SHOW TABLES LIKE 'notifications'")->fetchAll();
     if (empty($tableCheck)) {
@@ -32,22 +35,38 @@ try {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         ");
+        $hasSenderId = true;
+        $hasRecipientId = true;
+        $hasTargetType = true;
     } else {
         // Table exists, check for missing columns and add them dynamically
         $cols = $pdo->query("SHOW COLUMNS FROM notifications")->fetchAll();
         $colNames = array_column($cols, 'Field');
         
+        $hasUserId = in_array('user_id', $colNames);
+
+        if ($hasUserId) {
+            try { $pdo->exec("ALTER TABLE notifications MODIFY user_id INT NULL"); } catch (Throwable $t) {}
+        }
         if (!in_array('sender_id', $colNames)) {
-            $pdo->exec("ALTER TABLE notifications ADD COLUMN sender_id INT DEFAULT NULL AFTER id");
+            try { $pdo->exec("ALTER TABLE notifications ADD COLUMN sender_id INT DEFAULT NULL"); } catch (Throwable $t) {}
         }
         if (!in_array('recipient_id', $colNames)) {
-            $pdo->exec("ALTER TABLE notifications ADD COLUMN recipient_id INT DEFAULT NULL AFTER sender_id");
+            try { $pdo->exec("ALTER TABLE notifications ADD COLUMN recipient_id INT DEFAULT NULL"); } catch (Throwable $t) {}
         }
         if (!in_array('target_type', $colNames)) {
-            $pdo->exec("ALTER TABLE notifications ADD COLUMN target_type VARCHAR(20) DEFAULT 'all' AFTER recipient_id");
+            try { $pdo->exec("ALTER TABLE notifications ADD COLUMN target_type VARCHAR(20) DEFAULT 'all'"); } catch (Throwable $t) {}
         }
+
+        // Re-verify actual column names after migration attempts
+        $cols = $pdo->query("SHOW COLUMNS FROM notifications")->fetchAll();
+        $colNames = array_column($cols, 'Field');
+        $hasSenderId = in_array('sender_id', $colNames);
+        $hasRecipientId = in_array('recipient_id', $colNames);
+        $hasTargetType = in_array('target_type', $colNames);
+        $hasUserId = in_array('user_id', $colNames);
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
     error_log("Notifications table migration error: " . $e->getMessage());
 }
 
@@ -57,7 +76,7 @@ function logActivity($pdo, $module, $action, $recordId, $oldVal = null, $newVal 
     try {
         $stmt = $pdo->prepare("INSERT INTO activity_logs (user_id, module, action, record_id, old_value, new_value, ip_address) VALUES (:uid, :mod, :act, :rec, :old, :new, :ip)");
         $stmt->execute([
-            'uid' => $_SESSION['user_id'],
+            'uid' => $_SESSION['user_id'] ?? null,
             'mod' => $module,
             'act' => $action,
             'rec' => $recordId,
@@ -65,7 +84,7 @@ function logActivity($pdo, $module, $action, $recordId, $oldVal = null, $newVal 
             'new' => is_array($newVal) ? json_encode($newVal) : $newVal,
             'ip'  => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
         ]);
-    } catch (Exception $e) {}
+    } catch (Throwable $e) {}
 }
 
 function sendFcmPushNotification($title, $message, $fcmTokenOrTopic = 'all_users') {
@@ -165,7 +184,7 @@ try {
             exit;
         }
 
-        $targetType = $_POST['target_type'] ?? 'all'; // 'all' or 'user'
+        $targetType = $_POST['target_type'] ?? 'all';
         $recipientId = !empty($_POST['recipient_id']) ? (int)$_POST['recipient_id'] : null;
         $title = trim($_POST['title'] ?? '');
         $message = trim($_POST['message'] ?? '');
@@ -180,20 +199,41 @@ try {
             exit;
         }
 
-        // Send FCM Push Notification
+        // Dispatch FCM Push Notification
         $fcmResult = sendFcmPushNotification($title, $message, $targetType === 'all' ? 'all_users' : 'all_users');
 
-        $stmt = $pdo->prepare("
-            INSERT INTO notifications (sender_id, recipient_id, target_type, title, message)
-            VALUES (:sender_id, :recipient_id, :target_type, :title, :message)
-        ");
-        $stmt->execute([
-            'sender_id'    => $userId,
-            'recipient_id' => ($targetType === 'user' ? $recipientId : null),
-            'target_type'  => $targetType,
-            'title'        => $title,
-            'message'      => $message
-        ]);
+        if ($hasSenderId && $hasRecipientId && $hasTargetType) {
+            $stmt = $pdo->prepare("
+                INSERT INTO notifications (sender_id, recipient_id, target_type, title, message)
+                VALUES (:sender_id, :recipient_id, :target_type, :title, :message)
+            ");
+            $stmt->execute([
+                'sender_id'    => $userId,
+                'recipient_id' => ($targetType === 'user' ? $recipientId : null),
+                'target_type'  => $targetType,
+                'title'        => $title,
+                'message'      => $message
+            ]);
+        } else if ($hasUserId) {
+            $stmt = $pdo->prepare("
+                INSERT INTO notifications (user_id, title, message)
+                VALUES (:user_id, :title, :message)
+            ");
+            $stmt->execute([
+                'user_id' => ($targetType === 'user' ? $recipientId : $userId),
+                'title'   => $title,
+                'message' => $message
+            ]);
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO notifications (title, message)
+                VALUES (:title, :message)
+            ");
+            $stmt->execute([
+                'title'   => $title,
+                'message' => $message
+            ]);
+        }
 
         $notifId = $pdo->lastInsertId();
         logActivity($pdo, 'Notifications', 'Send Push Notification', $notifId, null, [
@@ -219,17 +259,31 @@ try {
             exit;
         }
 
-        $stmt = $pdo->query("
-            SELECT 
-                n.*, 
-                u_sender.name as sender_name, u_sender.email as sender_email,
-                u_rec.name as recipient_name, u_rec.email as recipient_email
-            FROM notifications n
-            LEFT JOIN users u_sender ON n.sender_id = u_sender.id
-            LEFT JOIN users u_rec ON n.recipient_id = u_rec.id
-            ORDER BY n.id DESC
-            LIMIT 100
-        ");
+        if ($hasSenderId && $hasRecipientId) {
+            $stmt = $pdo->query("
+                SELECT 
+                    n.*, 
+                    u_sender.name as sender_name, u_sender.email as sender_email,
+                    u_rec.name as recipient_name, u_rec.email as recipient_email
+                FROM notifications n
+                LEFT JOIN users u_sender ON n.sender_id = u_sender.id
+                LEFT JOIN users u_rec ON n.recipient_id = u_rec.id
+                ORDER BY n.id DESC
+                LIMIT 100
+            ");
+        } else if ($hasUserId) {
+            $stmt = $pdo->query("
+                SELECT 
+                    n.*, 
+                    u_rec.name as recipient_name, u_rec.email as recipient_email
+                FROM notifications n
+                LEFT JOIN users u_rec ON n.user_id = u_rec.id
+                ORDER BY n.id DESC
+                LIMIT 100
+            ");
+        } else {
+            $stmt = $pdo->query("SELECT n.* FROM notifications n ORDER BY n.id DESC LIMIT 100");
+        }
         $logs = $stmt->fetchAll();
 
         echo json_encode(['success' => true, 'data' => $logs]);
@@ -238,17 +292,29 @@ try {
 
     // 3. GET USER UNREAD / ALL NOTIFICATIONS (FOR CURRENT LOGGED IN USER)
     if ($action === 'my_notifications') {
-        $stmt = $pdo->prepare("
-            SELECT 
-                n.*,
-                u_sender.name as sender_name
-            FROM notifications n
-            LEFT JOIN users u_sender ON n.sender_id = u_sender.id
-            WHERE n.recipient_id = :uid OR n.recipient_id IS NULL OR n.target_type = 'all'
-            ORDER BY n.id DESC
-            LIMIT 20
-        ");
-        $stmt->execute(['uid' => $userId]);
+        if ($hasRecipientId && $hasSenderId) {
+            $stmt = $pdo->prepare("
+                SELECT 
+                    n.*,
+                    u_sender.name as sender_name
+                FROM notifications n
+                LEFT JOIN users u_sender ON n.sender_id = u_sender.id
+                WHERE n.recipient_id = :uid OR n.recipient_id IS NULL OR n.target_type = 'all'
+                ORDER BY n.id DESC
+                LIMIT 20
+            ");
+            $stmt->execute(['uid' => $userId]);
+        } else if ($hasUserId) {
+            $stmt = $pdo->prepare("
+                SELECT n.* FROM notifications n
+                WHERE n.user_id = :uid OR n.user_id IS NULL
+                ORDER BY n.id DESC
+                LIMIT 20
+            ");
+            $stmt->execute(['uid' => $userId]);
+        } else {
+            $stmt = $pdo->query("SELECT n.* FROM notifications n ORDER BY n.id DESC LIMIT 20");
+        }
         $notifications = $stmt->fetchAll();
 
         echo json_encode(['success' => true, 'data' => $notifications]);
@@ -265,8 +331,12 @@ try {
         echo json_encode(['success' => true]);
         exit;
     }
-} catch (Exception $err) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Notification API Error: ' . $err->getMessage()]);
+} catch (Throwable $err) {
+    echo json_encode([
+        'success' => false,
+        'data'    => [],
+        'message' => 'Notification API Notice: ' . $err->getMessage()
+    ]);
     exit;
 }
+

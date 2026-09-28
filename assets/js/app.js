@@ -17,8 +17,40 @@ const App = {
     },
 
     startActiveCallPolling: function() {
+        this.requestNotificationPermission();
         this.checkActiveCall();
-        setInterval(() => this.checkActiveCall(), 4000);
+        this.checkNewNotifications();
+        setInterval(() => {
+            this.checkActiveCall();
+            this.checkNewNotifications();
+        }, 5000);
+    },
+
+    requestNotificationPermission: function() {
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+    },
+
+    lastSeenNotifId: 0,
+
+    checkNewNotifications: async function() {
+        if (!this.currentUser) return;
+        try {
+            const res = await fetch('api/notifications?action=my_notifications');
+            const data = await res.json();
+            if (data.success && data.data && data.data.length > 0) {
+                const latest = data.data[0];
+                if (this.lastSeenNotifId > 0 && latest.id > this.lastSeenNotifId) {
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        new Notification(latest.title, {
+                            body: latest.message
+                        });
+                    }
+                }
+                this.lastSeenNotifId = latest.id;
+            }
+        } catch(e) {}
     },
 
     checkActiveCall: async function() {
@@ -1901,13 +1933,102 @@ const App = {
                     </div>
                 </div>
             `;
+        } else if (currentTab === 'notifications') {
+            let notifLogs = [];
+            let allUsers = [];
+            try {
+                const logsRes = await fetch('api/notifications?action=logs');
+                const logsData = await logsRes.json();
+                if (logsData.success) notifLogs = logsData.data || [];
+
+                const usersRes = await fetch('api/users?action=list');
+                const usersData = await usersRes.json();
+                if (usersData.success) allUsers = usersData.data || [];
+            } catch(e) {}
+
+            const isAdmin = (this.currentUser.role_name === 'super_admin' || this.currentUser.role_name === 'manager');
+
+            tabContentHtml = `
+                <div style="display:grid; grid-template-columns: ${isAdmin ? '1fr 1.6fr' : '1fr'}; gap:20px;">
+                    ${isAdmin ? `
+                        <div style="background:#ffffff; border:1px solid #cbd5e1; border-top:4px solid #2563eb; border-radius:18px; padding:22px; box-shadow:var(--shadow-xs);">
+                            <div style="font-size:16px; font-weight:800; color:#0f172a; margin-bottom:4px;">Dispatch Push Notification</div>
+                            <div style="font-size:12.5px; color:#64748b; margin-bottom:16px;">Send instant push alerts to all active team members or a specific user.</div>
+                            
+                            <form onsubmit="App.submitSendNotification(event)">
+                                <div style="margin-bottom:14px;">
+                                    <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Target Recipient *</label>
+                                    <select name="target_type" class="filter-select" style="width:100%; font-size:13.5px;" onchange="document.getElementById('notif-user-select-container').style.display = this.value === 'user' ? 'block' : 'none';" required>
+                                        <option value="all">Broadcast to All Team Members</option>
+                                        <option value="user">Specific Team Member Only</option>
+                                    </select>
+                                </div>
+
+                                <div id="notif-user-select-container" style="display:none; margin-bottom:14px;">
+                                    <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Select Recipient User *</label>
+                                    <select name="recipient_id" class="filter-select" style="width:100%; font-size:13.5px;">
+                                        <option value="">Choose Team Member...</option>
+                                        ${allUsers.map(u => `<option value="${u.id}">${u.name} (${u.email}) — ${u.role_display}</option>`).join('')}
+                                    </select>
+                                </div>
+
+                                <div style="margin-bottom:14px;">
+                                    <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Notification Title *</label>
+                                    <input type="text" name="title" class="filter-input" style="width:100%;" placeholder="e.g. Urgent Lead Follow-up" required>
+                                </div>
+
+                                <div style="margin-bottom:18px;">
+                                    <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Message Content *</label>
+                                    <textarea name="message" class="filter-input" style="width:100%; height:90px; padding:10px; font-size:13px;" placeholder="Write clear notification message..." required></textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px; font-weight:800;">Dispatch Notification Now</button>
+                            </form>
+                        </div>
+                    ` : ''}
+
+                    <div class="table-card">
+                        <div style="padding:16px; border-bottom:1px solid #e2e8f0; font-weight:800; font-size:15px; color:#0f172a; display:flex; justify-content:space-between; align-items:center;">
+                            <span>Notification Dispatch History & Audit Logs</span>
+                            <span class="badge badge-blue">${notifLogs.length} Sent</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Date & Time</th>
+                                        <th>Dispatched By</th>
+                                        <th>Target Recipient</th>
+                                        <th>Title</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${notifLogs.length === 0 ? `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">No notification dispatch logs found.</td></tr>` : ''}
+                                    ${notifLogs.map((n, idx) => `
+                                        <tr>
+                                            <td>${idx + 1}</td>
+                                            <td><small style="color:#64748b;">${n.created_at}</small></td>
+                                            <td><strong>${n.sender_name || 'Admin'}</strong></td>
+                                            <td><span class="badge ${n.target_type === 'all' ? 'badge-blue' : 'badge-green'}">${n.target_type === 'all' ? 'All Members' : (n.recipient_name || 'User')}</span></td>
+                                            <td><strong>${n.title}</strong></td>
+                                            <td><small style="color:#475569;">${n.message}</small></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         let html = `
             <div class="page-header">
                 <div>
                     <div class="page-title">CRM System Settings & Control Panel</div>
-                    <div class="page-subtitle">Configure lead statuses, acquisition sources, services portfolio & system health</div>
+                    <div class="page-subtitle">Configure lead statuses, acquisition sources, services portfolio, notifications & system health</div>
                 </div>
             </div>
 
@@ -1915,6 +2036,7 @@ const App = {
                 <button class="btn ${currentTab === 'statuses' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('statuses')">Lead Statuses</button>
                 <button class="btn ${currentTab === 'sources' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('sources')">Lead Sources</button>
                 <button class="btn ${currentTab === 'services' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('services')">Services Portfolio</button>
+                <button class="btn ${currentTab === 'notifications' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('notifications')">Push Notifications & Logs</button>
                 <button class="btn ${currentTab === 'health' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('health')">System Health & Audit Logs</button>
             </div>
 
@@ -1975,6 +2097,21 @@ const App = {
             this.renderSettings('services');
         } else {
             alert(data.message || 'Error adding service');
+        }
+    },
+
+    submitSendNotification: async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        formData.append('action', 'send');
+
+        const res = await fetch('api/notifications', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message);
+        if (data.success) {
+            form.reset();
+            this.renderSettings('notifications');
         }
     },
 
@@ -2603,37 +2740,51 @@ const App = {
         `;
     },
 
-    showNotifications: function() {
+    showNotifications: async function() {
+        if (document.getElementById('notif-modal')) return;
+
+        let notifs = [];
+        try {
+            const res = await fetch('api/notifications?action=my_notifications');
+            const data = await res.json();
+            if (data.success && data.data) {
+                notifs = data.data;
+            }
+        } catch(e) {}
+
         const modal = document.createElement('div');
         modal.id = 'notif-modal';
         modal.className = 'modal-backdrop show';
         modal.innerHTML = `
-            <div class="modal-box" style="max-width: 440px;">
-                <div class="modal-header">
-                    <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
-                        <span>Operations Center Alerts</span>
+            <div class="modal-box" style="max-width: 480px; border-radius: 18px; border-top: 4px solid var(--primary); padding: 24px;">
+                <div class="modal-header" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 14px;">
+                    <div class="modal-title" style="display:flex; align-items:center; gap:8px; font-weight:800; color:#0f172a;">
+                        <span>Operations Center Alerts & Push Notifications</span>
                     </div>
                     <button class="close-modal" onclick="App.closeModal('notif-modal')">✕</button>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <div style="padding:12px; background:#eff6ff; border-radius:10px; border:1px solid #bfdbfe;">
-                        <div style="font-weight:700; font-size:13.5px; color:#1e40af;">System Auto-Assignment</div>
-                        <div style="font-size:12.5px; color:#3b82f6; margin-top:2px;">3 new leads imported and auto-assigned to active callers</div>
-                        <small style="color:#64748b; font-size:11px;">10 minutes ago</small>
-                    </div>
-                    <div style="padding:12px; background:#f0fdf4; border-radius:10px; border:1px solid #a7f3d0;">
-                        <div style="font-weight:700; font-size:13.5px; color:#166534;">Follow-up Reminder</div>
-                        <div style="font-size:12.5px; color:#15803d; margin-top:2px;">Product demonstration scheduled for Vijay Malhotra today</div>
-                        <small style="color:#64748b; font-size:11px;">30 minutes ago</small>
-                    </div>
-                    <div style="padding:12px; background:#fff7ed; border-radius:10px; border:1px solid #fed7aa;">
-                        <div style="font-weight:700; font-size:13.5px; color:#9a3412;">Project Conversion</div>
-                        <div style="font-size:12.5px; color:#c2410c; margin-top:2px;">Lead #L-1094 successfully moved to Sales Funnel Stage 4</div>
-                        <small style="color:#64748b; font-size:11px;">1 hour ago</small>
-                    </div>
+                <div style="display:flex; flex-direction:column; gap:12px; margin-top:16px; max-height:360px; overflow-y:auto;">
+                    ${notifs.length === 0 ? `
+                        <div style="text-align:center; padding:32px 20px; background:#f8fafc; border-radius:12px; color:#64748b; font-size:13.5px;">
+                            No push notifications received yet.
+                        </div>
+                    ` : ''}
+                    ${notifs.map(n => `
+                        <div style="padding:14px; background:${n.target_type === 'all' ? '#eff6ff' : '#f0fdf4'}; border-radius:12px; border:1px solid ${n.target_type === 'all' ? '#bfdbfe' : '#a7f3d0'};">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="font-weight:800; font-size:13.5px; color:${n.target_type === 'all' ? '#1e40af' : '#166534'};">${n.title}</div>
+                                <span class="badge ${n.target_type === 'all' ? 'badge-blue' : 'badge-green'}" style="font-size:10px;">${n.target_type === 'all' ? 'Broadcast' : 'Direct Message'}</span>
+                            </div>
+                            <div style="font-size:12.5px; color:#334155; margin-top:4px; line-height:1.4;">${n.message}</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:6px; display:flex; justify-content:space-between;">
+                                <span>From: <strong>${n.sender_name || 'System Admin'}</strong></span>
+                                <span>${n.created_at}</span>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
-                <div style="margin-top:18px; text-align:right;">
-                    <button class="btn btn-secondary btn-sm" onclick="App.closeModal('notif-modal')">Close</button>
+                <div style="margin-top:18px; text-align:right; border-top:1px solid #f1f5f9; padding-top:14px;">
+                    <button class="btn btn-secondary btn-sm" onclick="App.closeModal('notif-modal')">Close Alerts</button>
                 </div>
             </div>
         `;

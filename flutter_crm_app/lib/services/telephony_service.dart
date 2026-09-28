@@ -5,13 +5,20 @@ import 'api_service.dart';
 class TelephonyService {
   final ApiService _apiService = ApiService();
 
-  // Check & Request Call Permissions
+  // Check & Request Call & Notification Permissions
   Future<bool> checkCallPermissions() async {
     final phoneStatus = await Permission.phone.status;
-    if (phoneStatus.isGranted) return true;
+    final notificationStatus = await Permission.notification.status;
 
-    final requestResult = await Permission.phone.request();
-    return requestResult.isGranted;
+    if (!phoneStatus.isGranted) {
+      await Permission.phone.request();
+    }
+
+    if (!notificationStatus.isGranted) {
+      await Permission.notification.request();
+    }
+
+    return (await Permission.phone.isGranted);
   }
 
   // Initiate Phone Call associated strictly with a LeadTriangle Lead

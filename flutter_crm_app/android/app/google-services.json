@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "257432141000",
+    "project_id": "leadtriangle-fc3d9",
+    "storage_bucket": "leadtriangle-fc3d9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:257432141000:android:e29c5cb024feb5f7bfb9fd",
+        "android_client_info": {
+          "package_name": "com.leadtriangle.leadtriangle_crm_op_exec"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBX5qi-Y7YwfVrCJVaFPxtJ_5l_Ed_LkxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

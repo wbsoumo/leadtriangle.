@@ -205,23 +205,40 @@ if ($action === 'detail') {
 }
 
 // 4. UPDATE PROJECT STAGE & PROGRESS %
-if ($action === 'update_stage') {
+if ($action === 'update_stage' || $action === 'update') {
     if ($roleName === 'operation_executive') {
-        echo json_encode(['success' => false, 'message' => 'Operation Executives cannot modify project stage.']);
+        echo json_encode(['success' => false, 'message' => 'Operation Executives cannot modify project details.']);
         exit;
     }
 
     $id = (int)($_POST['id'] ?? 0);
     $stageId = (int)($_POST['stage_id'] ?? 1);
     $progressPercent = min(100, max(0, (int)($_POST['progress_percent'] ?? 0)));
+    $deliveryDate = $_POST['expected_delivery_date'] ?? null;
+    $notes = trim($_POST['notes'] ?? '');
 
-    $stmt = $pdo->prepare("UPDATE projects SET stage_id = :st, progress_percent = :prg WHERE id = :id");
-    $stmt->execute(['st' => $stageId, 'prg' => $progressPercent, 'id' => $id]);
+    $sql = "UPDATE projects SET stage_id = :st, progress_percent = :prg";
+    $params = ['st' => $stageId, 'prg' => $progressPercent, 'id' => $id];
 
-    logActivity($pdo, 'projects', 'stage_updated', $id);
-    echo json_encode(['success' => true, 'message' => 'Project stage updated!']);
+    if ($deliveryDate !== null && $deliveryDate !== '') {
+        $sql .= ", expected_delivery_date = :ddate";
+        $params['ddate'] = $deliveryDate;
+    }
+    $sql .= " WHERE id = :id";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    if (!empty($notes)) {
+        $pdo->prepare("INSERT INTO project_updates (project_id, user_id, update_text) VALUES (:pid, :uid, :txt)")
+            ->execute(['pid' => $id, 'uid' => $userId, 'txt' => $notes]);
+    }
+
+    logActivity($pdo, 'projects', 'project_updated', $id);
+    echo json_encode(['success' => true, 'message' => 'Project updated successfully!']);
     exit;
 }
+
 
 // 5. ADD PROJECT UPDATE / NOTE
 if ($action === 'add_update') {

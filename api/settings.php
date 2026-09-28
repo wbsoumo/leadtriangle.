@@ -84,3 +84,72 @@ if ($action === 'add_status') {
     echo json_encode(['success' => true, 'message' => 'New lead status added!']);
     exit;
 }
+
+if ($action === 'add_source') {
+    if ($_SESSION['role_name'] !== 'super_admin') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    if (empty($name)) {
+        echo json_encode(['success' => false, 'message' => 'Lead source name required']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO lead_sources (name, is_active) VALUES (:name, 1)");
+    $stmt->execute(['name' => $name]);
+
+    echo json_encode(['success' => true, 'message' => 'New lead source added!']);
+    exit;
+}
+
+if ($action === 'add_service') {
+    if ($_SESSION['role_name'] !== 'super_admin') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    $amount = (float)($_POST['default_amount'] ?? 0);
+    if (empty($name)) {
+        echo json_encode(['success' => false, 'message' => 'Service name required']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO services (name, default_amount, is_active) VALUES (:name, :amt, 1)");
+    $stmt->execute(['name' => $name, 'amt' => $amount]);
+
+    echo json_encode(['success' => true, 'message' => 'New service added!']);
+    exit;
+}
+
+if ($action === 'system_health') {
+    if ($_SESSION['role_name'] !== 'super_admin') {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    $tablesCount = $pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()")->fetchColumn();
+    $totalLeads = $pdo->query("SELECT COUNT(*) FROM leads")->fetchColumn();
+    $totalCalls = $pdo->query("SELECT COUNT(*) FROM call_logs")->fetchColumn();
+    $totalProjects = $pdo->query("SELECT COUNT(*) FROM projects")->fetchColumn();
+    $dbSizeResult = $pdo->query("SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb FROM information_schema.tables WHERE table_schema = DATABASE()")->fetch();
+    $dbSize = $dbSizeResult['size_mb'] ?? '0.5';
+
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'php_version' => PHP_VERSION,
+            'db_name' => DB_NAME,
+            'tables_count' => (int)$tablesCount,
+            'total_leads' => (int)$totalLeads,
+            'total_calls' => (int)$totalCalls,
+            'total_projects' => (int)$totalProjects,
+            'db_size_mb' => $dbSize,
+            'status' => 'Healthy'
+        ]
+    ]);
+    exit;
+}
+

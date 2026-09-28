@@ -246,6 +246,7 @@ const App = {
         else if (view === 'projects') this.renderProjects();
         else if (view === 'reports') this.renderReports();
         else if (view === 'users') this.renderUsers();
+        else if (view === 'settings') this.renderSettings();
         else if (view === 'import') this.renderImport();
         else this.renderDashboard();
     },
@@ -311,7 +312,7 @@ const App = {
                 </div>
 
                 <!-- CARD 3: CALLS MADE TODAY -->
-                <div onclick="App.navigate('calling_queue')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
+                <div onclick="App.renderLeads(1, { filter: 'called' })" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                         <div style="width: 44px; height: 44px; border-radius: 12px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center;">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
@@ -328,7 +329,7 @@ const App = {
                 </div>
 
                 <!-- CARD 4: QUALIFIED LEADS / ACTIVE PROJECTS -->
-                <div onclick="App.navigate('funnel')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
+                <div onclick="App.navigate('projects')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                         <div style="width: 44px; height: 44px; border-radius: 12px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center;">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
@@ -639,19 +640,40 @@ const App = {
     },
 
     // 2. LEADS MODULE
-    renderLeads: async function(page = 1) {
-        const search = document.getElementById('lead-search-input')?.value || '';
-        const res = await fetch(`api/leads?action=list&page=${page}&search=${encodeURIComponent(search)}`);
+    leadsFilterState: {},
+
+    renderLeads: async function(page = 1, filters = null) {
+        if (filters !== null) {
+            this.leadsFilterState = filters;
+        }
+        const currentFilters = this.leadsFilterState || {};
+        const search = document.getElementById('lead-search-input')?.value || currentFilters.search || '';
+
+        let queryParams = `action=list&page=${page}&search=${encodeURIComponent(search)}`;
+        if (currentFilters.filter) queryParams += `&filter=${encodeURIComponent(currentFilters.filter)}`;
+        if (currentFilters.status_id) queryParams += `&status_id=${encodeURIComponent(currentFilters.status_id)}`;
+        if (currentFilters.is_qualified !== undefined) queryParams += `&is_qualified=${encodeURIComponent(currentFilters.is_qualified)}`;
+
+        const res = await fetch(`api/leads?${queryParams}`);
         const data = await res.json();
         if (!data.success) return;
 
         const leads = data.data.leads;
         const p = data.data.pagination;
 
+        let filterBadgeHtml = '';
+        if (currentFilters.filter === 'called') {
+            filterBadgeHtml = `<span class="badge badge-blue" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Already Called (${p.total} Leads) <a href="#" onclick="App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
+        } else if (currentFilters.filter === 'to_call') {
+            filterBadgeHtml = `<span class="badge badge-amber" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Pending To Call <a href="#" onclick="App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
+        } else if (currentFilters.filter === 'followups') {
+            filterBadgeHtml = `<span class="badge badge-purple" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Scheduled Follow-ups <a href="#" onclick="App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
+        }
+
         let html = `
             <div class="page-header">
                 <div>
-                    <div class="page-title">Lead Management Database</div>
+                    <div class="page-title" style="display:flex; align-items:center;">Lead Management Database ${filterBadgeHtml}</div>
                     <div class="page-subtitle">Track, filter, call, assign and qualify prospect leads</div>
                 </div>
                 <div class="header-actions">
@@ -662,9 +684,18 @@ const App = {
             </div>
 
             <div class="table-card">
-                <div class="table-filters">
-                    <input type="text" id="lead-search-input" placeholder="Search by name, phone, email, company..." class="filter-input" style="width: 280px;" value="${search}" onkeyup="if(event.key==='Enter') App.renderLeads(1)">
+                <div class="table-filters" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <input type="text" id="lead-search-input" placeholder="Search by name, phone, email, company..." class="filter-input" style="width: 260px;" value="${search}" onkeyup="if(event.key==='Enter') App.renderLeads(1)">
                     <button class="btn btn-secondary btn-sm" onclick="App.renderLeads(1)">Search</button>
+
+                    <!-- QUICK FILTER DROPDOWN -->
+                    <select class="filter-select" style="min-width:180px;" onchange="App.renderLeads(1, {filter: this.value})">
+                        <option value="" ${!currentFilters.filter ? 'selected' : ''}>All Leads</option>
+                        <option value="called" ${currentFilters.filter === 'called' ? 'selected' : ''}>📞 Called Leads</option>
+                        <option value="to_call" ${currentFilters.filter === 'to_call' ? 'selected' : ''}>⏳ Pending To Call</option>
+                        <option value="followups" ${currentFilters.filter === 'followups' ? 'selected' : ''}>📅 Scheduled Follow-ups</option>
+                    </select>
+
                     <button class="btn btn-secondary btn-sm" onclick="App.autoAssignSelectedLeads()">🔄 Equal Auto Assign</button>
                 </div>
 
@@ -679,11 +710,12 @@ const App = {
                                 <th>Service Interested</th>
                                 <th>Executive</th>
                                 <th>Status</th>
-                                <th>Priority</th>
+                                <th>Last Call Outcome</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
+                            ${leads.length === 0 ? `<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No lead records found matching filter.</td></tr>` : ''}
                             ${leads.map(l => `
                                 <tr>
                                     <td><input type="checkbox" class="chk-lead" value="${l.id}"></td>
@@ -692,11 +724,13 @@ const App = {
                                     <td><a href="tel:${l.mobile}" style="color:var(--success-text); text-decoration:none; font-weight:600;">📞 ${l.mobile}</a></td>
                                     <td>${l.service_name || 'General Query'}</td>
                                     <td>${l.executive_name || '<span style="color:var(--text-muted)">Unassigned</span>'}</td>
-                                    <td><span class="badge" style="background:${l.status_color}22; color:${l.status_color}; border:1px solid ${l.status_color}55;">${l.status_name}</span></td>
-                                    <td><span class="badge badge-amber">${l.priority}</span></td>
+                                    <td><span class="badge" style="background:${l.status_color || '#3b82f6'}22; color:${l.status_color || '#3b82f6'}; border:1px solid ${l.status_color || '#3b82f6'}55;">${l.status_name}</span></td>
+                                    <td><small style="color:#475569; font-weight:600;">${l.latest_call_outcome || '<span style="color:#94a3b8">Not Called Yet</span>'}</small></td>
                                     <td>
-                                        <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">Call Now</button>
-                                        <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">Details</button>
+                                        <div style="display:flex; gap:6px;">
+                                            <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">Call Now</button>
+                                            <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">Details</button>
+                                        </div>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -945,37 +979,122 @@ const App = {
     },
 
     // 3. CALLING QUEUE MODULE
-    renderCallingQueue: async function() {
-        const res = await fetch('api/leads?action=list&calling_queue=1&limit=50');
+    callingQueueFilterState: {
+        quick_filter: 'new',
+        executive_id: '',
+        search: ''
+    },
+
+    renderCallingQueue: async function(filters = {}) {
+        if (!this.dropdowns || !this.dropdowns.executives) {
+            await this.loadDropdowns();
+        }
+
+        Object.assign(this.callingQueueFilterState, filters);
+        const state = this.callingQueueFilterState;
+
+        let queryParams = 'action=list&calling_queue=1&limit=100';
+        if (state.quick_filter === 'new') {
+            queryParams += '&status_id=1';
+        } else if (state.quick_filter === 'followups') {
+            queryParams += '&filter=followups';
+        } else if (state.quick_filter === 'called') {
+            queryParams += '&filter=called';
+        }
+        if (state.executive_id) {
+            queryParams += '&executive_id=' + encodeURIComponent(state.executive_id);
+        }
+        if (state.search) {
+            queryParams += '&search=' + encodeURIComponent(state.search);
+        }
+
+        const res = await fetch(`api/leads?${queryParams}`);
         const data = await res.json();
         if (!data.success) return;
 
-        const queue = data.data.leads;
+        const queue = data.data.leads || [];
+        const execs = this.dropdowns?.executives || [];
+
+        let execOptionsHtml = `<option value="">All Operations Executives</option>` + execs.map(e => 
+            `<option value="${e.id}" ${state.executive_id == e.id ? 'selected' : ''}>${e.name}</option>`
+        ).join('');
 
         let html = `
             <div class="page-header">
                 <div>
                     <div class="page-title">Action Calling Queue</div>
-                    <div class="page-subtitle">Your prioritized daily task queue for telecalling</div>
+                    <div class="page-subtitle">List view of pending telecalling tasks & operations executive queue</div>
                 </div>
             </div>
 
-            <div class="kpi-grid" style="margin-bottom:20px;">
-                ${queue.map(l => `
-                    <div class="kpi-card" style="background:#ffffff; border:1px solid var(--card-border);">
-                        <div class="kpi-header">
-                            <span>${l.lead_code}</span>
-                            <span class="badge badge-blue">${l.priority}</span>
-                        </div>
-                        <div style="font-size:16px; font-weight:700; color:var(--text-primary); margin-top:4px;">${l.name}</div>
-                        <div style="font-size:13px; color:var(--text-muted);">${l.company_name || l.city || 'Client Query'}</div>
-                        <div style="font-size:13.5px; font-weight:600; color:var(--success-text); margin-top:4px;">📞 ${l.mobile}</div>
-                        <div style="display:flex; gap:8px; margin-top:12px;">
-                            <button class="btn btn-primary btn-sm" style="flex:1; justify-center;" onclick="App.openCallModal(${l.id}, '${l.name}', '${l.mobile}')">Call Now</button>
-                            <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">Details</button>
-                        </div>
+            <div class="table-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding:16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; border-radius:18px 18px 0 0;">
+                    <!-- QUICK FILTER TABS -->
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <span style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase;">Queue Filter:</span>
+                        <button class="btn btn-sm ${state.quick_filter === 'new' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderCallingQueue({quick_filter:'new'})">
+                            🆕 New Leads ${state.quick_filter === 'new' ? '✓' : ''}
+                        </button>
+                        <button class="btn btn-sm ${state.quick_filter === 'followups' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderCallingQueue({quick_filter:'followups'})">
+                            📅 Pending Follow-ups ${state.quick_filter === 'followups' ? '✓' : ''}
+                        </button>
+                        <button class="btn btn-sm ${state.quick_filter === 'called' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderCallingQueue({quick_filter:'called'})">
+                            📞 Already Called ${state.quick_filter === 'called' ? '✓' : ''}
+                        </button>
+                        <button class="btn btn-sm ${state.quick_filter === 'all' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderCallingQueue({quick_filter:'all'})">
+                            📋 All Queue Calls ${state.quick_filter === 'all' ? '✓' : ''}
+                        </button>
                     </div>
-                `).join('')}
+
+                    <!-- EXECUTIVE DROPDOWN FILTER & SEARCH -->
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <select class="filter-select" style="min-width:200px;" onchange="App.renderCallingQueue({executive_id: this.value})">
+                            ${execOptionsHtml}
+                        </select>
+                        <input type="text" id="calling-queue-search" class="filter-input" placeholder="Search name/phone..." value="${state.search || ''}" onkeyup="if(event.key==='Enter') App.renderCallingQueue({search: this.value})">
+                        <button class="btn btn-secondary btn-sm" onclick="App.renderCallingQueue({search: document.getElementById('calling-queue-search').value})">Search</button>
+                    </div>
+                </div>
+
+                <!-- TABLE LIST VIEW -->
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Lead Code</th>
+                                <th>Client / Company</th>
+                                <th>Mobile Number</th>
+                                <th>Service Interested</th>
+                                <th>Executive</th>
+                                <th>Priority</th>
+                                <th>Lead Status</th>
+                                <th>Last Outcome</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${queue.length === 0 ? `<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No calling queue records found matching selected filter.</td></tr>` : ''}
+                            ${queue.map(l => `
+                                <tr>
+                                    <td><strong style="color:var(--primary);">${l.lead_code}</strong></td>
+                                    <td><strong>${l.name}</strong><br><small style="color:var(--text-muted)">${l.company_name || l.city || 'Individual'}</small></td>
+                                    <td><a href="tel:${l.mobile}" style="color:var(--success-text); text-decoration:none; font-weight:700;">📞 ${l.mobile}</a></td>
+                                    <td>${l.service_name || 'General Query'}</td>
+                                    <td>${l.executive_name || '<span style="color:#94a3b8">Unassigned</span>'}</td>
+                                    <td><span class="badge badge-amber">${l.priority}</span></td>
+                                    <td><span class="badge" style="background:${l.status_color || '#3b82f6'}22; color:${l.status_color || '#3b82f6'}; border:1px solid ${l.status_color || '#3b82f6'}55;">${l.status_name || 'New'}</span></td>
+                                    <td><small style="color:#475569; font-weight:600;">${l.latest_call_outcome || 'No call yet'}</small></td>
+                                    <td>
+                                        <div style="display:flex; gap:6px;">
+                                            <button class="btn btn-primary btn-sm" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">Call Now</button>
+                                            <button class="btn btn-secondary btn-sm" onclick="App.viewLeadDetail(${l.id})">Details</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
         document.getElementById('content-viewport').innerHTML = html;
@@ -1256,16 +1375,19 @@ const App = {
     },
 
     // 8. PROJECTS WORKSPACE MODULE
+    projectsCache: [],
+
     renderProjects: async function() {
         const res = await fetch('api/projects?action=list');
         const data = await res.json();
         if (!data.success) return;
+        this.projectsCache = data.data || [];
 
         let html = `
             <div class="page-header">
                 <div>
                     <div class="page-title">Active Projects Workspace</div>
-                    <div class="page-subtitle">Track project delivery, progress percentages & client payments</div>
+                    <div class="page-subtitle">Track project delivery, progress percentages, stage updates & client details</div>
                 </div>
             </div>
 
@@ -1281,6 +1403,7 @@ const App = {
                                 <th>Stage</th>
                                 ${this.currentUser.role_name !== 'operation_executive' ? '<th>Final Value</th><th>Paid Amount</th>' : ''}
                                 <th>Delivery Date</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1295,9 +1418,12 @@ const App = {
                                             <div style="width:${p.progress_percent}%; height:100%; background:var(--primary);"></div>
                                         </div>
                                     </td>
-                                    <td><span class="badge" style="background:${p.stage_color}22; color:${p.stage_color}; border:1px solid ${p.stage_color}55;">${p.stage_name}</span></td>
-                                    ${this.currentUser.role_name !== 'operation_executive' ? `<td>₹${parseFloat(p.final_amount).toLocaleString()}</td><td><span class="badge badge-green">₹${parseFloat(p.paid_amount).toLocaleString()}</span></td>` : ''}
+                                    <td><span class="badge" style="background:${p.stage_color || '#3b82f6'}22; color:${p.stage_color || '#3b82f6'}; border:1px solid ${p.stage_color || '#3b82f6'}55;">${p.stage_name}</span></td>
+                                    ${this.currentUser.role_name !== 'operation_executive' ? `<td>₹${parseFloat(p.final_amount || 0).toLocaleString()}</td><td><span class="badge badge-green">₹${parseFloat(p.paid_amount || 0).toLocaleString()}</span></td>` : ''}
                                     <td>${p.expected_delivery_date || 'TBD'}</td>
+                                    <td>
+                                        <button class="btn btn-secondary btn-sm" onclick="App.openEditProjectModal(App.projectsCache.find(x => x.id == ${p.id}))">✏️ Edit</button>
+                                    </td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -1308,30 +1434,473 @@ const App = {
         document.getElementById('content-viewport').innerHTML = html;
     },
 
-    // 9. REPORTS MODULE
-    renderReports: async function() {
-        const res = await fetch('api/reports?type=leads');
+    openEditProjectModal: async function(project) {
+        if (!project) return;
+        if (document.getElementById('edit-project-modal')) return;
+
+        if (!this.dropdowns || !this.dropdowns.project_stages) {
+            await this.loadDropdowns();
+        }
+
+        const stages = this.dropdowns.project_stages || [
+            { id: 1, name: 'Project Kickoff & Requirements', color_code: '#3b82f6' },
+            { id: 2, name: 'UI/UX Design & Wireframing', color_code: '#8b5cf6' },
+            { id: 3, name: 'Core Development & Integration', color_code: '#ec4899' },
+            { id: 4, name: 'QA Testing & UAT Review', color_code: '#f59e0b' },
+            { id: 5, name: 'Deployment & Final Handover', color_code: '#10b981' }
+        ];
+
+        let stagesHtml = stages.map(s => 
+            `<option value="${s.id}" ${project.stage_id == s.id ? 'selected' : ''}>${s.name}</option>`
+        ).join('');
+
+        const modalHtml = `
+            <div class="modal-backdrop show" id="edit-project-modal">
+                <div class="modal-box" style="max-width: 520px; border-radius: 18px; border-top: 4px solid var(--primary); padding:24px;">
+                    <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:14px;">
+                        <div>
+                            <div style="font-size:11px; font-weight:800; color:var(--primary); text-transform:uppercase;">✏️ EDIT PROJECT DETAILS</div>
+                            <div class="modal-title" style="font-size:18px; font-weight:800; color:#0f172a; margin-top:2px;">${project.project_code} - ${project.client_name}</div>
+                        </div>
+                        <button class="close-modal" onclick="App.closeModal('edit-project-modal')">✕</button>
+                    </div>
+                    <form onsubmit="App.submitEditProject(event, ${project.id})" style="margin-top:16px;">
+                        <div style="margin-bottom:16px;">
+                            <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Project Stage</label>
+                            <select id="edit-prj-stage" class="filter-select" style="width:100%; font-size:14px; font-weight:600;" required>
+                                ${stagesHtml}
+                            </select>
+                        </div>
+
+                        <div style="margin-bottom:16px;">
+                            <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Progress Percentage</label>
+                            <input type="range" id="edit-prj-progress" min="0" max="100" value="${project.progress_percent}" style="width:100%; cursor:pointer;" oninput="document.getElementById('edit-prj-progress-val').innerText = this.value + '%'">
+                            <div style="text-align:right; font-weight:800; color:var(--primary); font-size:13px;" id="edit-prj-progress-val">${project.progress_percent}%</div>
+                        </div>
+
+                        <div style="margin-bottom:16px;">
+                            <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Expected Delivery Date</label>
+                            <input type="date" id="edit-prj-date" class="filter-input" style="width:100%;" value="${project.expected_delivery_date || ''}">
+                        </div>
+
+                        <div style="margin-bottom:20px;">
+                            <label style="font-size:12.5px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Log Progress Notes / Remark</label>
+                            <textarea id="edit-prj-notes" class="filter-input" style="width:100%; height:80px;" placeholder="Brief details about current project progress..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px; font-size:14px; font-weight:800; border-radius:12px;">Save Project Updates</button>
+                    </form>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+
+    submitEditProject: async function(e, projectId) {
+        e.preventDefault();
+        const stageId = document.getElementById('edit-prj-stage').value;
+        const progress = document.getElementById('edit-prj-progress').value;
+        const deliveryDate = document.getElementById('edit-prj-date').value;
+        const notes = document.getElementById('edit-prj-notes').value;
+
+        const formData = new FormData();
+        formData.append('action', 'update');
+        formData.append('id', projectId);
+        formData.append('stage_id', stageId);
+        formData.append('progress_percent', progress);
+        formData.append('expected_delivery_date', deliveryDate);
+        formData.append('notes', notes);
+
+        const res = await fetch('api/projects', { method: 'POST', body: formData });
         const data = await res.json();
+        if (data.success) {
+            this.closeModal('edit-project-modal');
+            this.renderProjects();
+        } else {
+            alert(data.message || 'Failed to update project');
+        }
+    },
+
+    // 9. ADVANCED ANALYTICS & OPERATIONS REPORTS MODULE
+    activeReportTab: 'status',
+
+    renderReports: async function(tab = null) {
+        if (tab) this.activeReportTab = tab;
+        const currentTab = this.activeReportTab || 'status';
+
+        const res = await fetch(`api/reports?type=${currentTab}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        const reportData = data.data || [];
+
+        let tableHeaders = '';
+        let tableRows = '';
+
+        if (currentTab === 'status') {
+            tableHeaders = `
+                <th>Lead Status</th>
+                <th>Total Leads Count</th>
+                <th>Qualified Prospects</th>
+                <th>Qualification Rate</th>
+                <th>Pipeline Value</th>
+            `;
+            tableRows = reportData.map(r => `
+                <tr>
+                    <td><strong>${r.status_name}</strong></td>
+                    <td><span class="badge badge-blue" style="font-size:13px; padding:6px 12px;">${r.lead_count}</span></td>
+                    <td><strong>${r.qualified_count || 0}</strong></td>
+                    <td><span class="badge badge-green">${r.lead_count > 0 ? Math.round(((r.qualified_count || 0)/r.lead_count)*100) : 0}%</span></td>
+                    <td>₹${(r.pipeline_value ? parseFloat(r.pipeline_value).toLocaleString('en-IN') : '0')}</td>
+                </tr>
+            `).join('');
+        } else if (currentTab === 'executives') {
+            tableHeaders = `
+                <th>Executive Name</th>
+                <th>Total Calls Logged</th>
+                <th>Connected Calls</th>
+                <th>Connection Rate</th>
+                <th>Leads Qualified</th>
+            `;
+            tableRows = reportData.map(r => `
+                <tr>
+                    <td><strong>${r.executive_name}</strong></td>
+                    <td><span class="badge badge-blue" style="font-size:13px; padding:6px 12px;">${r.total_calls}</span></td>
+                    <td><strong>${r.connected_calls || 0}</strong></td>
+                    <td><span class="badge badge-green">${r.total_calls > 0 ? Math.round(((r.connected_calls || 0)/r.total_calls)*100) : 0}%</span></td>
+                    <td><span class="badge badge-amber">${r.qualified_leads || 0}</span></td>
+                </tr>
+            `).join('');
+        } else if (currentTab === 'services') {
+            tableHeaders = `
+                <th>Service Name</th>
+                <th>Total Lead Inquiries</th>
+                <th>Active Projects</th>
+                <th>Total Revenue Earned</th>
+            `;
+            tableRows = reportData.map(r => `
+                <tr>
+                    <td><strong>${r.service_name}</strong></td>
+                    <td><span class="badge badge-blue" style="font-size:13px; padding:6px 12px;">${r.lead_count}</span></td>
+                    <td><strong>${r.project_count || 0}</strong></td>
+                    <td><strong style="color:var(--success-text);">₹${parseFloat(r.total_revenue || 0).toLocaleString('en-IN')}</strong></td>
+                </tr>
+            `).join('');
+        } else if (currentTab === 'source') {
+            tableHeaders = `
+                <th>Lead Source</th>
+                <th>Total Leads Acquired</th>
+                <th>Qualified Leads</th>
+                <th>Conversion Rate</th>
+            `;
+            tableRows = reportData.map(r => `
+                <tr>
+                    <td><strong>${r.source_name}</strong></td>
+                    <td><span class="badge badge-blue" style="font-size:13px; padding:6px 12px;">${r.total_leads}</span></td>
+                    <td><strong>${r.qualified_leads || 0}</strong></td>
+                    <td><span class="badge badge-green">${r.total_leads > 0 ? Math.round(((r.qualified_leads || 0)/r.total_leads)*100) : 0}%</span></td>
+                </tr>
+            `).join('');
+        }
 
         let html = `
             <div class="page-header">
                 <div>
-                    <div class="page-title">Analytics & Operations Reports</div>
-                    <div class="page-subtitle">Multi-dimensional operational intelligence</div>
+                    <div class="page-title">Advanced Operations & Analytics Reports</div>
+                    <div class="page-subtitle">Comprehensive data tables, pipeline performance & executive metrics</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="window.location.href='api/reports?action=export&type=${currentTab}'">📥 Download CSV Report</button>
                 </div>
             </div>
 
-            <div class="kpi-grid">
-                ${data.data.map(r => `
-                    <div class="kpi-card">
-                        <div class="kpi-header"><span>${r.status_name}</span></div>
-                        <div class="kpi-val">${r.lead_count} Leads</div>
-                        <div class="kpi-sub">Qualified: ${r.qualified_count}</div>
-                    </div>
-                `).join('')}
+            <div class="table-card">
+                <!-- REPORT TAB NAVIGATION -->
+                <div style="display:flex; gap:10px; padding:16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; border-radius:18px 18px 0 0; flex-wrap:wrap;">
+                    <button class="btn btn-sm ${currentTab === 'status' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('status')">📊 Lead Pipeline Conversion</button>
+                    <button class="btn btn-sm ${currentTab === 'executives' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('executives')">📞 Telecalling Executive Metrics</button>
+                    <button class="btn btn-sm ${currentTab === 'services' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('services')">💼 Service Portfolio Revenue</button>
+                    <button class="btn btn-sm ${currentTab === 'source' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderReports('source')">🌐 Lead Source Acquisition</button>
+                </div>
+
+                <!-- DATA TABLE -->
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                ${tableHeaders}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${reportData.length === 0 ? `<tr><td colspan="5" style="text-align:center; padding:30px; color:#64748b;">No report data available for this view.</td></tr>` : ''}
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
         document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    // 10. SYSTEM SETTINGS MODULE
+    activeSettingsTab: 'statuses',
+
+    renderSettings: async function(tab = null) {
+        if (tab) this.activeSettingsTab = tab;
+        const currentTab = this.activeSettingsTab || 'statuses';
+
+        const dropdownRes = await fetch('api/settings?action=get_dropdowns');
+        const dropdownData = await dropdownRes.json();
+        if (!dropdownData.success) return;
+        const d = dropdownData.data;
+
+        let tabContentHtml = '';
+
+        if (currentTab === 'statuses') {
+            tabContentHtml = `
+                <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
+                    <div class="table-card">
+                        <div style="padding:16px; border-bottom:1px solid #e2e8f0; font-weight:800; font-size:15px; color:#0f172a;">Active Lead Statuses</div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Sort Order</th><th>Status Name</th><th>Color Badge Preview</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${d.statuses.map(s => `
+                                        <tr>
+                                            <td>#${s.sort_order}</td>
+                                            <td><strong>${s.name}</strong></td>
+                                            <td><span class="badge" style="background:${s.color_code}22; color:${s.color_code}; border:1px solid ${s.color_code}55;">${s.name}</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; padding:20px;">
+                        <div style="font-size:16px; font-weight:800; color:#0f172a; margin-bottom:14px;">+ Add Lead Status</div>
+                        <form onsubmit="App.submitAddStatus(event)">
+                            <div style="margin-bottom:14px;">
+                                <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Status Name *</label>
+                                <input type="text" id="new-status-name" class="filter-input" style="width:100%;" placeholder="e.g. Negotiation" required>
+                            </div>
+                            <div style="margin-bottom:16px;">
+                                <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Badge Color *</label>
+                                <input type="color" id="new-status-color" value="#3b82f6" style="width:100%; height:40px; border-radius:8px; border:1px solid #cbd5e1; cursor:pointer;">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Save Status</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        } else if (currentTab === 'sources') {
+            tabContentHtml = `
+                <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
+                    <div class="table-card">
+                        <div style="padding:16px; border-bottom:1px solid #e2e8f0; font-weight:800; font-size:15px; color:#0f172a;">Active Lead Sources</div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Source ID</th><th>Source Name</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${d.sources.map(src => `
+                                        <tr>
+                                            <td>#${src.id}</td>
+                                            <td><strong>${src.name}</strong></td>
+                                            <td><span class="badge badge-green">Active</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; padding:20px;">
+                        <div style="font-size:16px; font-weight:800; color:#0f172a; margin-bottom:14px;">+ Add Lead Source</div>
+                        <form onsubmit="App.submitAddSource(event)">
+                            <div style="margin-bottom:16px;">
+                                <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Source Channel Name *</label>
+                                <input type="text" id="new-source-name" class="filter-input" style="width:100%;" placeholder="e.g. LinkedIn Ads" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Save Source</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        } else if (currentTab === 'services') {
+            tabContentHtml = `
+                <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
+                    <div class="table-card">
+                        <div style="padding:16px; border-bottom:1px solid #e2e8f0; font-weight:800; font-size:15px; color:#0f172a;">Service Portfolio & Pricing</div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Service Name</th><th>Base Price</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${d.services.map(srv => `
+                                        <tr>
+                                            <td><strong>${srv.name}</strong></td>
+                                            <td>₹${parseFloat(srv.default_amount || 0).toLocaleString('en-IN')}</td>
+                                            <td><span class="badge badge-green">Active</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; padding:20px;">
+                        <div style="font-size:16px; font-weight:800; color:#0f172a; margin-bottom:14px;">+ Add New Service</div>
+                        <form onsubmit="App.submitAddService(event)">
+                            <div style="margin-bottom:14px;">
+                                <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Service Title *</label>
+                                <input type="text" id="new-service-name" class="filter-input" style="width:100%;" placeholder="e.g. App Development" required>
+                            </div>
+                            <div style="margin-bottom:16px;">
+                                <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Default Amount (₹)</label>
+                                <input type="number" id="new-service-amount" class="filter-input" style="width:100%;" placeholder="50000">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Save Service</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        } else if (currentTab === 'health') {
+            const healthRes = await fetch('api/settings?action=system_health');
+            const healthData = await healthRes.json();
+            const sh = healthData.data || {};
+
+            const logRes = await fetch('api/settings?action=list_activity_logs');
+            const logData = await logRes.json();
+            const logs = logData.data || [];
+
+            tabContentHtml = `
+                <div>
+                    <div class="kpi-grid" style="margin-bottom:20px;">
+                        <div class="kpi-card" style="background:#ffffff; border:1px solid #e2e8f0;">
+                            <div class="kpi-header"><span>PHP Engine</span></div>
+                            <div class="kpi-val" style="font-size:22px;">v${sh.php_version || '8.x'}</div>
+                            <div class="kpi-sub">Database: ${sh.db_name || 'MySQL'}</div>
+                        </div>
+                        <div class="kpi-card" style="background:#ffffff; border:1px solid #e2e8f0;">
+                            <div class="kpi-header"><span>Database Tables</span></div>
+                            <div class="kpi-val" style="font-size:22px;">${sh.tables_count || 0} Tables</div>
+                            <div class="kpi-sub">DB Size: ${sh.db_size_mb || '0'} MB</div>
+                        </div>
+                        <div class="kpi-card" style="background:#ffffff; border:1px solid #e2e8f0;">
+                            <div class="kpi-header"><span>System Records</span></div>
+                            <div class="kpi-val" style="font-size:22px;">${sh.total_leads || 0} Leads</div>
+                            <div class="kpi-sub">${sh.total_calls || 0} Call Logs | ${sh.total_projects || 0} Projects</div>
+                        </div>
+                        <div class="kpi-card" style="background:#ffffff; border:1px solid #e2e8f0;">
+                            <div class="kpi-header"><span>System Health</span></div>
+                            <div class="kpi-val" style="font-size:22px; color:var(--success-text);">🟢 Operational</div>
+                            <div class="kpi-sub">All database connections active</div>
+                        </div>
+                    </div>
+
+                    <div class="table-card">
+                        <div style="padding:16px; border-bottom:1px solid #e2e8f0; font-weight:800; font-size:15px; color:#0f172a;">Recent Audit & System Logs</div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Timestamp</th><th>User</th><th>Module</th><th>Action</th><th>IP Address</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${logs.slice(0, 15).map(l => `
+                                        <tr>
+                                            <td><small style="color:#64748b;">${l.created_at}</small></td>
+                                            <td><strong>${l.user_name || 'System'}</strong></td>
+                                            <td><span class="badge badge-blue">${l.module}</span></td>
+                                            <td>${l.action}</td>
+                                            <td><code>${l.ip_address || '127.0.0.1'}</code></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        let html = `
+            <div class="page-header">
+                <div>
+                    <div class="page-title">CRM System Settings & Control Panel</div>
+                    <div class="page-subtitle">Configure lead statuses, acquisition sources, services portfolio & system health</div>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
+                <button class="btn ${currentTab === 'statuses' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('statuses')">⚙️ Lead Statuses</button>
+                <button class="btn ${currentTab === 'sources' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('sources')">🌐 Lead Sources</button>
+                <button class="btn ${currentTab === 'services' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('services')">💼 Services Portfolio</button>
+                <button class="btn ${currentTab === 'health' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderSettings('health')">🛡️ System Health & Audit Logs</button>
+            </div>
+
+            ${tabContentHtml}
+        `;
+        document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    submitAddStatus: async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('new-status-name').value;
+        const color = document.getElementById('new-status-color').value;
+
+        const formData = new FormData();
+        formData.append('action', 'add_status');
+        formData.append('name', name);
+        formData.append('color_code', color);
+
+        const res = await fetch('api/settings', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            this.renderSettings('statuses');
+        } else {
+            alert(data.message || 'Error adding status');
+        }
+    },
+
+    submitAddSource: async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('new-source-name').value;
+
+        const formData = new FormData();
+        formData.append('action', 'add_source');
+        formData.append('name', name);
+
+        const res = await fetch('api/settings', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            this.renderSettings('sources');
+        } else {
+            alert(data.message || 'Error adding source');
+        }
+    },
+
+    submitAddService: async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('new-service-name').value;
+        const amount = document.getElementById('new-service-amount').value;
+
+        const formData = new FormData();
+        formData.append('action', 'add_service');
+        formData.append('name', name);
+        formData.append('default_amount', amount);
+
+        const res = await fetch('api/settings', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            this.renderSettings('services');
+        } else {
+            alert(data.message || 'Error adding service');
+        }
     },
 
     // 10. USER MANAGEMENT MODULE

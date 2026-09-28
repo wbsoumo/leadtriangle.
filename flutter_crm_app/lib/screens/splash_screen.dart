@@ -41,6 +41,11 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (session['success'] == true && session['data']?['is_logged_in'] == true) {
+      final userId = session['data']?['user']?['id']?.toString() ?? 'user';
+      final token = 'android_app_device_$userId';
+      await _apiService.registerFcmToken(token, deviceType: 'android_app');
+
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const HomeDashboardScreen()),
       );

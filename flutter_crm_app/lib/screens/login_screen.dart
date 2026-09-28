@@ -35,6 +35,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (res['success'] == true) {
+      final userId = res['data']?['id']?.toString() ?? 'user';
+      final token = 'android_app_device_$userId';
+      await _apiService.registerFcmToken(token, deviceType: 'android_app');
+
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeDashboardScreen()),

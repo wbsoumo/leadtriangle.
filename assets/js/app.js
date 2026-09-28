@@ -10,10 +10,26 @@ const App = {
         await this.checkAuth();
         if (this.currentUser) {
             await this.loadDropdowns();
+            this.autoRegisterWebToken();
             this.bindEvents();
             this.navigate(this.currentView);
             this.startActiveCallPolling();
         }
+    },
+
+    autoRegisterWebToken: function() {
+        try {
+            let token = localStorage.getItem('fcm_device_token');
+            if (!token) {
+                token = 'web_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+                localStorage.setItem('fcm_device_token', token);
+            }
+            const formData = new FormData();
+            formData.append('action', 'register_token');
+            formData.append('fcm_token', token);
+            formData.append('device_type', 'web');
+            fetch('api/notifications', { method: 'POST', body: formData });
+        } catch(e) {}
     },
 
     startActiveCallPolling: function() {

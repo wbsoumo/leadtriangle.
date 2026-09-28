@@ -644,15 +644,22 @@ const App = {
     leadsFilterState: {},
 
     renderLeads: async function(page = 1, filters = null) {
+        if (!this.dropdowns || !this.dropdowns.statuses) {
+            await this.loadDropdowns();
+        }
+
         if (filters !== null) {
-            this.leadsFilterState = filters;
+            this.leadsFilterState = { ...(this.leadsFilterState || {}), ...filters };
         }
         const currentFilters = this.leadsFilterState || {};
         const search = document.getElementById('lead-search-input')?.value || currentFilters.search || '';
+        currentFilters.search = search;
 
         let queryParams = `action=list&page=${page}&search=${encodeURIComponent(search)}`;
         if (currentFilters.filter) queryParams += `&filter=${encodeURIComponent(currentFilters.filter)}`;
         if (currentFilters.status_id) queryParams += `&status_id=${encodeURIComponent(currentFilters.status_id)}`;
+        if (currentFilters.priority) queryParams += `&priority=${encodeURIComponent(currentFilters.priority)}`;
+        if (currentFilters.executive_id) queryParams += `&executive_id=${encodeURIComponent(currentFilters.executive_id)}`;
         if (currentFilters.is_qualified !== undefined) queryParams += `&is_qualified=${encodeURIComponent(currentFilters.is_qualified)}`;
 
         const res = await fetch(`api/leads?${queryParams}`);
@@ -664,11 +671,11 @@ const App = {
 
         let filterBadgeHtml = '';
         if (currentFilters.filter === 'called') {
-            filterBadgeHtml = `<span class="badge badge-blue" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Already Called (${p.total} Leads) <a href="#" onclick="App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
+            filterBadgeHtml = `<span class="badge badge-blue" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Already Called (${p.total} Leads) <a href="#" onclick="App.leadsFilterState = {}; App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
         } else if (currentFilters.filter === 'to_call') {
-            filterBadgeHtml = `<span class="badge badge-amber" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Pending To Call <a href="#" onclick="App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
+            filterBadgeHtml = `<span class="badge badge-amber" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Pending To Call <a href="#" onclick="App.leadsFilterState = {}; App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
         } else if (currentFilters.filter === 'followups') {
-            filterBadgeHtml = `<span class="badge badge-purple" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Scheduled Follow-ups <a href="#" onclick="App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
+            filterBadgeHtml = `<span class="badge badge-purple" style="font-size:12px; padding:6px 12px; margin-left:8px;">Filter: Scheduled Follow-ups <a href="#" onclick="App.leadsFilterState = {}; App.renderLeads(1, {}); return false;" style="color:#fff; margin-left:8px; text-decoration:none;">✕ Clear</a></span>`;
         }
 
         let html = `
@@ -686,18 +693,33 @@ const App = {
 
             <div class="table-card">
                 <div class="table-filters" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                    <input type="text" id="lead-search-input" placeholder="Search by name, phone, email, company..." class="filter-input" style="width: 260px;" value="${search}" onkeyup="if(event.key==='Enter') App.renderLeads(1)">
-                    <button class="btn btn-secondary btn-sm" onclick="App.renderLeads(1)">Search</button>
+                    <input type="text" id="lead-search-input" placeholder="Search by name, phone, email, company..." class="filter-input" style="width: 240px;" value="${search}" onkeyup="if(event.key==='Enter') App.renderLeads(1, {search: this.value})">
+                    <button class="btn btn-secondary btn-sm" onclick="App.renderLeads(1, {search: document.getElementById('lead-search-input').value})">Search</button>
 
                     <!-- QUICK FILTER DROPDOWN -->
-                    <select class="filter-select" style="min-width:180px;" onchange="App.renderLeads(1, {filter: this.value})">
-                        <option value="" ${!currentFilters.filter ? 'selected' : ''}>All Leads</option>
+                    <select class="filter-select" style="min-width:160px;" onchange="App.renderLeads(1, {filter: this.value})">
+                        <option value="" ${!currentFilters.filter ? 'selected' : ''}>All Lead Types</option>
                         <option value="called" ${currentFilters.filter === 'called' ? 'selected' : ''}>Called Leads</option>
                         <option value="to_call" ${currentFilters.filter === 'to_call' ? 'selected' : ''}>Pending To Call</option>
                         <option value="followups" ${currentFilters.filter === 'followups' ? 'selected' : ''}>Scheduled Follow-ups</option>
                     </select>
 
+                    <!-- STATUS FILTER -->
+                    <select class="filter-select" style="min-width:160px;" onchange="App.renderLeads(1, {status_id: this.value})">
+                        <option value="">All Lead Statuses</option>
+                        ${(this.dropdowns?.statuses || []).map(s => `<option value="${s.id}" ${currentFilters.status_id == s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
+                    </select>
+
+                    <!-- PRIORITY FILTER -->
+                    <select class="filter-select" style="min-width:140px;" onchange="App.renderLeads(1, {priority: this.value})">
+                        <option value="">All Priorities</option>
+                        <option value="High" ${currentFilters.priority === 'High' ? 'selected' : ''}>High Priority</option>
+                        <option value="Medium" ${currentFilters.priority === 'Medium' ? 'selected' : ''}>Medium Priority</option>
+                        <option value="Low" ${currentFilters.priority === 'Low' ? 'selected' : ''}>Low Priority</option>
+                    </select>
+
                     <button class="btn btn-secondary btn-sm" onclick="App.autoAssignSelectedLeads()">Equal Auto Assign</button>
+                    ${(currentFilters.filter || currentFilters.status_id || currentFilters.priority || currentFilters.search) ? `<button class="btn btn-secondary btn-sm" style="color:#ef4444;" onclick="App.leadsFilterState = {}; App.renderLeads(1, {});">✕ Reset Filters</button>` : ''}
                 </div>
 
                 <div class="table-responsive">
@@ -1005,6 +1027,9 @@ const App = {
         if (state.executive_id) {
             queryParams += '&executive_id=' + encodeURIComponent(state.executive_id);
         }
+        if (state.priority) {
+            queryParams += '&priority=' + encodeURIComponent(state.priority);
+        }
         if (state.search) {
             queryParams += '&search=' + encodeURIComponent(state.search);
         }
@@ -1048,9 +1073,15 @@ const App = {
                     </div>
 
                     <!-- EXECUTIVE DROPDOWN FILTER & SEARCH -->
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <select class="filter-select" style="min-width:200px;" onchange="App.renderCallingQueue({executive_id: this.value})">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <select class="filter-select" style="min-width:180px;" onchange="App.renderCallingQueue({executive_id: this.value})">
                             ${execOptionsHtml}
+                        </select>
+                        <select class="filter-select" style="min-width:140px;" onchange="App.renderCallingQueue({priority: this.value})">
+                            <option value="" ${!state.priority ? 'selected' : ''}>All Priorities</option>
+                            <option value="High" ${state.priority === 'High' ? 'selected' : ''}>High Priority</option>
+                            <option value="Medium" ${state.priority === 'Medium' ? 'selected' : ''}>Medium Priority</option>
+                            <option value="Low" ${state.priority === 'Low' ? 'selected' : ''}>Low Priority</option>
                         </select>
                         <input type="text" id="calling-queue-search" class="filter-input" placeholder="Search name/phone..." value="${state.search || ''}" onkeyup="if(event.key==='Enter') App.renderCallingQueue({search: this.value})">
                         <button class="btn btn-secondary btn-sm" onclick="App.renderCallingQueue({search: document.getElementById('calling-queue-search').value})">Search</button>
@@ -1216,20 +1247,34 @@ const App = {
     },
 
     // 5. FOLLOWUPS MODULE
-    renderFollowups: async function() {
-        const res = await fetch('api/followups?action=list&filter=all');
+    activeFollowupsFilter: 'today',
+
+    renderFollowups: async function(filter = null) {
+        if (filter) this.activeFollowupsFilter = filter;
+        const currentFilter = this.activeFollowupsFilter || 'today';
+
+        const res = await fetch(`api/followups?action=list&filter=${currentFilter}`);
         const data = await res.json();
         if (!data.success) return;
+
+        const followups = data.data || [];
 
         let html = `
             <div class="page-header">
                 <div>
                     <div class="page-title">Follow-up Management</div>
-                    <div class="page-subtitle">Track scheduled callback tasks</div>
+                    <div class="page-subtitle">Track scheduled callback tasks & upcoming customer follow-ups</div>
                 </div>
             </div>
 
             <div class="table-card">
+                <div style="display:flex; gap:10px; padding:16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; border-radius:18px 18px 0 0; flex-wrap:wrap; overflow-x:auto;">
+                    <button class="btn btn-sm ${currentFilter === 'today' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderFollowups('today')">Today's Callbacks</button>
+                    <button class="btn btn-sm ${currentFilter === 'overdue' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderFollowups('overdue')">Overdue Callbacks</button>
+                    <button class="btn btn-sm ${currentFilter === 'upcoming' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderFollowups('upcoming')">Upcoming Callbacks</button>
+                    <button class="btn btn-sm ${currentFilter === 'all' ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderFollowups('all')">All Scheduled Callbacks</button>
+                </div>
+
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead>
@@ -1243,14 +1288,15 @@ const App = {
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.data.map(f => `
+                            ${followups.length === 0 ? `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">No follow-up records found matching filter.</td></tr>` : ''}
+                            ${followups.map(f => `
                                 <tr>
                                     <td><strong>${f.lead_name}</strong><br><small style="color:var(--text-muted)">${f.company_name || 'Lead'}</small></td>
                                     <td><a href="tel:${f.lead_mobile}" style="color:var(--success-text); font-weight:600;">${f.lead_mobile}</a></td>
                                     <td>${f.followup_date} at ${f.followup_time}</td>
                                     <td>${f.purpose || f.notes || 'Routine follow up'}</td>
-                                    <td><span class="badge badge-amber">${f.status}</span></td>
-                                    <td><button class="btn btn-success btn-sm" onclick="App.completeFollowup(${f.id})">Mark Done</button></td>
+                                    <td><span class="badge ${f.status === 'Completed' ? 'badge-green' : 'badge-amber'}">${f.status}</span></td>
+                                    <td>${f.status !== 'Completed' ? `<button class="btn btn-success btn-sm" onclick="App.completeFollowup(${f.id})">Mark Done</button>` : `<span class="badge badge-green">✓ Completed</span>`}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -1377,12 +1423,30 @@ const App = {
 
     // 8. PROJECTS WORKSPACE MODULE
     projectsCache: [],
+    projectsFilterState: {},
 
-    renderProjects: async function() {
-        const res = await fetch('api/projects?action=list');
+    renderProjects: async function(filters = null) {
+        if (!this.dropdowns || !this.dropdowns.project_stages) {
+            await this.loadDropdowns();
+        }
+        if (filters !== null) {
+            this.projectsFilterState = { ...(this.projectsFilterState || {}), ...filters };
+        }
+        const state = this.projectsFilterState || {};
+
+        let queryParams = 'action=list';
+        if (state.stage_id) queryParams += '&stage_id=' + encodeURIComponent(state.stage_id);
+        if (state.search) queryParams += '&search=' + encodeURIComponent(state.search);
+
+        const res = await fetch(`api/projects?${queryParams}`);
         const data = await res.json();
         if (!data.success) return;
         this.projectsCache = data.data || [];
+        const stages = this.dropdowns?.project_stages || [];
+
+        let stageOptionsHtml = `<option value="">All Project Stages</option>` + stages.map(s => 
+            `<option value="${s.id}" ${state.stage_id == s.id ? 'selected' : ''}>${s.name}</option>`
+        ).join('');
 
         let html = `
             <div class="page-header">
@@ -1393,6 +1457,15 @@ const App = {
             </div>
 
             <div class="table-card">
+                <div style="display:flex; gap:10px; padding:16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; border-radius:18px 18px 0 0; flex-wrap:wrap; align-items:center;">
+                    <select class="filter-select" style="min-width:200px;" onchange="App.renderProjects({stage_id: this.value})">
+                        ${stageOptionsHtml}
+                    </select>
+                    <input type="text" id="project-search-input" placeholder="Search project code, client, company..." class="filter-input" style="width:240px;" value="${state.search || ''}" onkeyup="if(event.key==='Enter') App.renderProjects({search: this.value})">
+                    <button class="btn btn-secondary btn-sm" onclick="App.renderProjects({search: document.getElementById('project-search-input').value})">Search</button>
+                    ${(state.stage_id || state.search) ? `<button class="btn btn-secondary btn-sm" style="color:#ef4444;" onclick="App.projectsFilterState = {}; App.renderProjects({});">✕ Clear Filters</button>` : ''}
+                </div>
+
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead>
@@ -1408,7 +1481,8 @@ const App = {
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.data.map(p => `
+                            ${this.projectsCache.length === 0 ? `<tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">No project records found matching filter.</td></tr>` : ''}
+                            ${this.projectsCache.map(p => `
                                 <tr>
                                     <td><strong style="color:var(--primary);">${p.project_code}</strong></td>
                                     <td><strong>${p.client_name}</strong><br><small style="color:var(--text-muted)">${p.company_name || ''}</small></td>

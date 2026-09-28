@@ -29,9 +29,20 @@ if ($action === 'list') {
     $where = [];
     $params = [];
 
+    $stageId = $_GET['stage_id'] ?? null;
+    $search = trim($_GET['search'] ?? '');
+
     if ($roleName === 'manager') {
         $where[] = "p.assigned_manager_id = :mgr_id";
         $params['mgr_id'] = $userId;
+    }
+    if (!empty($stageId)) {
+        $where[] = "p.stage_id = :stage_id";
+        $params['stage_id'] = $stageId;
+    }
+    if (!empty($search)) {
+        $where[] = "(p.project_code LIKE :search OR p.client_name LIKE :search OR p.company_name LIKE :search)";
+        $params['search'] = "%$search%";
     }
 
     $whereClause = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";

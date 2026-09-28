@@ -123,6 +123,17 @@ svg {
     gap: 10px;
 }
 
+.brand-logo-img {
+    width: 32px !important;
+    height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    object-fit: contain;
+    border-radius: 6px;
+    flex-shrink: 0;
+    display: block !important;
+}
+
 .brand-logo {
     width: 32px;
     height: 32px;

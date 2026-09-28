@@ -20,7 +20,7 @@ session_start();
     <aside class="sidebar" id="main-sidebar">
         <div class="sidebar-header">
             <div class="brand-wrapper">
-                <img src="assets/images/logo.png" alt="LeadTriangle Logo" style="width: 32px; height: 32px; object-fit: contain; border-radius: 6px;">
+                <img src="assets/images/logo.png" alt="LeadTriangle Logo" class="brand-logo-img" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'brand-logo\'>LT</div><div class=\'brand-title\'>Leadstriangle</div>';">
                 <div class="brand-title">Leadstriangle</div>
             </div>
             <button class="collapse-toggle" onclick="App.toggleSidebar()" title="Toggle Sidebar">

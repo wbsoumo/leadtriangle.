@@ -39,6 +39,22 @@ class ApiService {
     }
   }
 
+  // Register FCM Device Token for Push Notifications
+  Future<bool> registerFcmToken(String token, {String deviceType = 'android_app'}) async {
+    try {
+      final headers = await _getHeaders();
+      final res = await http.post(
+        Uri.parse('$baseUrl/notifications.php?action=register_token'),
+        headers: headers,
+        body: {'fcm_token': token, 'device_type': deviceType},
+      );
+      final data = jsonDecode(res.body);
+      return data['success'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Check Current Session
   Future<Map<String, dynamic>> checkSession() async {
     try {

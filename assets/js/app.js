@@ -1936,6 +1936,7 @@ const App = {
         } else if (currentTab === 'notifications') {
             let notifLogs = [];
             let allUsers = [];
+            let fcmTokens = [];
             try {
                 const logsRes = await fetch('api/notifications?action=logs');
                 const logsData = await logsRes.json();
@@ -1944,6 +1945,10 @@ const App = {
                 const usersRes = await fetch('api/users?action=list');
                 const usersData = await usersRes.json();
                 if (usersData.success) allUsers = usersData.data || [];
+
+                const tokensRes = await fetch('api/notifications?action=get_tokens');
+                const tokensData = await tokensRes.json();
+                if (tokensData.success) fcmTokens = tokensData.data || [];
             } catch(e) {}
 
             const isAdmin = (this.currentUser.role_name === 'super_admin' || this.currentUser.role_name === 'manager');
@@ -1987,37 +1992,96 @@ const App = {
                         </div>
                     ` : ''}
 
-                    <div class="table-card">
-                        <div style="padding:16px; border-bottom:1px solid #e2e8f0; font-weight:800; font-size:15px; color:#0f172a; display:flex; justify-content:space-between; align-items:center;">
-                            <span>Notification Dispatch History & Audit Logs</span>
-                            <span class="badge badge-blue">${notifLogs.length} Sent</span>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Date & Time</th>
-                                        <th>Dispatched By</th>
-                                        <th>Target Recipient</th>
-                                        <th>Title</th>
-                                        <th>Message</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${notifLogs.length === 0 ? `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">No notification dispatch logs found.</td></tr>` : ''}
-                                    ${notifLogs.map((n, idx) => `
+                    <div style="display:flex; flex-direction:column; gap:20px;">
+                        <!-- Registered Devices Table Card -->
+                        <div class="table-card">
+                            <div style="padding:16px; border-bottom:1px solid #e2e8f0; font-weight:800; font-size:15px; color:#0f172a; display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <span>Registered FCM Devices & Tokens</span>
+                                    <small style="display:block; font-size:11px; color:#64748b; font-weight:500;">Active mobile apps & web browsers registered for push alerts</small>
+                                </div>
+                                <div style="display:flex; gap:10px; align-items:center;">
+                                    <button class="btn btn-secondary" style="padding:6px 12px; font-size:12px;" onclick="App.registerCurrentWebDeviceToken()">+ Register Current Web Browser</button>
+                                    <span class="badge badge-green">${fcmTokens.length} Active Devices</span>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
                                         <tr>
-                                            <td>${idx + 1}</td>
-                                            <td><small style="color:#64748b;">${n.created_at}</small></td>
-                                            <td><strong>${n.sender_name || 'Admin'}</strong></td>
-                                            <td><span class="badge ${n.target_type === 'all' ? 'badge-blue' : 'badge-green'}">${n.target_type === 'all' ? 'All Members' : (n.recipient_name || 'User')}</span></td>
-                                            <td><strong>${n.title}</strong></td>
-                                            <td><small style="color:#475569;">${n.message}</small></td>
+                                            <th>#</th>
+                                            <th>User Name</th>
+                                            <th>Email</th>
+                                            <th>Device Type</th>
+                                            <th>FCM Token snippet</th>
+                                            <th>Registered At</th>
                                         </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        ${fcmTokens.length === 0 ? `
+                                            <tr>
+                                                <td colspan="6" style="text-align:center; padding:25px; color:#64748b;">
+                                                    No registered device tokens found yet.<br>
+                                                    <small style="color:#94a3b8;">Click <strong>"+ Register Current Web Browser"</strong> above or login to the Flutter CRM app to register this device.</small>
+                                                </td>
+                                            </tr>
+                                        ` : ''}
+                                        ${fcmTokens.map((t, idx) => `
+                                            <tr>
+                                                <td>${idx + 1}</td>
+                                                <td><strong>${t.user_name || 'User #' + t.user_id}</strong></td>
+                                                <td><small style="color:#64748b;">${t.user_email || '-'}</small></td>
+                                                <td>
+                                                    <span class="badge ${t.device_type === 'android_app' ? 'badge-blue' : 'badge-purple'}">
+                                                        ${t.device_type === 'android_app' ? '📱 Android App' : '🌐 Web Browser'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <code style="background:#f1f5f9; padding:3px 6px; border-radius:4px; font-size:11px; color:#334155;">
+                                                        ${t.fcm_token ? (t.fcm_token.substring(0, 18) + '...') : '-'}
+                                                    </code>
+                                                </td>
+                                                <td><small style="color:#64748b;">${t.updated_at || t.created_at}</small></td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Notification Logs Table Card -->
+                        <div class="table-card">
+                            <div style="padding:16px; border-bottom:1px solid #e2e8f0; font-weight:800; font-size:15px; color:#0f172a; display:flex; justify-content:space-between; align-items:center;">
+                                <span>Notification Dispatch History & Audit Logs</span>
+                                <span class="badge badge-blue">${notifLogs.length} Sent</span>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Date & Time</th>
+                                            <th>Dispatched By</th>
+                                            <th>Target Recipient</th>
+                                            <th>Title</th>
+                                            <th>Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${notifLogs.length === 0 ? `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">No notification dispatch logs found.</td></tr>` : ''}
+                                        ${notifLogs.map((n, idx) => `
+                                            <tr>
+                                                <td>${idx + 1}</td>
+                                                <td><small style="color:#64748b;">${n.created_at}</small></td>
+                                                <td><strong>${n.sender_name || 'Admin'}</strong></td>
+                                                <td><span class="badge ${n.target_type === 'all' ? 'badge-blue' : 'badge-green'}">${n.target_type === 'all' ? 'All Members' : (n.recipient_name || 'User')}</span></td>
+                                                <td><strong>${n.title}</strong></td>
+                                                <td><small style="color:#475569;">${n.message}</small></td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2108,11 +2172,41 @@ const App = {
 
         const res = await fetch('api/notifications', { method: 'POST', body: formData });
         const data = await res.json();
-        alert(data.message);
+        let msg = data.message || 'Notification dispatched.';
+        if (typeof data.registered_tokens !== 'undefined') {
+            msg += `\n\n• Total Registered Devices: ${data.registered_tokens}\n• Successfully Delivered: ${data.delivered_tokens}`;
+        }
+        alert(msg);
         if (data.success) {
             form.reset();
             this.renderSettings('notifications');
         }
+    },
+
+    registerCurrentWebDeviceToken: async function() {
+        let token = localStorage.getItem('fcm_device_token');
+        if (!token) {
+            token = 'web_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+            localStorage.setItem('fcm_device_token', token);
+        }
+
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            const perm = await Notification.requestPermission();
+            if (perm !== 'granted') {
+                alert('Notification permission denied by browser. Please enable permissions in browser address bar.');
+                return;
+            }
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'register_token');
+        formData.append('fcm_token', token);
+        formData.append('device_type', 'web');
+
+        const res = await fetch('api/notifications', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message || 'Web browser token registered successfully.');
+        this.renderSettings('notifications');
     },
 
     // 10. USER MANAGEMENT MODULE

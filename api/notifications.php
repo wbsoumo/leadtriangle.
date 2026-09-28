@@ -67,6 +67,19 @@ try {
         $hasTargetType = in_array('target_type', $colNames);
         $hasUserId = in_array('user_id', $colNames);
     }
+
+    // Ensure user_fcm_tokens table exists for storing device FCM tokens
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS user_fcm_tokens (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            fcm_token VARCHAR(255) NOT NULL UNIQUE,
+            device_type VARCHAR(50) DEFAULT 'web',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_user_token (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
 } catch (Throwable $e) {
     error_log("Notifications table migration error: " . $e->getMessage());
 }
@@ -177,6 +190,44 @@ function sendFcmPushNotification($title, $message, $fcmTokenOrTopic = 'all_users
 }
 
 try {
+    // 0. REGISTER FCM DEVICE TOKEN (FROM WEB / MOBILE APP)
+    if ($action === 'register_token') {
+        $fcmToken = trim($_POST['fcm_token'] ?? '');
+        $deviceType = trim($_POST['device_type'] ?? 'web');
+        if (!empty($fcmToken)) {
+            $stmt = $pdo->prepare("
+                INSERT INTO user_fcm_tokens (user_id, fcm_token, device_type)
+                VALUES (:uid, :token, :dev)
+                ON DUPLICATE KEY UPDATE user_id = :uid, device_type = :dev, updated_at = NOW()
+            ");
+            $stmt->execute(['uid' => $userId, 'token' => $fcmToken, 'dev' => $deviceType]);
+            echo json_encode(['success' => true, 'message' => 'FCM Device Token registered successfully.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'FCM token parameter is required.']);
+        }
+        exit;
+    }
+
+    // 0.1 GET ALL REGISTERED TOKENS (ADMIN ONLY)
+    if ($action === 'get_tokens') {
+        if ($roleName !== 'super_admin' && $roleName !== 'manager') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access Denied: Only Admins can view registered FCM tokens.']);
+            exit;
+        }
+
+        $stmt = $pdo->query("
+            SELECT t.*, u.name as user_name, u.email as user_email
+            FROM user_fcm_tokens t
+            LEFT JOIN users u ON t.user_id = u.id
+            ORDER BY t.updated_at DESC
+        ");
+        $tokens = $stmt->fetchAll();
+
+        echo json_encode(['success' => true, 'data' => $tokens]);
+        exit;
+    }
+
     // 1. SEND PUSH NOTIFICATION (ADMIN ONLY)
     if ($action === 'send') {
         if ($roleName !== 'super_admin' && $roleName !== 'manager') {
@@ -200,8 +251,27 @@ try {
             exit;
         }
 
-        // Dispatch FCM Push Notification
-        $fcmResult = sendFcmPushNotification($title, $message, $targetType === 'all' ? 'all_users' : 'all_users');
+        // 1. Dispatch FCM Push Notification to Topic 'all_users'
+        $fcmTopicResult = sendFcmPushNotification($title, $message, 'all_users');
+
+        // 2. Dispatch FCM Push Notification to every individual registered token
+        $deliveredCount = 0;
+        if ($targetType === 'user' && !empty($recipientId)) {
+            $stmtTokens = $pdo->prepare("SELECT fcm_token FROM user_fcm_tokens WHERE user_id = :uid");
+            $stmtTokens->execute(['uid' => $recipientId]);
+        } else {
+            $stmtTokens = $pdo->query("SELECT fcm_token FROM user_fcm_tokens");
+        }
+        $registeredTokens = $stmtTokens->fetchAll(PDO::FETCH_COLUMN);
+
+        foreach ($registeredTokens as $tok) {
+            if (!empty($tok)) {
+                $tokRes = sendFcmPushNotification($title, $message, $tok);
+                if (!empty($tokRes['success'])) {
+                    $deliveredCount++;
+                }
+            }
+        }
 
         $userRefId = ($targetType === 'user' && !empty($recipientId)) ? $recipientId : $userId;
 
@@ -253,16 +323,19 @@ try {
 
         $notifId = $pdo->lastInsertId();
         logActivity($pdo, 'Notifications', 'Send Push Notification', $notifId, null, [
-            'target_type'  => $targetType,
-            'recipient_id' => $recipientId,
-            'title'        => $title,
-            'fcm_sent'     => $fcmResult['success'] ?? false
+            'target_type'        => $targetType,
+            'recipient_id'       => $recipientId,
+            'title'              => $title,
+            'registered_tokens' => count($registeredTokens),
+            'delivered_tokens'  => $deliveredCount
         ]);
 
         echo json_encode([
-            'success'    => true,
-            'message'    => 'Push Notification dispatched successfully to ' . ($targetType === 'all' ? 'All Team Members' : 'Selected User') . '.',
-            'fcm_status' => $fcmResult
+            'success'           => true,
+            'message'           => 'Push Notification dispatched successfully to ' . ($targetType === 'all' ? 'All Team Members' : 'Selected User') . '.',
+            'registered_tokens' => count($registeredTokens),
+            'delivered_tokens'  => $deliveredCount,
+            'fcm_topic_status'  => $fcmTopicResult
         ]);
         exit;
     }

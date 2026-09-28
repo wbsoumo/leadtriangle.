@@ -4,6 +4,22 @@
 // Set PHP default timezone to Indian Standard Time (IST - Asia/Kolkata)
 date_default_timezone_set('Asia/Kolkata');
 
+// Configure 30-day session lifetime for web and API
+function startThirtyDaySession() {
+    if (session_status() === PHP_SESSION_NONE) {
+        $thirtyDays = 30 * 86400; // 30 days in seconds (2,592,000s)
+        ini_set('session.gc_maxlifetime', $thirtyDays);
+        session_set_cookie_params([
+            'lifetime' => $thirtyDays,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+        session_start();
+    }
+}
+startThirtyDaySession();
+
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'helnovexaa_leadtriangle');
 define('DB_USER', 'helnovexaa_leadtriangle');

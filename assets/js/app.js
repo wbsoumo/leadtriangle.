@@ -1444,13 +1444,13 @@ const App = {
                 <!-- TAB 1: LEAD DETAILS -->
                 <div class="lead-modal-tab-content" id="tab-content-details" style="${defaultTab === 'details' ? 'display:block;' : 'display:none;'}">
                     <!-- Quick Action & Disposition Banner inside Details -->
-                    <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:18px 24px;">
-                        <div style="font-size:12px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">
+                    <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:16px 20px;">
+                        <div style="font-size:11.5px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">
                             ⚡ Update Disposition &amp; Next Action
                         </div>
                         <form id="popup-disp-form" onsubmit="App.submitWorkspaceDisposition(event, ${l.id})">
                             <input type="hidden" id="popup-disp-lead-id" value="${l.id}">
-                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:10px;">
+                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-bottom:10px;">
                                 <div>
                                     <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Action / Call Outcome *</label>
                                     <select id="popup-disp-action-val" required class="filter-select" style="width:100%; font-weight:700; padding:8px 10px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;" onchange="App.onDispositionActionChange(this.value, 'popup-disp-')">
@@ -1472,7 +1472,7 @@ const App = {
                             <!-- Follow-up fields container -->
                             <div id="popup-fu-fields-group" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px; margin-bottom:12px;">
                                 <div style="font-size:11px; font-weight:800; color:#b45309; margin-bottom:6px;">📅 Schedule Follow-up Callback</div>
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
                                     <div>
                                         <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Date *</label>
                                         <input type="date" id="popup-disp-date" class="filter-input" style="width:100%;" value="${tomorrowStr}">
@@ -1485,7 +1485,7 @@ const App = {
                             </div>
 
                             <div style="display:flex; justify-content:flex-end;">
-                                <button type="submit" class="btn btn-primary btn-sm" style="padding:7px 18px; font-weight:700;">Save Action &amp; Update Status &rarr;</button>
+                                <button type="submit" class="btn btn-primary btn-sm" style="padding:8px 20px; font-weight:700; border-radius:8px;">Save Action &amp; Update Status &rarr;</button>
                             </div>
                         </form>
                     </div>

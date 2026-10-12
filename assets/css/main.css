@@ -818,6 +818,8 @@ svg {
     opacity: 0;
     pointer-events: none;
     transition: var(--transition);
+    padding: 16px;
+    box-sizing: border-box;
 }
 
 .modal-backdrop.show {
@@ -1171,10 +1173,11 @@ svg {
 /* Modal Custom styling for Lead Detail */
 .lead-modal-panel {
     background: #ffffff;
-    border-radius: 20px;
+    border-radius: 18px;
     max-width: 760px;
-    width: 95%;
-    max-height: 90vh;
+    width: 100%;
+    max-height: calc(100vh - 32px);
+    margin: auto;
     box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35);
     overflow: hidden;
     border: 1px solid #cbd5e1;
@@ -1185,39 +1188,40 @@ svg {
 .lead-modal-header {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     color: #ffffff;
-    padding: 22px 26px 18px;
+    padding: 16px 20px 14px;
     position: relative;
     flex-shrink: 0;
 }
 
 .lead-modal-phone-display {
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 800;
     color: #ffffff;
     font-family: 'Space Grotesk', 'Inter', monospace;
     letter-spacing: 0.5px;
-    margin: 4px 0 12px;
+    margin: 4px 0 10px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    word-break: break-all;
 }
 
 .lead-modal-actions {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 .btn-call-lg {
     background: #2563eb;
     color: #ffffff !important;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 700;
-    padding: 9px 20px;
-    border-radius: 10px;
+    padding: 8px 18px;
+    border-radius: 9px;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     text-decoration: none;
     border: none;
     cursor: pointer;
@@ -1233,13 +1237,13 @@ svg {
 .btn-whatsapp-lg {
     background: #16a34a;
     color: #ffffff !important;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 700;
-    padding: 9px 20px;
-    border-radius: 10px;
+    padding: 8px 18px;
+    border-radius: 9px;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     text-decoration: none;
     border: none;
     cursor: pointer;
@@ -1257,51 +1261,62 @@ svg {
     display: flex;
     background: #f1f5f9;
     border-bottom: 1px solid #e2e8f0;
-    padding: 6px 16px 0;
-    gap: 6px;
+    padding: 6px 12px 0;
+    gap: 4px;
     flex-shrink: 0;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.lead-modal-tabs-bar::-webkit-scrollbar {
+    height: 4px;
+}
+.lead-modal-tabs-bar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
 }
 
 .lead-modal-tab-btn {
-    padding: 10px 18px;
-    font-size: 13px;
+    padding: 9px 14px;
+    font-size: 12.5px;
     font-weight: 700;
     color: #64748b;
     border: none;
     background: transparent;
-    border-radius: 10px 10px 0 0;
+    border-radius: 8px 8px 0 0;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    transition: all 0.2s;
+    gap: 6px;
+    transition: all 0.15s;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .lead-modal-tab-btn:hover {
     color: #0f172a;
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.7);
 }
 
 .lead-modal-tab-btn.active {
     color: #2563eb;
     background: #ffffff;
-    border-top: 2px solid #2563eb;
-    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.03);
+    border-top: 2.5px solid #2563eb;
+    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.04);
 }
 
 .lead-modal-body-scroll {
     overflow-y: auto;
     flex: 1;
     background: #ffffff;
+    -webkit-overflow-scrolling: touch;
 }
 
 .lead-detail-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    padding: 22px 26px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 16px 20px 24px;
     background: #ffffff;
 }
 
@@ -1309,22 +1324,54 @@ svg {
     background: #f8fafc;
     border: 1px solid #f1f5f9;
     border-radius: 10px;
-    padding: 10px 14px;
+    padding: 10px 12px;
+    min-width: 0;
+    overflow-wrap: break-word;
 }
 
 .lead-field-label {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
     text-transform: uppercase;
     color: #64748b;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     letter-spacing: 0.5px;
 }
 
 .lead-field-val {
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 600;
     color: #0f172a;
+    word-break: break-word;
 }
+
+/* Mobile & Small Screens Optimization */
+@media (max-width: 640px) {
+    .modal-backdrop {
+        padding: 8px;
+    }
+    .lead-modal-panel {
+        max-height: calc(100vh - 16px);
+        border-radius: 14px;
+    }
+    .lead-modal-header {
+        padding: 14px 16px 12px;
+    }
+    .lead-modal-phone-display {
+        font-size: 20px;
+    }
+    .lead-detail-grid {
+        grid-template-columns: 1fr;
+        padding: 12px 14px 20px;
+    }
+    .lead-modal-tab-btn {
+        padding: 8px 10px;
+        font-size: 11.5px;
+    }
+    .lead-modal-tabs-bar {
+        padding: 4px 8px 0;
+    }
+}
+
 
 

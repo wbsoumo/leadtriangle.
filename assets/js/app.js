@@ -1254,14 +1254,80 @@ const App = {
         }
     },
 
-    // 3. PREMIUM VIEW LEAD DETAIL MODAL (With Lead Code, Color Palette, and Full Disposition form)
-    openWorkspaceLeadModal: async function(leadId) {
+    // Tab switcher inside the lead popup
+    switchLeadModalTab: function(tabName) {
+        document.querySelectorAll('.lead-modal-tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.lead-modal-tab-content').forEach(pane => pane.style.display = 'none');
+
+        const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+        const activePane = document.getElementById(`tab-content-${tabName}`);
+        if (activeBtn) activeBtn.classList.add('active');
+        if (activePane) activePane.style.display = 'block';
+    },
+
+    // Submit a persistent note/remark on the lead
+    submitLeadNote: async function(e, leadId) {
+        if (e && e.preventDefault) e.preventDefault();
+        const noteInput = document.getElementById('new-lead-note-text');
+        const text = noteInput ? noteInput.value.trim() : '';
+        if (!text) return;
+
+        const formData = new FormData();
+        formData.append('action', 'add_note');
+        formData.append('lead_id', leadId);
+        formData.append('note_text', text);
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            this.openWorkspaceLeadModal(leadId, 'remarks');
+        } else {
+            alert(data.message || 'Error saving note');
+        }
+    },
+
+    // Reassign lead to another executive/manager
+    submitReassignLead: async function(e, leadId) {
+        if (e && e.preventDefault) e.preventDefault();
+        const execId = document.getElementById('popup-reassign-exec')?.value || '';
+        const notes = document.getElementById('popup-reassign-reason')?.value || '';
+
+        if (!execId) {
+            alert('Please select an executive to assign this lead to.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'assign');
+        formData.append('lead_ids[]', leadId);
+        formData.append('executive_id', execId);
+        if (notes) formData.append('assignment_note', notes);
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            alert('Lead assigned successfully!');
+            this.openWorkspaceLeadModal(leadId, 'reassign');
+            if (this.currentView === 'workspace' || !this.currentView) {
+                this.renderWorkspace();
+            }
+        } else {
+            alert(data.message || 'Error assigning lead');
+        }
+    },
+
+    // 3. PREMIUM VIEW LEAD DETAIL MODAL (With 4 Organized Tabs: Details, Activity, Remarks, Assign)
+    openWorkspaceLeadModal: async function(leadId, defaultTab = 'details') {
         const modal = document.getElementById('ws-view-lead-modal');
         const contentBox = document.getElementById('ws-view-lead-content');
         if (!modal || !contentBox) return;
 
         contentBox.innerHTML = '<div style="padding:40px; text-align:center; color:#64748b; font-size:15px; font-weight:600;">Loading lead profile...</div>';
         this.openModal('ws-view-lead-modal');
+
+        if (!this.dropdowns || !this.dropdowns.executives) {
+            await this.loadDropdowns();
+        }
 
         const res = await fetch(`api/leads?action=detail&id=${leadId}`);
         const data = await res.json();
@@ -1272,7 +1338,11 @@ const App = {
 
         const l = data.data.lead;
         const calls = data.data.calls || [];
+        const followups = data.data.followups || [];
+        const notes = data.data.notes || [];
         const cleanPhone = (l.mobile || '').replace(/[^0-9]/g, '');
+
+        const executives = this.dropdowns?.executives || [];
 
         const today = new Date();
         today.setDate(today.getDate() + 1);
@@ -1281,6 +1351,7 @@ const App = {
         // Array of optional fields: if empty, hide field and label completely
         const candidateFields = [
             { label: 'Status', value: l.status_name },
+            { label: 'Lead Code', value: l.lead_code },
             { label: 'Alternate Mobile', value: l.alternate_mobile },
             { label: 'Email Address', value: l.email },
             { label: 'Company Name', value: l.company_name },
@@ -1294,25 +1365,28 @@ const App = {
             { label: 'Assigned Manager', value: l.manager_name },
             { label: 'Scheduled Follow-up', value: l.next_followup_at },
             { label: 'Last Contacted', value: l.last_contacted_at },
-            { label: 'Initial Remarks', value: l.initial_remark }
+            { label: 'Initial Requirement', value: l.initial_remark || l.initial_requirement }
         ];
 
         // Filter out empty / null / blank fields
         const validFields = candidateFields.filter(f => f.value && String(f.value).trim() !== '' && String(f.value).trim() !== 'null');
 
         contentBox.innerHTML = `
+            <!-- MODAL HEADER -->
             <div class="lead-modal-header">
-                <button type="button" class="close-modal" style="position:absolute; top:20px; right:24px; color:#ffffff; font-size:20px; background:transparent; border:none; cursor:pointer;" onclick="App.closeModal('ws-view-lead-modal')">✕</button>
+                <button type="button" class="close-modal" style="position:absolute; top:18px; right:20px; color:#ffffff; font-size:22px; background:transparent; border:none; cursor:pointer;" onclick="App.closeModal('ws-view-lead-modal')">✕</button>
                 
-                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="font-size:11px; font-weight:800; background:rgba(255,255,255,0.15); color:#60a5fa; padding:3px 10px; border-radius:20px; text-transform:uppercase; letter-spacing:0.8px;">
                             ${l.lead_code || 'LEAD'}
                         </span>
-                        <span style="font-size:12px; font-weight:600; color:#94a3b8;">${l.status_name || 'New'}</span>
+                        <span style="font-size:12px; font-weight:700; color:#cbd5e1; background:rgba(255,255,255,0.1); padding:3px 8px; border-radius:12px;">
+                            ${l.status_name || 'New'}
+                        </span>
                     </div>
 
-                    <!-- Row Color Picker in popup -->
+                    <!-- Row Color Picker inside popup -->
                     <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.1); padding:4px 10px; border-radius:20px;">
                         <span style="font-size:11px; color:#cbd5e1; font-weight:700;">Row Color:</span>
                         <div style="display:flex; gap:5px; align-items:center;">
@@ -1328,102 +1402,249 @@ const App = {
                     </div>
                 </div>
 
-                <div style="font-size:24px; font-weight:800; color:#ffffff; margin-top:2px;">${l.name}</div>
+                <div style="font-size:23px; font-weight:800; color:#ffffff; margin-top:2px;">${l.name}</div>
                 
-                <!-- Highly Visible Large Phone Number -->
+                <!-- Large Phone Number -->
                 <div class="lead-modal-phone-display">
                     <span>📞 ${l.mobile}</span>
                 </div>
 
-                <!-- Prominent Quick Action Buttons -->
+                <!-- Quick Action Buttons -->
                 <div class="lead-modal-actions">
                     <button type="button" class="btn-call-lg" onclick="App.closeModal('ws-view-lead-modal'); App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                         Call Now
                     </button>
                     <a href="https://wa.me/91${cleanPhone}" target="_blank" class="btn-whatsapp-lg">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                         WhatsApp
                     </a>
                 </div>
             </div>
 
-            <!-- PROPER EMBEDDED DISPOSITION & ACTION SECTION -->
-            <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:18px 28px;">
-                <div style="font-size:13px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-                    <span>⚡ Quick Action &amp; Disposition</span>
-                </div>
-                <form id="popup-disp-form" onsubmit="App.submitWorkspaceDisposition(event, ${l.id})">
-                    <input type="hidden" id="popup-disp-lead-id" value="${l.id}">
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:10px;">
-                        <div>
-                            <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Action / Call Outcome *</label>
-                            <select id="popup-disp-action-val" required class="filter-select" style="width:100%; font-weight:700; padding:8px 10px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;" onchange="App.onDispositionActionChange(this.value, 'popup-disp-')">
-                                <option value="Calling">Calling</option>
-                                <option value="Call Connected">Call Connected</option>
-                                <option value="Not Interested">Not Interested</option>
-                                <option value="Follow-up Needed">Follow-up Needed</option>
-                                <option value="Ringing">Ringing</option>
-                                <option value="Not Responding">Not Responding</option>
-                                <option value="Invalid Number">Invalid Number</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Remarks</label>
-                            <input type="text" id="popup-disp-remarks" class="filter-input" style="width:100%; padding:8px 10px; border-radius:8px;" placeholder="Outcome notes, customer reply...">
-                        </div>
-                    </div>
-
-                    <!-- Follow-up fields container -->
-                    <div id="popup-fu-fields-group" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px; margin-bottom:12px;">
-                        <div style="font-size:11px; font-weight:800; color:#b45309; margin-bottom:6px;">📅 Schedule Follow-up Callback</div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                            <div>
-                                <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Date *</label>
-                                <input type="date" id="popup-disp-date" class="filter-input" style="width:100%;" value="${tomorrowStr}">
-                            </div>
-                            <div>
-                                <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Time *</label>
-                                <input type="time" id="popup-disp-time" class="filter-input" style="width:100%;" value="11:00">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display:flex; justify-content:flex-end; gap:8px;">
-                        <button type="submit" class="btn btn-primary" style="padding:7px 18px; font-size:12.5px; font-weight:700;">Save Action &amp; Update Status &rarr;</button>
-                    </div>
-                </form>
+            <!-- TAB NAVIGATION BAR -->
+            <div class="lead-modal-tabs-bar">
+                <button type="button" class="lead-modal-tab-btn ${defaultTab === 'details' ? 'active' : ''}" id="tab-btn-details" onclick="App.switchLeadModalTab('details')">
+                    📋 Lead Details
+                </button>
+                <button type="button" class="lead-modal-tab-btn ${defaultTab === 'activity' ? 'active' : ''}" id="tab-btn-activity" onclick="App.switchLeadModalTab('activity')">
+                    ⚡ Activity &amp; Calls (${calls.length})
+                </button>
+                <button type="button" class="lead-modal-tab-btn ${defaultTab === 'remarks' ? 'active' : ''}" id="tab-btn-remarks" onclick="App.switchLeadModalTab('remarks')">
+                    💬 Remarks &amp; Notes (${notes.length})
+                </button>
+                <button type="button" class="lead-modal-tab-btn ${defaultTab === 'reassign' ? 'active' : ''}" id="tab-btn-reassign" onclick="App.switchLeadModalTab('reassign')">
+                    👥 Assign &amp; Team
+                </button>
             </div>
 
-            <!-- Structured Fields (Only non-empty fields shown) -->
-            <div class="lead-detail-grid">
-                ${validFields.map(f => `
-                    <div class="lead-field-item">
-                        <div class="lead-field-label">${f.label}</div>
-                        <div class="lead-field-val">${f.value}</div>
-                    </div>
-                `).join('')}
-            </div>
-
-            <!-- Recent Action Logs in modal -->
-            ${calls.length > 0 ? `
-                <div style="padding:0 28px 24px;">
-                    <div style="font-size:13px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:10px; border-top:1px solid #f1f5f9; padding-top:16px;">
-                        Recent Action Logs (${calls.length})
-                    </div>
-                    <div style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
-                        ${calls.slice(0, 5).map(c => `
-                            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+            <!-- TAB CONTENT CONTAINER (SCROLLABLE) -->
+            <div class="lead-modal-body-scroll">
+                
+                <!-- TAB 1: LEAD DETAILS -->
+                <div class="lead-modal-tab-content" id="tab-content-details" style="${defaultTab === 'details' ? 'display:block;' : 'display:none;'}">
+                    <!-- Quick Action & Disposition Banner inside Details -->
+                    <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:18px 24px;">
+                        <div style="font-size:12px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">
+                            ⚡ Update Disposition &amp; Next Action
+                        </div>
+                        <form id="popup-disp-form" onsubmit="App.submitWorkspaceDisposition(event, ${l.id})">
+                            <input type="hidden" id="popup-disp-lead-id" value="${l.id}">
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:10px;">
                                 <div>
-                                    <strong style="color:#0f172a;">${c.outcome_name || 'Call Logged'}</strong> &bull; <span style="color:#64748b;">${c.agent_name}</span>
-                                    ${c.remarks ? `<div style="color:#475569; margin-top:2px;">${c.remarks}</div>` : ''}
+                                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Action / Call Outcome *</label>
+                                    <select id="popup-disp-action-val" required class="filter-select" style="width:100%; font-weight:700; padding:8px 10px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;" onchange="App.onDispositionActionChange(this.value, 'popup-disp-')">
+                                        <option value="Calling">Calling</option>
+                                        <option value="Call Connected">Call Connected</option>
+                                        <option value="Not Interested">Not Interested</option>
+                                        <option value="Follow-up Needed">Follow-up Needed</option>
+                                        <option value="Ringing">Ringing</option>
+                                        <option value="Not Responding">Not Responding</option>
+                                        <option value="Invalid Number">Invalid Number</option>
+                                    </select>
                                 </div>
-                                <span style="color:#94a3b8; font-size:11px;">${(c.called_at || '').replace(/:\d\d$/, '')}</span>
+                                <div>
+                                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Remarks / Quick Outcome Note</label>
+                                    <input type="text" id="popup-disp-remarks" class="filter-input" style="width:100%; padding:8px 10px; border-radius:8px;" placeholder="Outcome notes, customer reply...">
+                                </div>
+                            </div>
+
+                            <!-- Follow-up fields container -->
+                            <div id="popup-fu-fields-group" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px; margin-bottom:12px;">
+                                <div style="font-size:11px; font-weight:800; color:#b45309; margin-bottom:6px;">📅 Schedule Follow-up Callback</div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                    <div>
+                                        <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Date *</label>
+                                        <input type="date" id="popup-disp-date" class="filter-input" style="width:100%;" value="${tomorrowStr}">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Time *</label>
+                                        <input type="time" id="popup-disp-time" class="filter-input" style="width:100%;" value="${11}:00">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display:flex; justify-content:flex-end;">
+                                <button type="submit" class="btn btn-primary btn-sm" style="padding:7px 18px; font-weight:700;">Save Action &amp; Update Status &rarr;</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Structured Lead Fields Grid -->
+                    <div class="lead-detail-grid">
+                        ${validFields.map(f => `
+                            <div class="lead-field-item">
+                                <div class="lead-field-label">${f.label}</div>
+                                <div class="lead-field-val">${f.value}</div>
                             </div>
                         `).join('')}
                     </div>
                 </div>
-            ` : ''}
+
+                <!-- TAB 2: ACTIVITY & CALLS -->
+                <div class="lead-modal-tab-content" id="tab-content-activity" style="${defaultTab === 'activity' ? 'display:block;' : 'display:none;'} padding:22px 26px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div>
+                            <div style="font-size:14px; font-weight:800; color:#0f172a;">Call Logs &amp; Activity Trail</div>
+                            <div style="font-size:12px; color:#64748b;">Complete history of every dial and status update</div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="App.closeModal('ws-view-lead-modal'); App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">+ Log New Call</button>
+                    </div>
+
+                    ${calls.length === 0 ? `
+                        <div style="text-align:center; padding:40px 20px; color:#94a3b8; font-size:13px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">
+                            No calls logged yet for this lead. Click "Call Now" or "+ Log New Call" to record the first interaction.
+                        </div>
+                    ` : `
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            ${calls.map(c => `
+                                <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <span style="font-weight:800; font-size:13px; color:#0f172a;">${c.outcome_name || 'Call Logged'}</span>
+                                            <span style="font-size:11px; background:#eff6ff; color:#2563eb; font-weight:700; padding:2px 8px; border-radius:12px;">By ${c.agent_name || 'Agent'}</span>
+                                        </div>
+                                        <div style="font-size:11px; color:#64748b; font-weight:600;">
+                                            📅 ${(c.called_at || '').replace(/:\d\d$/, '')}
+                                        </div>
+                                    </div>
+                                    ${c.remarks ? `<div style="margin-top:6px; font-size:12.5px; color:#475569; background:#f8fafc; padding:8px 12px; border-radius:8px; border:1px solid #f1f5f9;">${c.remarks}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+
+                    <!-- Follow-ups scheduled under activity -->
+                    <div style="margin-top:24px; border-top:1px solid #f1f5f9; padding-top:18px;">
+                        <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;">Scheduled Callback Tasks (${followups.length})</div>
+                        ${followups.length === 0 ? `
+                            <div style="font-size:12.5px; color:#94a3b8;">No pending follow-ups scheduled.</div>
+                        ` : `
+                            <div style="display:flex; flex-direction:column; gap:8px;">
+                                ${followups.map(f => `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:8px 14px; font-size:12px;">
+                                        <div>
+                                            <strong style="color:#b45309;">📅 ${f.followup_date} at ${f.followup_time || '10:00'}</strong> &bull; <span style="color:#78350f;">${f.notes || f.purpose || 'Follow-up'}</span>
+                                        </div>
+                                        <span class="badge ${f.status === 'Completed' ? 'badge-green' : 'badge-amber'}">${f.status}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `}
+                    </div>
+                </div>
+
+                <!-- TAB 3: REMARKS & PERSISTENT NOTES -->
+                <div class="lead-modal-tab-content" id="tab-content-remarks" style="${defaultTab === 'remarks' ? 'display:block;' : 'display:none;'} padding:22px 26px;">
+                    <div style="margin-bottom:16px;">
+                        <div style="font-size:14px; font-weight:800; color:#0f172a;">Lead Remarks &amp; Internal Notes</div>
+                        <div style="font-size:12px; color:#64748b;">Add detailed remarks, deal context, or handover instructions that will be permanently stored for this lead</div>
+                    </div>
+
+                    <!-- Add Note Input Form -->
+                    <form onsubmit="App.submitLeadNote(event, ${l.id})" style="margin-bottom:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+                        <label style="display:block; font-size:11px; font-weight:800; color:#334155; margin-bottom:6px; text-transform:uppercase;">Add New Remark / Note</label>
+                        <textarea id="new-lead-note-text" required class="filter-input" style="width:100%; height:75px; padding:10px; font-size:13px; background:#ffffff; margin-bottom:8px;" placeholder="Write specific client requirements, budget details, next steps..."></textarea>
+                        <div style="display:flex; justify-content:flex-end;">
+                            <button type="submit" class="btn btn-primary btn-sm" style="font-weight:700;">+ Save Remark</button>
+                        </div>
+                    </form>
+
+                    <!-- Stored Notes List -->
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        ${(l.initial_remark || l.initial_requirement) ? `
+                            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <span style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">Initial Intake Requirement</span>
+                                    <span style="font-size:11px; color:#60a5fa;">Creation Time</span>
+                                </div>
+                                <div style="font-size:13px; color:#1e3a8a;">${l.initial_remark || l.initial_requirement}</div>
+                            </div>
+                        ` : ''}
+
+                        ${notes.map(n => `
+                            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <span style="font-size:12px; font-weight:800; color:#0f172a;">${n.author_name || 'Agent'}</span>
+                                    <span style="font-size:11px; color:#94a3b8;">📅 ${(n.created_at || '').replace(/:\d\d$/, '')}</span>
+                                </div>
+                                <div style="font-size:13px; color:#334155; white-space:pre-wrap;">${n.note_text}</div>
+                            </div>
+                        `).join('')}
+
+                        ${notes.length === 0 && !l.initial_remark && !l.initial_requirement ? `
+                            <div style="text-align:center; padding:30px; color:#94a3b8; font-size:13px;">
+                                No remarks saved yet. Enter a note above to store permanent context.
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- TAB 4: ASSIGN & TEAM HANDOVER -->
+                <div class="lead-modal-tab-content" id="tab-content-reassign" style="${defaultTab === 'reassign' ? 'display:block;' : 'display:none;'} padding:22px 26px;">
+                    <div style="margin-bottom:16px;">
+                        <div style="font-size:14px; font-weight:800; color:#0f172a;">Lead Assignment &amp; Team Handover</div>
+                        <div style="font-size:12px; color:#64748b;">All activities, call logs, and remarks remain intact when assigning this lead to another executive</div>
+                    </div>
+
+                    <!-- Current Assigned Details -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+                        <div>
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Current Executive</div>
+                            <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">${l.executive_name || '<span style="color:#ef4444;">Unassigned</span>'}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Assigned Manager</div>
+                            <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">${l.manager_name || 'General Pool'}</div>
+                        </div>
+                    </div>
+
+                    <!-- Reassign Form -->
+                    <form onsubmit="App.submitReassignLead(event, ${l.id})" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:14px; padding:18px;">
+                        <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:12px;">Transfer Lead Ownership</div>
+                        
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Select Calling Executive *</label>
+                            <select id="popup-reassign-exec" required class="filter-select" style="width:100%; font-size:13px; font-weight:700; padding:10px;">
+                                <option value="">-- Choose Executive --</option>
+                                ${executives.map(e => `
+                                    <option value="${e.id}" ${e.id == l.assigned_executive_id ? 'selected' : ''}>${e.name} (${e.email || 'Executive'})</option>
+                                `).join('')}
+                            </select>
+                        </div>
+
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Handover Reason / Instructions (Optional)</label>
+                            <textarea id="popup-reassign-reason" class="filter-input" style="width:100%; height:65px; padding:10px; font-size:13px;" placeholder="Reason for transfer or special instructions for the new executive..."></textarea>
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end;">
+                            <button type="submit" class="btn btn-primary" style="font-weight:700; padding:9px 20px;">Confirm &amp; Transfer Lead &rarr;</button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
         `;
     },
 

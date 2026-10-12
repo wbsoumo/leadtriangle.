@@ -154,6 +154,10 @@ const App = {
         // Apply page-level permissions filtering for sidebar items
         if (this.currentUser.allowed_pages && this.currentUser.role_name !== 'super_admin') {
             const allowed = this.currentUser.allowed_pages.split(',').map(s => s.trim());
+            // Always ensure core workspace and dashboard views are available to all active operators
+            if (!allowed.includes('workspace')) allowed.push('workspace');
+            if (!allowed.includes('dashboard')) allowed.push('dashboard');
+
             document.querySelectorAll('.sidebar-menu .menu-item[data-view]').forEach(item => {
                 const view = item.getAttribute('data-view');
                 if (view && !allowed.includes(view)) {
@@ -348,7 +352,7 @@ const App = {
                 </div>
 
                 <!-- CARD 2: TOTAL LEADS / ACTIVE USERS -->
-                <div onclick="App.navigate('leads')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
+                <div onclick="App.navigate('workspace')" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 10px rgba(15,23,42,0.03); cursor: pointer; transition: transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                         <div style="width: 44px; height: 44px; border-radius: 12px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center;">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
@@ -360,7 +364,7 @@ const App = {
                     <div>
                         <div style="font-size: 13.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Active Prospects / Leads</div>
                         <div style="font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; margin-bottom: 6px;">${d.total_leads.toLocaleString()}</div>
-                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+${d.new_leads_today} new today →</div>
+                        <div style="font-size: 12.5px; font-weight: 600; color: #16a34a;">+${d.new_leads_today} new today &bull; Open Workspace →</div>
                     </div>
                 </div>
 

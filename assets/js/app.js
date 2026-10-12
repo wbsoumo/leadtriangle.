@@ -869,22 +869,19 @@ const App = {
                         <thead>
                             <tr>
                                 <th style="width: 44px; text-align:center;">#</th>
-                                <th style="width: 80px; text-align:center;">Color</th>
-                                <th style="min-width: 140px;">Lead Code</th>
-                                <th style="min-width: 170px;">Client Name</th>
+                                <th style="min-width: 180px;">Client Name</th>
                                 <th style="min-width: 150px;">Phone Number</th>
-                                <th style="min-width: 150px;">Company / City</th>
+                                <th style="min-width: 160px;">Company / City</th>
                                 <th style="min-width: 140px;">Status</th>
-                                <th style="min-width: 170px;">Quick Disposition</th>
-                                <th style="min-width: 160px;">Remarks / Follow-up</th>
-                                <th style="min-width: 130px;">Last Contacted</th>
-                                <th style="min-width: 140px; text-align:center;">Actions</th>
+                                <th style="min-width: 200px;">Remarks / Follow-up</th>
+                                <th style="min-width: 140px;">Last Contacted</th>
+                                <th style="min-width: 150px; text-align:center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${leads.length === 0 ? `
                                 <tr>
-                                    <td colspan="11" style="text-align:center; padding:50px; color:#64748b; font-size:14px;">
+                                    <td colspan="8" style="text-align:center; padding:50px; color:#64748b; font-size:14px;">
                                         No lead rows match your workspace filter criteria.
                                     </td>
                                 </tr>
@@ -893,49 +890,23 @@ const App = {
                                 const rowColorClass = getRowColorClass(l.row_color || l.status_color);
                                 const statusPill = getStatusPillClass(l.status_name);
                                 const customStyle = l.row_color && !rowColorClass ? `background-color: ${l.row_color}18;` : '';
-                                const leadObjJson = JSON.stringify(l).replace(/"/g, '&quot;');
 
                                 return `
-                                    <tr id="ws-row-${l.id}" class="${rowColorClass}" style="${customStyle}">
+                                    <tr id="ws-row-${l.id}" class="${rowColorClass}" style="cursor:pointer; ${customStyle}" onclick="App.openWorkspaceLeadModal(${l.id})">
                                         <!-- Row number -->
                                         <td style="text-align:center; font-weight:700; color:#64748b; font-size:11px;">
                                             ${(p.page - 1) * p.limit + index + 1}
                                         </td>
 
-                                        <!-- Manual Row Color Palette Picker -->
-                                        <td style="text-align:center;">
-                                            <div style="position:relative; display:inline-block;">
-                                                <button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px; font-size:11px; height:24px;" onclick="App.toggleRowColorMenu(${l.id})" title="Change Row Color">
-                                                    🎨
-                                                </button>
-                                                <div id="row-color-menu-${l.id}" style="display:none; position:absolute; left:0; top:28px; z-index:99; background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:8px; box-shadow:0 10px 25px rgba(0,0,0,0.15); width:130px;">
-                                                    <div style="font-size:10px; font-weight:800; color:#64748b; margin-bottom:6px; text-transform:uppercase;">Row Color</div>
-                                                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px;">
-                                                        <div class="color-swatch-btn" style="background:#eff6ff;" onclick="App.changeLeadRowColor(${l.id}, 'blue')" title="Blue"></div>
-                                                        <div class="color-swatch-btn" style="background:#f0fdf4;" onclick="App.changeLeadRowColor(${l.id}, 'green')" title="Green"></div>
-                                                        <div class="color-swatch-btn" style="background:#fefce8;" onclick="App.changeLeadRowColor(${l.id}, 'amber')" title="Amber"></div>
-                                                        <div class="color-swatch-btn" style="background:#fff7ed;" onclick="App.changeLeadRowColor(${l.id}, 'orange')" title="Orange"></div>
-                                                        <div class="color-swatch-btn" style="background:#fef2f2;" onclick="App.changeLeadRowColor(${l.id}, 'red')" title="Red"></div>
-                                                        <div class="color-swatch-btn" style="background:#faf5ff;" onclick="App.changeLeadRowColor(${l.id}, 'purple')" title="Purple"></div>
-                                                        <div class="color-swatch-btn" style="background:#f8fafc;" onclick="App.changeLeadRowColor(${l.id}, 'gray')" title="Gray"></div>
-                                                        <div class="color-swatch-btn" style="background:#ffffff; border:1px dashed #94a3b8;" onclick="App.changeLeadRowColor(${l.id}, 'default')" title="Clear">✕</div>
-                                                    </div>
-                                                </div>
+                                        <!-- Client Name -->
+                                        <td>
+                                            <div style="font-weight:700; color:#0f172a; display:flex; align-items:center; gap:6px;">
+                                                <span>${l.name}</span>
                                             </div>
                                         </td>
 
-                                        <!-- Lead Code -->
-                                        <td>
-                                            <span style="font-weight:800; color:var(--primary); cursor:pointer;" onclick="App.openWorkspaceLeadModal(${l.id})">${l.lead_code}</span>
-                                        </td>
-
-                                        <!-- Client Name -->
-                                        <td>
-                                            <div style="font-weight:700; color:#0f172a; cursor:pointer;" onclick="App.openWorkspaceLeadModal(${l.id})">${l.name}</div>
-                                        </td>
-
                                         <!-- Mobile Number (Prominent clickable) -->
-                                        <td>
+                                        <td onclick="event.stopPropagation()">
                                             <a href="tel:${l.mobile}" style="font-weight:700; color:#16a34a; text-decoration:none; font-family:'Space Grotesk', monospace; font-size:13.5px;" title="Call Direct">
                                                 📞 ${l.mobile}
                                             </a>
@@ -955,22 +926,8 @@ const App = {
                                             </span>
                                         </td>
 
-                                        <!-- Inline Action / Disposition Dropdown -->
-                                        <td>
-                                            <select class="filter-select" id="ws-disp-select-${l.id}" style="width:100%; font-size:12px; font-weight:700; padding:6px 10px; border-radius:8px; background:#ffffff;" onchange="App.handleInlineDispositionSelect(${l.id}, this.value)">
-                                                <option value="" disabled selected>Update Action &darr;</option>
-                                                <option value="Calling">Calling</option>
-                                                <option value="Call Connected">Call Connected</option>
-                                                <option value="Not Interested">Not Interested</option>
-                                                <option value="Follow-up Needed">Follow-up Needed</option>
-                                                <option value="Ringing">Ringing</option>
-                                                <option value="Not Responding">Not Responding</option>
-                                                <option value="Invalid Number">Invalid Number</option>
-                                            </select>
-                                        </td>
-
                                         <!-- Remarks & Scheduled Followup Column -->
-                                        <td id="ws-remarks-cell-${l.id}" style="max-width:180px; overflow:hidden; text-overflow:ellipsis;">
+                                        <td id="ws-remarks-cell-${l.id}" style="max-width:220px; overflow:hidden; text-overflow:ellipsis;">
                                             ${l.next_followup_at ? `
                                                 <div style="font-size:11px; font-weight:800; color:#b45309; background:#fffbeb; padding:2px 6px; border-radius:6px; display:inline-block; border:1px solid #fde68a;">
                                                     📅 ${l.next_followup_at.split(' ')[0]}
@@ -989,12 +946,12 @@ const App = {
                                         </td>
 
                                         <!-- Actions (View Lead & Call) -->
-                                        <td style="text-align:center;">
+                                        <td style="text-align:center;" onclick="event.stopPropagation()">
                                             <div style="display:flex; gap:6px; justify-content:center;">
-                                                <button class="btn btn-primary btn-sm" style="padding:5px 10px; font-size:12px; font-weight:700;" onclick="App.openWorkspaceLeadModal(${l.id})" title="View Full Lead Profile">
+                                                <button type="button" class="btn btn-primary btn-sm" style="padding:5px 12px; font-size:12px; font-weight:700;" onclick="App.openWorkspaceLeadModal(${l.id})" title="View Full Lead Profile & Actions">
                                                     View Lead
                                                 </button>
-                                                <button class="btn btn-success btn-sm" style="padding:5px 10px; font-size:12px; font-weight:700; background:#16a34a;" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')" title="Call Now">
+                                                <button type="button" class="btn btn-success btn-sm" style="padding:5px 10px; font-size:12px; font-weight:700; background:#16a34a;" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')" title="Call Now">
                                                     Call
                                                 </button>
                                             </div>
@@ -1051,14 +1008,14 @@ const App = {
             </div>
 
             <!-- MODAL: FAST DISPOSITION & REMARKS MODAL -->
-            <div class="modal-backdrop" id="ws-disposition-modal">
+            <div class="modal-backdrop" id="ws-disposition-modal" style="display:none;">
                 <div class="modal-box" style="max-width:480px; border-radius:18px; border-top:4px solid var(--primary);">
                     <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:12px;">
                         <div>
                             <div class="modal-title" id="ws-disp-modal-title">Lead Action &amp; Disposition</div>
                             <div style="font-size:12.5px; color:#64748b;" id="ws-disp-modal-subtitle">Update status and schedule callbacks</div>
                         </div>
-                        <button class="close-modal" onclick="App.closeModal('ws-disposition-modal')">✕</button>
+                        <button type="button" class="close-modal" onclick="App.closeModal('ws-disposition-modal')">✕</button>
                     </div>
 
                     <form onsubmit="App.submitWorkspaceDisposition(event)" style="margin-top:16px;">
@@ -1107,7 +1064,7 @@ const App = {
             </div>
 
             <!-- MODAL: PREMIUM VIEW LEAD DETAIL PANEL -->
-            <div class="modal-backdrop" id="ws-view-lead-modal">
+            <div class="modal-backdrop" id="ws-view-lead-modal" style="display:none;">
                 <div class="lead-modal-panel" id="ws-view-lead-content">
                     <!-- Dynamic populated lead content -->
                 </div>
@@ -1257,34 +1214,39 @@ const App = {
         this.openModal('ws-disposition-modal');
     },
 
-    onDispositionActionChange: function(val) {
-        const fuGroup = document.getElementById('ws-followup-fields-group');
+    onDispositionActionChange: function(val, prefix = 'ws-disp-') {
+        const fuGroup = document.getElementById(prefix === 'popup-disp-' ? 'popup-fu-fields-group' : 'ws-followup-fields-group');
         if (fuGroup) {
             fuGroup.style.display = val === 'Follow-up Needed' ? 'block' : 'none';
         }
     },
 
-    submitWorkspaceDisposition: async function(e) {
-        e.preventDefault();
-        const leadId = document.getElementById('ws-disp-lead-id').value;
-        const disposition = document.getElementById('ws-disp-action-val').value;
-        const remarks = document.getElementById('ws-disp-remarks').value.trim();
-        const fDate = document.getElementById('ws-disp-date').value;
-        const fTime = document.getElementById('ws-disp-time').value;
+    submitWorkspaceDisposition: async function(e, customLeadId = null) {
+        if (e && e.preventDefault) e.preventDefault();
+        
+        const isFromPopup = !!document.getElementById('popup-disp-action-val');
+        const leadId = customLeadId || (isFromPopup ? document.getElementById('popup-disp-lead-id')?.value : document.getElementById('ws-disp-lead-id')?.value);
+        const disposition = isFromPopup ? document.getElementById('popup-disp-action-val')?.value : document.getElementById('ws-disp-action-val')?.value;
+        const remarks = (isFromPopup ? document.getElementById('popup-disp-remarks')?.value : document.getElementById('ws-disp-remarks')?.value || '').trim();
+        const fDate = isFromPopup ? document.getElementById('popup-disp-date')?.value : document.getElementById('ws-disp-date')?.value;
+        const fTime = isFromPopup ? document.getElementById('popup-disp-time')?.value : document.getElementById('ws-disp-time')?.value;
+
+        if (!leadId || !disposition) return;
 
         const formData = new FormData();
         formData.append('action', 'update_disposition');
         formData.append('lead_id', leadId);
         formData.append('disposition', disposition);
         formData.append('remarks', remarks);
-        formData.append('followup_date', fDate);
-        formData.append('followup_time', fTime);
+        formData.append('followup_date', fDate || '');
+        formData.append('followup_time', fTime || '');
 
         const res = await fetch('api/leads', { method: 'POST', body: formData });
         const data = await res.json();
 
         if (data.success) {
             this.closeModal('ws-disposition-modal');
+            this.closeModal('ws-view-lead-modal');
             // Refresh workspace table
             this.renderWorkspace();
         } else {
@@ -1292,13 +1254,13 @@ const App = {
         }
     },
 
-    // 3. PREMIUM VIEW LEAD DETAIL MODAL (Fields hidden if empty)
+    // 3. PREMIUM VIEW LEAD DETAIL MODAL (With Lead Code, Color Palette, and Full Disposition form)
     openWorkspaceLeadModal: async function(leadId) {
         const modal = document.getElementById('ws-view-lead-modal');
         const contentBox = document.getElementById('ws-view-lead-content');
         if (!modal || !contentBox) return;
 
-        contentBox.innerHTML = '<div style="padding:40px; text-align:center; color:#64748b;">Loading lead details...</div>';
+        contentBox.innerHTML = '<div style="padding:40px; text-align:center; color:#64748b; font-size:15px; font-weight:600;">Loading lead profile...</div>';
         this.openModal('ws-view-lead-modal');
 
         const res = await fetch(`api/leads?action=detail&id=${leadId}`);
@@ -1312,9 +1274,12 @@ const App = {
         const calls = data.data.calls || [];
         const cleanPhone = (l.mobile || '').replace(/[^0-9]/g, '');
 
+        const today = new Date();
+        today.setDate(today.getDate() + 1);
+        const tomorrowStr = today.toISOString().split('T')[0];
+
         // Array of optional fields: if empty, hide field and label completely
         const candidateFields = [
-            { label: 'Lead Code', value: l.lead_code },
             { label: 'Status', value: l.status_name },
             { label: 'Alternate Mobile', value: l.alternate_mobile },
             { label: 'Email Address', value: l.email },
@@ -1337,8 +1302,32 @@ const App = {
 
         contentBox.innerHTML = `
             <div class="lead-modal-header">
-                <button type="button" class="close-modal" style="position:absolute; top:20px; right:24px; color:#ffffff; font-size:20px;" onclick="App.closeModal('ws-view-lead-modal')">✕</button>
-                <div style="font-size:12px; font-weight:800; color:#60a5fa; text-transform:uppercase; letter-spacing:1px;">Lead Details</div>
+                <button type="button" class="close-modal" style="position:absolute; top:20px; right:24px; color:#ffffff; font-size:20px; background:transparent; border:none; cursor:pointer;" onclick="App.closeModal('ws-view-lead-modal')">✕</button>
+                
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:11px; font-weight:800; background:rgba(255,255,255,0.15); color:#60a5fa; padding:3px 10px; border-radius:20px; text-transform:uppercase; letter-spacing:0.8px;">
+                            ${l.lead_code || 'LEAD'}
+                        </span>
+                        <span style="font-size:12px; font-weight:600; color:#94a3b8;">${l.status_name || 'New'}</span>
+                    </div>
+
+                    <!-- Row Color Picker in popup -->
+                    <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.1); padding:4px 10px; border-radius:20px;">
+                        <span style="font-size:11px; color:#cbd5e1; font-weight:700;">Row Color:</span>
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <div class="color-swatch-btn" style="background:#eff6ff;" onclick="App.changeLeadRowColor(${l.id}, 'blue')" title="Blue"></div>
+                            <div class="color-swatch-btn" style="background:#f0fdf4;" onclick="App.changeLeadRowColor(${l.id}, 'green')" title="Green"></div>
+                            <div class="color-swatch-btn" style="background:#fefce8;" onclick="App.changeLeadRowColor(${l.id}, 'amber')" title="Amber"></div>
+                            <div class="color-swatch-btn" style="background:#fff7ed;" onclick="App.changeLeadRowColor(${l.id}, 'orange')" title="Orange"></div>
+                            <div class="color-swatch-btn" style="background:#fef2f2;" onclick="App.changeLeadRowColor(${l.id}, 'red')" title="Red"></div>
+                            <div class="color-swatch-btn" style="background:#faf5ff;" onclick="App.changeLeadRowColor(${l.id}, 'purple')" title="Purple"></div>
+                            <div class="color-swatch-btn" style="background:#f8fafc;" onclick="App.changeLeadRowColor(${l.id}, 'gray')" title="Gray"></div>
+                            <div class="color-swatch-btn" style="background:rgba(255,255,255,0.3); border:1px dashed #ffffff; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px;" onclick="App.changeLeadRowColor(${l.id}, 'default')" title="Clear Color">✕</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div style="font-size:24px; font-weight:800; color:#ffffff; margin-top:2px;">${l.name}</div>
                 
                 <!-- Highly Visible Large Phone Number -->
@@ -1356,10 +1345,54 @@ const App = {
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                         WhatsApp
                     </a>
-                    <button type="button" class="btn btn-secondary" style="font-weight:700;" onclick="App.closeModal('ws-view-lead-modal'); App.openDispositionModal(${l.id})">
-                        Update Disposition
-                    </button>
                 </div>
+            </div>
+
+            <!-- PROPER EMBEDDED DISPOSITION & ACTION SECTION -->
+            <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:18px 28px;">
+                <div style="font-size:13px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                    <span>⚡ Quick Action &amp; Disposition</span>
+                </div>
+                <form id="popup-disp-form" onsubmit="App.submitWorkspaceDisposition(event, ${l.id})">
+                    <input type="hidden" id="popup-disp-lead-id" value="${l.id}">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:10px;">
+                        <div>
+                            <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Action / Call Outcome *</label>
+                            <select id="popup-disp-action-val" required class="filter-select" style="width:100%; font-weight:700; padding:8px 10px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;" onchange="App.onDispositionActionChange(this.value, 'popup-disp-')">
+                                <option value="Calling">Calling</option>
+                                <option value="Call Connected">Call Connected</option>
+                                <option value="Not Interested">Not Interested</option>
+                                <option value="Follow-up Needed">Follow-up Needed</option>
+                                <option value="Ringing">Ringing</option>
+                                <option value="Not Responding">Not Responding</option>
+                                <option value="Invalid Number">Invalid Number</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Remarks</label>
+                            <input type="text" id="popup-disp-remarks" class="filter-input" style="width:100%; padding:8px 10px; border-radius:8px;" placeholder="Outcome notes, customer reply...">
+                        </div>
+                    </div>
+
+                    <!-- Follow-up fields container -->
+                    <div id="popup-fu-fields-group" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px; margin-bottom:12px;">
+                        <div style="font-size:11px; font-weight:800; color:#b45309; margin-bottom:6px;">📅 Schedule Follow-up Callback</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <div>
+                                <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Date *</label>
+                                <input type="date" id="popup-disp-date" class="filter-input" style="width:100%;" value="${tomorrowStr}">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Time *</label>
+                                <input type="time" id="popup-disp-time" class="filter-input" style="width:100%;" value="11:00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:8px;">
+                        <button type="submit" class="btn btn-primary" style="padding:7px 18px; font-size:12.5px; font-weight:700;">Save Action &amp; Update Status &rarr;</button>
+                    </div>
+                </form>
             </div>
 
             <!-- Structured Fields (Only non-empty fields shown) -->
@@ -3607,9 +3640,25 @@ const App = {
         document.body.appendChild(modal);
     },
 
+    openModal: function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.add('show');
+            el.style.display = 'flex';
+        }
+    },
+
     closeModal: function(id) {
         const el = document.getElementById(id);
-        if (el) el.remove();
+        if (el) {
+            el.classList.remove('show');
+            // If it's a dynamic modal that was appended to body directly, remove it after transition, or if it has static backdrop just hide
+            if (['create-lead-modal', 'call-modal', 'edit-project-modal', 'create-user-modal', 'notif-modal'].includes(id)) {
+                el.remove();
+            } else {
+                el.style.display = 'none';
+            }
+        }
     }
 };
 

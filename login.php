@@ -656,7 +656,7 @@ if (!empty($_SESSION['user_id'])) {
                 <div class="form-group">
                     <label for="email">Work Email</label>
                     <div class="input-wrapper">
-                        <input type="email" id="email" class="form-input" required placeholder="name@leadstriangle.com" value="admin@leadstriangle.com" autocomplete="email">
+                        <input type="email" id="email" class="form-input" required placeholder="name@company.com" autocomplete="email">
                         <span class="input-icon">
                             <i data-lucide="mail" style="width:18px;height:18px;"></i>
                         </span>
@@ -666,7 +666,7 @@ if (!empty($_SESSION['user_id'])) {
                 <div class="form-group">
                     <label for="password">Password</label>
                     <div class="input-wrapper">
-                        <input type="password" id="password" class="form-input" required placeholder="••••••••" value="Admin@123" autocomplete="current-password">
+                        <input type="password" id="password" class="form-input" required placeholder="••••••••" autocomplete="current-password">
                         <span class="input-icon">
                             <i data-lucide="lock" style="width:18px;height:18px;"></i>
                         </span>
@@ -688,11 +688,6 @@ if (!empty($_SESSION['user_id'])) {
                     <div id="btn-spinner" class="spinner"></div>
                 </button>
             </form>
-
-            <div class="credentials-card">
-                <div>Demo: <code>Admin@123</code></div>
-                <button type="button" class="copy-btn" onclick="fillDemoCreds()">Auto Fill</button>
-            </div>
         </div>
     </div>
 
@@ -815,11 +810,6 @@ if (!empty($_SESSION['user_id'])) {
                 eyeIcon.setAttribute('data-lucide', 'eye');
             }
             if (window.lucide) lucide.createIcons();
-        }
-
-        function fillDemoCreds() {
-            document.getElementById('email').value = 'admin@leadstriangle.com';
-            document.getElementById('password').value = 'Admin@123';
         }
 
         // Form Submit Handler

@@ -121,10 +121,14 @@ const App = {
                 this.currentUser = data.data.user;
                 this.renderUserUI();
             } else {
-                this.renderLogin(data.message && data.data?.need_install ? data.message : null);
+                if (data.data?.need_install) {
+                    this.renderLogin(data.message);
+                } else {
+                    window.location.href = '/login';
+                }
             }
         } catch (e) {
-            this.renderLogin();
+            window.location.href = '/login';
         }
     },
 
@@ -241,7 +245,7 @@ const App = {
 
     logout: async function() {
         await fetch('api/auth?action=logout');
-        window.location.reload();
+        window.location.href = '/login';
     },
 
     bindEvents: function() {

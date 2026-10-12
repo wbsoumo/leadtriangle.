@@ -19,6 +19,12 @@
     # Handle Deploy page (/deploy -> /deploy.php)
     RewriteRule ^deploy$ deploy.php [QSA,L]
 
+    # Handle Login page (/login -> /login.php)
+    RewriteRule ^login$ login.php [QSA,L]
+
+    # Handle CRM app views
+    RewriteRule ^(app|dashboard|leads|calling_queue|calling-queue|followups|meetings|funnel|projects|reports|users|settings|import)$ app.php [QSA,L]
+
     # Allow actual physical PHP files to run directly
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule \.php$ - [L]

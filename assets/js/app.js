@@ -290,6 +290,7 @@ const App = {
         container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Loading module...</div>';
 
         if (view === 'dashboard') this.renderDashboard();
+        else if (view === 'workspace') this.renderWorkspace();
         else if (view === 'leads') this.renderLeads();
         else if (view === 'calling_queue' || view === 'calling-queue') this.renderCallingQueue({ quick_filter: 'new' });
         else if (view === 'followups') this.renderFollowups();
@@ -688,6 +689,705 @@ const App = {
             this.closeModal('create-lead-modal');
             this.navigate(this.currentView || 'leads');
         }
+    },
+
+    // 1b. GOOGLE SHEETS-STYLE SPREADSHEET WORKSPACE MODULE
+    workspaceFilterState: {
+        page: 1,
+        limit: 25,
+        search: '',
+        status_name: '',
+        row_color: '',
+        followup_date: '',
+        filter: '',
+        sort_by: 'id',
+        sort_order: 'DESC'
+    },
+
+    renderWorkspace: async function(page = null, newFilters = null) {
+        if (!this.dropdowns || !this.dropdowns.statuses) {
+            await this.loadDropdowns();
+        }
+
+        if (page !== null) {
+            this.workspaceFilterState.page = page;
+        }
+        if (newFilters !== null) {
+            this.workspaceFilterState = { ...this.workspaceFilterState, ...newFilters };
+        }
+
+        const state = this.workspaceFilterState;
+        let query = `action=list&page=${state.page}&limit=${state.limit}&sort_by=${state.sort_by}&sort_order=${state.sort_order}`;
+        if (state.search) query += `&search=${encodeURIComponent(state.search)}`;
+        if (state.status_name) query += `&status_name=${encodeURIComponent(state.status_name)}`;
+        if (state.row_color) query += `&row_color=${encodeURIComponent(state.row_color)}`;
+        if (state.followup_date) query += `&followup_date=${encodeURIComponent(state.followup_date)}`;
+        if (state.filter) query += `&filter=${encodeURIComponent(state.filter)}`;
+
+        // Fetch leads for workspace
+        const res = await fetch(`api/leads?${query}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        const leads = data.data.leads || [];
+        const p = data.data.pagination || { page: 1, limit: 25, total: 0, total_pages: 1 };
+
+        // Fetch followups for dedicated section below workspace
+        const fuRes = await fetch('api/followups?action=list&filter=all');
+        const fuData = await fuRes.json();
+        const allFollowups = fuData.success && fuData.data ? fuData.data : [];
+
+        // Categorize follow-ups
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayFu = allFollowups.filter(f => f.followup_date === todayStr && f.status === 'Pending');
+        const upcomingFu = allFollowups.filter(f => f.followup_date > todayStr && f.status === 'Pending');
+        const overdueFu = allFollowups.filter(f => f.followup_date < todayStr && f.status === 'Pending');
+        const completedFu = allFollowups.filter(f => f.status === 'Completed');
+
+        // Color helper
+        const getRowColorClass = (color) => {
+            if (!color) return '';
+            const c = color.toLowerCase();
+            if (c.includes('blue') || c === '#3b82f6' || c === '#2563eb' || c === '#eff6ff') return 'workspace-row-color-blue';
+            if (c.includes('green') || c === '#10b981' || c === '#16a34a' || c === '#f0fdf4') return 'workspace-row-color-green';
+            if (c.includes('amber') || c === '#f59e0b' || c === '#fefce8') return 'workspace-row-color-amber';
+            if (c.includes('yellow') || c === '#eab308' || c === '#fef9c3') return 'workspace-row-color-yellow';
+            if (c.includes('orange') || c === '#f97316' || c === '#fff7ed') return 'workspace-row-color-orange';
+            if (c.includes('red') || c === '#ef4444' || c === '#dc2626' || c === '#fef2f2') return 'workspace-row-color-red';
+            if (c.includes('purple') || c === '#8b5cf6' || c === '#9333ea' || c === '#faf5ff') return 'workspace-row-color-purple';
+            if (c.includes('gray') || c === '#6b7280' || c === '#f8fafc') return 'workspace-row-color-gray';
+            return '';
+        };
+
+        const getStatusPillClass = (statusName) => {
+            if (!statusName) return 'status-New';
+            return 'status-' + statusName.replace(/\s+/g, '-');
+        };
+
+        let html = `
+            <div class="workspace-wrapper">
+                <!-- TOP HEADER -->
+                <div class="page-header" style="margin-bottom:0;">
+                    <div>
+                        <div class="page-title" style="display:flex; align-items:center; gap:10px;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+                            User Workspace
+                            <span class="badge badge-blue" style="font-size:12px; font-weight:800; padding:4px 10px;">Google Sheets View</span>
+                        </div>
+                        <div class="page-subtitle">Admin-uploaded lead roster &bull; Quick dispositions, color tagging, fast dialing &amp; scheduled follow-ups</div>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="App.renderWorkspace(1, {})" title="Refresh Workspace">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                            Refresh
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="App.exportLeadsCsv()">Export CSV</button>
+                    </div>
+                </div>
+
+                <!-- ADVANCED SPREADSHEET TOOLBAR & FILTERS -->
+                <div class="workspace-toolbar">
+                    <div class="workspace-filters-bar">
+                        <!-- Search Box -->
+                        <div style="position:relative; width:220px;">
+                            <input type="text" id="ws-search-input" class="filter-input" style="width:100%; padding-left:32px; font-size:13px;" placeholder="Search name, phone..." value="${state.search}" onkeyup="if(event.key==='Enter') App.renderWorkspace(1, {search: this.value})">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:10px; top:10px; color:#94a3b8;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="App.renderWorkspace(1, {search: document.getElementById('ws-search-input').value})">Filter</button>
+
+                        <!-- Lead Type / State Filter -->
+                        <select class="filter-select" style="font-size:12.5px; font-weight:600;" onchange="App.renderWorkspace(1, {filter: this.value})">
+                            <option value="" ${!state.filter ? 'selected' : ''}>All Types</option>
+                            <option value="unconnected" ${state.filter === 'unconnected' ? 'selected' : ''}>Unconnected Leads</option>
+                            <option value="to_call" ${state.filter === 'to_call' ? 'selected' : ''}>Pending To Call</option>
+                            <option value="called" ${state.filter === 'called' ? 'selected' : ''}>Already Contacted</option>
+                            <option value="followups" ${state.filter === 'followups' ? 'selected' : ''}>Has Follow-up</option>
+                        </select>
+
+                        <!-- Lead Status / Disposition Filter -->
+                        <select class="filter-select" style="font-size:12.5px; font-weight:600;" onchange="App.renderWorkspace(1, {status_name: this.value})">
+                            <option value="" ${!state.status_name ? 'selected' : ''}>All Statuses</option>
+                            <option value="New" ${state.status_name === 'New' ? 'selected' : ''}>New</option>
+                            <option value="Calling" ${state.status_name === 'Calling' ? 'selected' : ''}>Calling</option>
+                            <option value="Connected" ${state.status_name === 'Connected' ? 'selected' : ''}>Connected</option>
+                            <option value="Not Interested" ${state.status_name === 'Not Interested' ? 'selected' : ''}>Not Interested</option>
+                            <option value="Follow-up Needed" ${state.status_name === 'Follow-up Needed' ? 'selected' : ''}>Follow-up Needed</option>
+                            <option value="Ringing" ${state.status_name === 'Ringing' ? 'selected' : ''}>Ringing</option>
+                            <option value="Not Responding" ${state.status_name === 'Not Responding' ? 'selected' : ''}>Not Responding</option>
+                            <option value="Invalid Number" ${state.status_name === 'Invalid Number' ? 'selected' : ''}>Invalid Number</option>
+                        </select>
+
+                        <!-- Row Color Filter -->
+                        <select class="filter-select" style="font-size:12.5px; font-weight:600;" onchange="App.renderWorkspace(1, {row_color: this.value})">
+                            <option value="" ${!state.row_color ? 'selected' : ''}>All Row Colors</option>
+                            <option value="none" ${state.row_color === 'none' ? 'selected' : ''}>No Color</option>
+                            <option value="blue" ${state.row_color === 'blue' ? 'selected' : ''}>Blue</option>
+                            <option value="green" ${state.row_color === 'green' ? 'selected' : ''}>Green</option>
+                            <option value="amber" ${state.row_color === 'amber' ? 'selected' : ''}>Amber / Yellow</option>
+                            <option value="orange" ${state.row_color === 'orange' ? 'selected' : ''}>Orange</option>
+                            <option value="red" ${state.row_color === 'red' ? 'selected' : ''}>Red</option>
+                            <option value="purple" ${state.row_color === 'purple' ? 'selected' : ''}>Purple</option>
+                            <option value="gray" ${state.row_color === 'gray' ? 'selected' : ''}>Gray</option>
+                        </select>
+
+                        <!-- Follow-up Date Filter -->
+                        <select class="filter-select" style="font-size:12.5px; font-weight:600;" onchange="App.renderWorkspace(1, {followup_date: this.value})">
+                            <option value="" ${!state.followup_date ? 'selected' : ''}>All Follow-up Dates</option>
+                            <option value="today" ${state.followup_date === 'today' ? 'selected' : ''}>Today</option>
+                            <option value="upcoming" ${state.followup_date === 'upcoming' ? 'selected' : ''}>Upcoming</option>
+                            <option value="overdue" ${state.followup_date === 'overdue' ? 'selected' : ''}>Overdue</option>
+                            <option value="has_followup" ${state.followup_date === 'has_followup' ? 'selected' : ''}>Any Scheduled</option>
+                        </select>
+
+                        <!-- Sort Field -->
+                        <select class="filter-select" style="font-size:12.5px;" onchange="App.renderWorkspace(1, {sort_by: this.value})">
+                            <option value="id" ${state.sort_by === 'id' ? 'selected' : ''}>Sort: Latest ID</option>
+                            <option value="name" ${state.sort_by === 'name' ? 'selected' : ''}>Sort: Name</option>
+                            <option value="status" ${state.sort_by === 'status' ? 'selected' : ''}>Sort: Status</option>
+                            <option value="next_followup" ${state.sort_by === 'next_followup' ? 'selected' : ''}>Sort: Follow-up Date</option>
+                            <option value="last_contacted" ${state.sort_by === 'last_contacted' ? 'selected' : ''}>Sort: Last Called</option>
+                        </select>
+
+                        <!-- Reset Button -->
+                        ${(state.search || state.status_name || state.row_color || state.followup_date || state.filter) ? `
+                            <button class="btn btn-secondary btn-sm" style="color:#ef4444;" onclick="App.workspaceFilterState = {page:1, limit:25, search:'', status_name:'', row_color:'', followup_date:'', filter:'', sort_by:'id', sort_order:'DESC'}; App.renderWorkspace(1);">✕ Clear</button>
+                        ` : ''}
+                    </div>
+
+                    <div style="font-size:12.5px; color:#64748b; font-weight:600; white-space:nowrap;">
+                        Total: <strong style="color:#0f172a;">${p.total}</strong> Leads &bull; Page ${p.page} of ${Math.max(1, p.total_pages)}
+                    </div>
+                </div>
+
+                <!-- 1. WORKSPACE SPREADSHEET TABLE (Google Sheets Style with fixed admin columns) -->
+                <div class="workspace-table-container">
+                    <table class="workspace-grid" id="workspace-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 44px; text-align:center;">#</th>
+                                <th style="width: 80px; text-align:center;">Color</th>
+                                <th style="min-width: 140px;">Lead Code</th>
+                                <th style="min-width: 170px;">Client Name</th>
+                                <th style="min-width: 150px;">Phone Number</th>
+                                <th style="min-width: 150px;">Company / City</th>
+                                <th style="min-width: 140px;">Status</th>
+                                <th style="min-width: 170px;">Quick Disposition</th>
+                                <th style="min-width: 160px;">Remarks / Follow-up</th>
+                                <th style="min-width: 130px;">Last Contacted</th>
+                                <th style="min-width: 140px; text-align:center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${leads.length === 0 ? `
+                                <tr>
+                                    <td colspan="11" style="text-align:center; padding:50px; color:#64748b; font-size:14px;">
+                                        No lead rows match your workspace filter criteria.
+                                    </td>
+                                </tr>
+                            ` : ''}
+                            ${leads.map((l, index) => {
+                                const rowColorClass = getRowColorClass(l.row_color || l.status_color);
+                                const statusPill = getStatusPillClass(l.status_name);
+                                const customStyle = l.row_color && !rowColorClass ? `background-color: ${l.row_color}18;` : '';
+                                const leadObjJson = JSON.stringify(l).replace(/"/g, '&quot;');
+
+                                return `
+                                    <tr id="ws-row-${l.id}" class="${rowColorClass}" style="${customStyle}">
+                                        <!-- Row number -->
+                                        <td style="text-align:center; font-weight:700; color:#64748b; font-size:11px;">
+                                            ${(p.page - 1) * p.limit + index + 1}
+                                        </td>
+
+                                        <!-- Manual Row Color Palette Picker -->
+                                        <td style="text-align:center;">
+                                            <div style="position:relative; display:inline-block;">
+                                                <button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px; font-size:11px; height:24px;" onclick="App.toggleRowColorMenu(${l.id})" title="Change Row Color">
+                                                    🎨
+                                                </button>
+                                                <div id="row-color-menu-${l.id}" style="display:none; position:absolute; left:0; top:28px; z-index:99; background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:8px; box-shadow:0 10px 25px rgba(0,0,0,0.15); width:130px;">
+                                                    <div style="font-size:10px; font-weight:800; color:#64748b; margin-bottom:6px; text-transform:uppercase;">Row Color</div>
+                                                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px;">
+                                                        <div class="color-swatch-btn" style="background:#eff6ff;" onclick="App.changeLeadRowColor(${l.id}, 'blue')" title="Blue"></div>
+                                                        <div class="color-swatch-btn" style="background:#f0fdf4;" onclick="App.changeLeadRowColor(${l.id}, 'green')" title="Green"></div>
+                                                        <div class="color-swatch-btn" style="background:#fefce8;" onclick="App.changeLeadRowColor(${l.id}, 'amber')" title="Amber"></div>
+                                                        <div class="color-swatch-btn" style="background:#fff7ed;" onclick="App.changeLeadRowColor(${l.id}, 'orange')" title="Orange"></div>
+                                                        <div class="color-swatch-btn" style="background:#fef2f2;" onclick="App.changeLeadRowColor(${l.id}, 'red')" title="Red"></div>
+                                                        <div class="color-swatch-btn" style="background:#faf5ff;" onclick="App.changeLeadRowColor(${l.id}, 'purple')" title="Purple"></div>
+                                                        <div class="color-swatch-btn" style="background:#f8fafc;" onclick="App.changeLeadRowColor(${l.id}, 'gray')" title="Gray"></div>
+                                                        <div class="color-swatch-btn" style="background:#ffffff; border:1px dashed #94a3b8;" onclick="App.changeLeadRowColor(${l.id}, 'default')" title="Clear">✕</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <!-- Lead Code -->
+                                        <td>
+                                            <span style="font-weight:800; color:var(--primary); cursor:pointer;" onclick="App.openWorkspaceLeadModal(${l.id})">${l.lead_code}</span>
+                                        </td>
+
+                                        <!-- Client Name -->
+                                        <td>
+                                            <div style="font-weight:700; color:#0f172a; cursor:pointer;" onclick="App.openWorkspaceLeadModal(${l.id})">${l.name}</div>
+                                        </td>
+
+                                        <!-- Mobile Number (Prominent clickable) -->
+                                        <td>
+                                            <a href="tel:${l.mobile}" style="font-weight:700; color:#16a34a; text-decoration:none; font-family:'Space Grotesk', monospace; font-size:13.5px;" title="Call Direct">
+                                                📞 ${l.mobile}
+                                            </a>
+                                        </td>
+
+                                        <!-- Company / City -->
+                                        <td>
+                                            <div style="font-weight:600; color:#334155;">${l.company_name || '—'}</div>
+                                            <div style="font-size:11px; color:#64748b;">${l.city || l.location || ''}</div>
+                                        </td>
+
+                                        <!-- Status Badge -->
+                                        <td id="ws-status-cell-${l.id}">
+                                            <span class="status-pill ${statusPill}" style="${l.status_color ? `border-color:${l.status_color}55; color:${l.status_color}; background:${l.status_color}18;` : ''}">
+                                                <span class="status-indicator-dot" style="background:${l.status_color || '#3b82f6'};"></span>
+                                                ${l.status_name || 'New'}
+                                            </span>
+                                        </td>
+
+                                        <!-- Inline Action / Disposition Dropdown -->
+                                        <td>
+                                            <select class="filter-select" id="ws-disp-select-${l.id}" style="width:100%; font-size:12px; font-weight:700; padding:6px 10px; border-radius:8px; background:#ffffff;" onchange="App.handleInlineDispositionSelect(${l.id}, this.value)">
+                                                <option value="" disabled selected>Update Action &darr;</option>
+                                                <option value="Calling">Calling</option>
+                                                <option value="Call Connected">Call Connected</option>
+                                                <option value="Not Interested">Not Interested</option>
+                                                <option value="Follow-up Needed">Follow-up Needed</option>
+                                                <option value="Ringing">Ringing</option>
+                                                <option value="Not Responding">Not Responding</option>
+                                                <option value="Invalid Number">Invalid Number</option>
+                                            </select>
+                                        </td>
+
+                                        <!-- Remarks & Scheduled Followup Column -->
+                                        <td id="ws-remarks-cell-${l.id}" style="max-width:180px; overflow:hidden; text-overflow:ellipsis;">
+                                            ${l.next_followup_at ? `
+                                                <div style="font-size:11px; font-weight:800; color:#b45309; background:#fffbeb; padding:2px 6px; border-radius:6px; display:inline-block; border:1px solid #fde68a;">
+                                                    📅 ${l.next_followup_at.split(' ')[0]}
+                                                </div>
+                                            ` : ''}
+                                            <div style="font-size:11.5px; color:#475569; margin-top:2px;" title="${l.latest_call_outcome || l.initial_remark || ''}">
+                                                ${l.latest_call_outcome ? `Latest: ${l.latest_call_outcome}` : (l.initial_remark || '<span style="color:#94a3b8">—</span>')}
+                                            </div>
+                                        </td>
+
+                                        <!-- Last Contacted -->
+                                        <td>
+                                            <small style="color:#64748b; font-weight:600;">
+                                                ${l.last_contacted_at ? l.last_contacted_at.replace(/:\d\d$/, '') : '<span style="color:#94a3b8">Never</span>'}
+                                            </small>
+                                        </td>
+
+                                        <!-- Actions (View Lead & Call) -->
+                                        <td style="text-align:center;">
+                                            <div style="display:flex; gap:6px; justify-content:center;">
+                                                <button class="btn btn-primary btn-sm" style="padding:5px 10px; font-size:12px; font-weight:700;" onclick="App.openWorkspaceLeadModal(${l.id})" title="View Full Lead Profile">
+                                                    View Lead
+                                                </button>
+                                                <button class="btn btn-success btn-sm" style="padding:5px 10px; font-size:12px; font-weight:700; background:#16a34a;" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')" title="Call Now">
+                                                    Call
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- PAGINATION BAR -->
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px 16px; background:#ffffff; border:1px solid var(--card-border); border-radius:12px;">
+                    <div style="font-size:13px; color:#64748b;">
+                        Showing ${(p.page - 1) * p.limit + 1} - ${Math.min(p.page * p.limit, p.total)} of ${p.total} leads
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn btn-secondary btn-sm" ${p.page <= 1 ? 'disabled' : ''} onclick="App.renderWorkspace(${p.page - 1})">&larr; Previous</button>
+                        ${Array.from({ length: Math.min(5, p.total_pages) }, (_, i) => {
+                            const pageNum = i + 1;
+                            return `<button class="btn btn-sm ${p.page === pageNum ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderWorkspace(${pageNum})">${pageNum}</button>`;
+                        }).join('')}
+                        ${p.total_pages > 5 ? `<span style="padding:6px; color:#94a3b8;">...</span><button class="btn btn-sm ${p.page === p.total_pages ? 'btn-primary' : 'btn-secondary'}" onclick="App.renderWorkspace(${p.total_pages})">${p.total_pages}</button>` : ''}
+                        <button class="btn btn-secondary btn-sm" ${p.page >= p.total_pages ? 'disabled' : ''} onclick="App.renderWorkspace(${p.page + 1})">Next &rarr;</button>
+                    </div>
+                </div>
+
+                <!-- 6. DEDICATED FOLLOW-UPS SECTION BELOW WORKSPACE -->
+                <div style="background:#ffffff; border:1px solid var(--card-border); border-radius:18px; padding:24px; box-shadow:0 2px 8px rgba(15,23,42,0.04); margin-top:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="font-size:18px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                                📅 Scheduled Follow-ups Center
+                                <span class="badge badge-amber">${todayFu.length} Today</span>
+                                ${overdueFu.length > 0 ? `<span class="badge badge-red">${overdueFu.length} Overdue</span>` : ''}
+                            </div>
+                            <div style="font-size:12.5px; color:#64748b; margin-top:2px;">All callback tasks linked to your workspace leads</div>
+                        </div>
+
+                        <!-- Follow-up tabs -->
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn btn-sm btn-primary" id="fu-subtab-today" onclick="App.switchWorkspaceFollowupTab('today')">Today (${todayFu.length})</button>
+                            <button class="btn btn-sm btn-secondary" id="fu-subtab-overdue" onclick="App.switchWorkspaceFollowupTab('overdue')">Overdue (${overdueFu.length})</button>
+                            <button class="btn btn-sm btn-secondary" id="fu-subtab-upcoming" onclick="App.switchWorkspaceFollowupTab('upcoming')">Upcoming (${upcomingFu.length})</button>
+                            <button class="btn btn-sm btn-secondary" id="fu-subtab-completed" onclick="App.switchWorkspaceFollowupTab('completed')">Completed (${completedFu.length})</button>
+                        </div>
+                    </div>
+
+                    <!-- Followup items list container -->
+                    <div id="ws-followups-container">
+                        ${this.renderFollowupsSnippet(todayFu, 'today')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: FAST DISPOSITION & REMARKS MODAL -->
+            <div class="modal-backdrop" id="ws-disposition-modal">
+                <div class="modal-box" style="max-width:480px; border-radius:18px; border-top:4px solid var(--primary);">
+                    <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding-bottom:12px;">
+                        <div>
+                            <div class="modal-title" id="ws-disp-modal-title">Lead Action &amp; Disposition</div>
+                            <div style="font-size:12.5px; color:#64748b;" id="ws-disp-modal-subtitle">Update status and schedule callbacks</div>
+                        </div>
+                        <button class="close-modal" onclick="App.closeModal('ws-disposition-modal')">✕</button>
+                    </div>
+
+                    <form onsubmit="App.submitWorkspaceDisposition(event)" style="margin-top:16px;">
+                        <input type="hidden" id="ws-disp-lead-id">
+                        
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:6px;">Action / Disposition *</label>
+                            <select id="ws-disp-action-val" required class="filter-select" style="width:100%; font-weight:700; padding:10px;" onchange="App.onDispositionActionChange(this.value)">
+                                <option value="Calling">Calling</option>
+                                <option value="Call Connected">Call Connected</option>
+                                <option value="Not Interested">Not Interested</option>
+                                <option value="Follow-up Needed">Follow-up Needed</option>
+                                <option value="Ringing">Ringing</option>
+                                <option value="Not Responding">Not Responding</option>
+                                <option value="Invalid Number">Invalid Number</option>
+                            </select>
+                        </div>
+
+                        <!-- Date + Time selection for Follow-up Needed -->
+                        <div id="ws-followup-fields-group" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:14px; margin-bottom:16px;">
+                            <div style="font-size:12px; font-weight:800; color:#b45309; margin-bottom:10px;">📅 Schedule Follow-up Date &amp; Time</div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <div>
+                                    <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:4px;">Date *</label>
+                                    <input type="date" id="ws-disp-date" class="filter-input" style="width:100%;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:4px;">Time *</label>
+                                    <input type="time" id="ws-disp-time" class="filter-input" style="width:100%;" value="11:00">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Remarks field -->
+                        <div style="margin-bottom:20px;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:6px;">Remarks (Optional)</label>
+                            <textarea id="ws-disp-remarks" class="filter-input" style="width:100%; height:75px; padding:10px; font-size:13px;" placeholder="Add remarks, customer response, or next steps..."></textarea>
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end; gap:10px;">
+                            <button type="button" class="btn btn-secondary" onclick="App.closeModal('ws-disposition-modal')">Cancel</button>
+                            <button type="submit" class="btn btn-primary" style="font-weight:700;">Save Action &amp; Update Status &rarr;</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL: PREMIUM VIEW LEAD DETAIL PANEL -->
+            <div class="modal-backdrop" id="ws-view-lead-modal">
+                <div class="lead-modal-panel" id="ws-view-lead-content">
+                    <!-- Dynamic populated lead content -->
+                </div>
+            </div>
+        `;
+
+        document.getElementById('content-viewport').innerHTML = html;
+        this.allWorkspaceFollowups = allFollowups;
+    },
+
+    // Snippet renderer for follow-up lists
+    renderFollowupsSnippet: function(items, type) {
+        if (!items || items.length === 0) {
+            return `
+                <div style="text-align:center; padding:30px; color:#64748b; font-size:13px;">
+                    No ${type} follow-ups scheduled.
+                </div>
+            `;
+        }
+
+        return `
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Client / Lead</th>
+                            <th>Phone Number</th>
+                            <th>Follow-up Date &amp; Time</th>
+                            <th>Notes / Purpose</th>
+                            <th>Status</th>
+                            <th style="text-align:center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(f => `
+                            <tr>
+                                <td>
+                                    <strong style="color:#0f172a; cursor:pointer;" onclick="App.openWorkspaceLeadModal(${f.lead_id})">${f.lead_name}</strong>
+                                    ${f.company_name ? `<br><small style="color:#64748b;">${f.company_name}</small>` : ''}
+                                </td>
+                                <td>
+                                    <a href="tel:${f.lead_mobile}" style="font-weight:700; color:#16a34a; text-decoration:none; font-family:'Space Grotesk', monospace;">📞 ${f.lead_mobile}</a>
+                                </td>
+                                <td>
+                                    <span style="font-weight:700; color:#0f172a;">${f.followup_date}</span>
+                                    <span style="color:#64748b; font-size:12px;">at ${f.followup_time || '10:00'}</span>
+                                </td>
+                                <td>${f.notes || f.purpose || 'Follow-up'}</td>
+                                <td>
+                                    <span class="badge ${f.status === 'Completed' ? 'badge-green' : (f.status === 'Overdue' ? 'badge-red' : 'badge-amber')}">${f.status}</span>
+                                </td>
+                                <td style="text-align:center;">
+                                    <div style="display:flex; gap:6px; justify-content:center;">
+                                        <button class="btn btn-primary btn-sm" onclick="App.openWorkspaceLeadModal(${f.lead_id})">Open Lead</button>
+                                        ${f.status !== 'Completed' ? `<button class="btn btn-success btn-sm" onclick="App.completeWorkspaceFollowup(${f.id})">Mark Done</button>` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    },
+
+    switchWorkspaceFollowupTab: function(tab) {
+        document.querySelectorAll('#fu-subtab-today, #fu-subtab-overdue, #fu-subtab-upcoming, #fu-subtab-completed').forEach(b => {
+            b.className = 'btn btn-sm btn-secondary';
+        });
+        const activeBtn = document.getElementById(`fu-subtab-${tab}`);
+        if (activeBtn) activeBtn.className = 'btn btn-sm btn-primary';
+
+        const all = this.allWorkspaceFollowups || [];
+        const todayStr = new Date().toISOString().split('T')[0];
+        let filtered = [];
+        if (tab === 'today') filtered = all.filter(f => f.followup_date === todayStr && f.status === 'Pending');
+        else if (tab === 'upcoming') filtered = all.filter(f => f.followup_date > todayStr && f.status === 'Pending');
+        else if (tab === 'overdue') filtered = all.filter(f => f.followup_date < todayStr && f.status === 'Pending');
+        else if (tab === 'completed') filtered = all.filter(f => f.status === 'Completed');
+
+        document.getElementById('ws-followups-container').innerHTML = this.renderFollowupsSnippet(filtered, tab);
+    },
+
+    completeWorkspaceFollowup: async function(id) {
+        const formData = new FormData();
+        formData.append('action', 'update_status');
+        formData.append('id', id);
+        formData.append('status', 'Completed');
+
+        const res = await fetch('api/followups', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            this.renderWorkspace();
+        }
+    },
+
+    toggleRowColorMenu: function(leadId) {
+        const menu = document.getElementById(`row-color-menu-${leadId}`);
+        if (!menu) return;
+        const isHidden = menu.style.display === 'none';
+        document.querySelectorAll('[id^="row-color-menu-"]').forEach(el => el.style.display = 'none');
+        menu.style.display = isHidden ? 'block' : 'none';
+    },
+
+    changeLeadRowColor: async function(leadId, colorName) {
+        const row = document.getElementById(`ws-row-${leadId}`);
+        const menu = document.getElementById(`row-color-menu-${leadId}`);
+        if (menu) menu.style.display = 'none';
+
+        // Clear existing color classes
+        if (row) {
+            row.classList.remove(
+                'workspace-row-color-blue', 'workspace-row-color-green', 'workspace-row-color-amber',
+                'workspace-row-color-yellow', 'workspace-row-color-orange', 'workspace-row-color-red',
+                'workspace-row-color-purple', 'workspace-row-color-gray'
+            );
+            if (colorName !== 'default') {
+                row.classList.add(`workspace-row-color-${colorName}`);
+            }
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'update_row_color');
+        formData.append('lead_id', leadId);
+        formData.append('row_color', colorName);
+
+        await fetch('api/leads', { method: 'POST', body: formData });
+    },
+
+    handleInlineDispositionSelect: function(leadId, disposition) {
+        if (!disposition) return;
+        this.openDispositionModal(leadId, disposition);
+    },
+
+    openDispositionModal: function(leadId, preselectedAction = 'Calling') {
+        document.getElementById('ws-disp-lead-id').value = leadId;
+        const sel = document.getElementById('ws-disp-action-val');
+        if (sel) sel.value = preselectedAction;
+
+        document.getElementById('ws-disp-remarks').value = '';
+        const today = new Date();
+        today.setDate(today.getDate() + 1);
+        const tomorrowStr = today.toISOString().split('T')[0];
+        document.getElementById('ws-disp-date').value = tomorrowStr;
+
+        this.onDispositionActionChange(preselectedAction);
+        this.openModal('ws-disposition-modal');
+    },
+
+    onDispositionActionChange: function(val) {
+        const fuGroup = document.getElementById('ws-followup-fields-group');
+        if (fuGroup) {
+            fuGroup.style.display = val === 'Follow-up Needed' ? 'block' : 'none';
+        }
+    },
+
+    submitWorkspaceDisposition: async function(e) {
+        e.preventDefault();
+        const leadId = document.getElementById('ws-disp-lead-id').value;
+        const disposition = document.getElementById('ws-disp-action-val').value;
+        const remarks = document.getElementById('ws-disp-remarks').value.trim();
+        const fDate = document.getElementById('ws-disp-date').value;
+        const fTime = document.getElementById('ws-disp-time').value;
+
+        const formData = new FormData();
+        formData.append('action', 'update_disposition');
+        formData.append('lead_id', leadId);
+        formData.append('disposition', disposition);
+        formData.append('remarks', remarks);
+        formData.append('followup_date', fDate);
+        formData.append('followup_time', fTime);
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            this.closeModal('ws-disposition-modal');
+            // Refresh workspace table
+            this.renderWorkspace();
+        } else {
+            alert(data.message || 'Error updating disposition');
+        }
+    },
+
+    // 3. PREMIUM VIEW LEAD DETAIL MODAL (Fields hidden if empty)
+    openWorkspaceLeadModal: async function(leadId) {
+        const modal = document.getElementById('ws-view-lead-modal');
+        const contentBox = document.getElementById('ws-view-lead-content');
+        if (!modal || !contentBox) return;
+
+        contentBox.innerHTML = '<div style="padding:40px; text-align:center; color:#64748b;">Loading lead details...</div>';
+        this.openModal('ws-view-lead-modal');
+
+        const res = await fetch(`api/leads?action=detail&id=${leadId}`);
+        const data = await res.json();
+        if (!data.success || !data.data || !data.data.lead) {
+            contentBox.innerHTML = '<div style="padding:40px; text-align:center; color:#ef4444;">Could not load lead information.</div>';
+            return;
+        }
+
+        const l = data.data.lead;
+        const calls = data.data.calls || [];
+        const cleanPhone = (l.mobile || '').replace(/[^0-9]/g, '');
+
+        // Array of optional fields: if empty, hide field and label completely
+        const candidateFields = [
+            { label: 'Lead Code', value: l.lead_code },
+            { label: 'Status', value: l.status_name },
+            { label: 'Alternate Mobile', value: l.alternate_mobile },
+            { label: 'Email Address', value: l.email },
+            { label: 'Company Name', value: l.company_name },
+            { label: 'City / Location', value: [l.city, l.state, l.location].filter(Boolean).join(', ') },
+            { label: 'Industry', value: l.industry },
+            { label: 'Lead Source', value: l.source_name },
+            { label: 'Service Interested', value: l.service_name },
+            { label: 'Priority', value: l.priority },
+            { label: 'Lead Type', value: l.lead_type },
+            { label: 'Assigned Executive', value: l.executive_name },
+            { label: 'Assigned Manager', value: l.manager_name },
+            { label: 'Scheduled Follow-up', value: l.next_followup_at },
+            { label: 'Last Contacted', value: l.last_contacted_at },
+            { label: 'Initial Remarks', value: l.initial_remark }
+        ];
+
+        // Filter out empty / null / blank fields
+        const validFields = candidateFields.filter(f => f.value && String(f.value).trim() !== '' && String(f.value).trim() !== 'null');
+
+        contentBox.innerHTML = `
+            <div class="lead-modal-header">
+                <button type="button" class="close-modal" style="position:absolute; top:20px; right:24px; color:#ffffff; font-size:20px;" onclick="App.closeModal('ws-view-lead-modal')">✕</button>
+                <div style="font-size:12px; font-weight:800; color:#60a5fa; text-transform:uppercase; letter-spacing:1px;">Lead Details</div>
+                <div style="font-size:24px; font-weight:800; color:#ffffff; margin-top:2px;">${l.name}</div>
+                
+                <!-- Highly Visible Large Phone Number -->
+                <div class="lead-modal-phone-display">
+                    <span>📞 ${l.mobile}</span>
+                </div>
+
+                <!-- Prominent Quick Action Buttons -->
+                <div class="lead-modal-actions">
+                    <button type="button" class="btn-call-lg" onclick="App.closeModal('ws-view-lead-modal'); App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        Call Now
+                    </button>
+                    <a href="https://wa.me/91${cleanPhone}" target="_blank" class="btn-whatsapp-lg">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                        WhatsApp
+                    </a>
+                    <button type="button" class="btn btn-secondary" style="font-weight:700;" onclick="App.closeModal('ws-view-lead-modal'); App.openDispositionModal(${l.id})">
+                        Update Disposition
+                    </button>
+                </div>
+            </div>
+
+            <!-- Structured Fields (Only non-empty fields shown) -->
+            <div class="lead-detail-grid">
+                ${validFields.map(f => `
+                    <div class="lead-field-item">
+                        <div class="lead-field-label">${f.label}</div>
+                        <div class="lead-field-val">${f.value}</div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Recent Action Logs in modal -->
+            ${calls.length > 0 ? `
+                <div style="padding:0 28px 24px;">
+                    <div style="font-size:13px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:10px; border-top:1px solid #f1f5f9; padding-top:16px;">
+                        Recent Action Logs (${calls.length})
+                    </div>
+                    <div style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+                        ${calls.slice(0, 5).map(c => `
+                            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <strong style="color:#0f172a;">${c.outcome_name || 'Call Logged'}</strong> &bull; <span style="color:#64748b;">${c.agent_name}</span>
+                                    ${c.remarks ? `<div style="color:#475569; margin-top:2px;">${c.remarks}</div>` : ''}
+                                </div>
+                                <span style="color:#94a3b8; font-size:11px;">${(c.called_at || '').replace(/:\d\d$/, '')}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        `;
     },
 
     // 2. LEADS MODULE

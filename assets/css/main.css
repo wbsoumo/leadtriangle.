@@ -1007,3 +1007,274 @@ svg {
         font-size: 12.5px !important;
     }
 }
+
+/* ==========================================================================
+   WORKSPACE GOOGLE SHEETS-STYLE SPREADSHEET TABLE SYSTEM
+   ========================================================================== */
+.workspace-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: 100%;
+}
+
+.workspace-toolbar {
+    background: #ffffff;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.workspace-filters-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.workspace-table-container {
+    background: #ffffff;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    overflow: auto;
+    position: relative;
+    max-height: calc(100vh - 290px);
+    min-height: 380px;
+}
+
+.workspace-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.workspace-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    font-weight: 700;
+    font-size: 11.5px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 10px 14px;
+    border-bottom: 2px solid #cbd5e1;
+    border-right: 1px solid #e2e8f0;
+    user-select: none;
+}
+
+.workspace-grid thead th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 30;
+    background: #e2e8f0 !important;
+}
+
+.workspace-grid tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #f1f5f9;
+    vertical-align: middle;
+    color: #1e293b;
+    font-size: 13px;
+    transition: background-color 0.15s ease;
+}
+
+.workspace-grid tbody tr:hover td {
+    filter: brightness(0.97);
+}
+
+.workspace-grid tbody td.sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: inherit;
+    border-right: 2px solid #e2e8f0;
+}
+
+/* Preset Row Color Highlights (Google Sheets Style) */
+.workspace-row-color-blue   { background-color: #eff6ff !important; }
+.workspace-row-color-green  { background-color: #f0fdf4 !important; }
+.workspace-row-color-amber  { background-color: #fefce8 !important; }
+.workspace-row-color-yellow { background-color: #fef9c3 !important; }
+.workspace-row-color-orange { background-color: #fff7ed !important; }
+.workspace-row-color-red    { background-color: #fef2f2 !important; }
+.workspace-row-color-purple { background-color: #faf5ff !important; }
+.workspace-row-color-gray   { background-color: #f8fafc !important; }
+
+/* Status indicators */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+    border: 1px solid transparent;
+}
+
+.status-pill.status-New              { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.status-pill.status-Connected        { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.status-pill.status-Not-Interested   { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
+.status-pill.status-Follow-up-Needed { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.status-pill.status-Ringing          { background: #fefce8; color: #a16207; border-color: #fef08a; }
+.status-pill.status-Not-Responding   { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+.status-pill.status-Invalid-Number   { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.status-pill.status-Calling          { background: #ecfeff; color: #0e7490; border-color: #a5f3fc; }
+
+.status-indicator-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Color picker popover */
+.color-picker-dropdown {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 4px 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.color-swatch-btn {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.15);
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+
+.color-swatch-btn:hover {
+    transform: scale(1.2);
+}
+
+/* Modal Custom styling for Lead Detail */
+.lead-modal-panel {
+    background: #ffffff;
+    border-radius: 20px;
+    max-width: 680px;
+    width: 100%;
+    box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25);
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.lead-modal-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #ffffff;
+    padding: 24px 28px;
+    position: relative;
+}
+
+.lead-modal-phone-display {
+    font-size: 28px;
+    font-weight: 800;
+    color: #ffffff;
+    font-family: 'Space Grotesk', 'Inter', monospace;
+    letter-spacing: 0.5px;
+    margin: 6px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.lead-modal-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-call-lg {
+    background: #2563eb;
+    color: #ffffff !important;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 10px 22px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    transition: all 0.2s;
+}
+
+.btn-call-lg:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+.btn-whatsapp-lg {
+    background: #16a34a;
+    color: #ffffff !important;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 10px 22px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
+    transition: all 0.2s;
+}
+
+.btn-whatsapp-lg:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+}
+
+.lead-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 24px 28px;
+    background: #ffffff;
+}
+
+.lead-field-item {
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+
+.lead-field-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+}
+
+.lead-field-val {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+}
+

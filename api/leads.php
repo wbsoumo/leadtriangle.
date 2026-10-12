@@ -17,6 +17,54 @@ $userId = $_SESSION['user_id'];
 $roleName = $_SESSION['role_name'];
 $teamId = $_SESSION['team_id'];
 
+// Auto-migration: ensure row_color column exists on leads table
+try {
+    $pdo->exec("ALTER TABLE leads ADD COLUMN row_color VARCHAR(30) NULL DEFAULT NULL AFTER status_id");
+} catch (Exception $e) {}
+
+// Auto-migration: ensure standard status values exist in lead_statuses
+try {
+    $standardStatuses = [
+        ['New', '#3B82F6'],
+        ['Connected', '#10B981'],
+        ['Not Interested', '#6B7280'],
+        ['Follow-up Needed', '#F59E0B'],
+        ['Ringing', '#EAB308'],
+        ['Not Responding', '#F97316'],
+        ['Invalid Number', '#EF4444'],
+        ['Calling', '#06B6D4']
+    ];
+    $checkStatus = $pdo->prepare("SELECT id FROM lead_statuses WHERE name = :nm");
+    $insertStatus = $pdo->prepare("INSERT INTO lead_statuses (name, color_code, is_system) VALUES (:nm, :col, 1)");
+    foreach ($standardStatuses as $st) {
+        $checkStatus->execute(['nm' => $st[0]]);
+        if (!$checkStatus->fetch()) {
+            $insertStatus->execute(['nm' => $st[0], 'col' => $st[1]]);
+        }
+    }
+} catch (Exception $e) {}
+
+// Auto-migration: ensure call outcomes exist in call_outcomes
+try {
+    $standardOutcomes = [
+        ['Call Connected', 'connected', '#10B981'],
+        ['Calling', 'connected', '#06B6D4'],
+        ['Not Interested', 'connected', '#6B7280'],
+        ['Ringing', 'not_connected', '#EAB308'],
+        ['Not Responding', 'not_connected', '#F97316'],
+        ['Invalid Number', 'unreachable', '#EF4444'],
+        ['Follow-up Needed', 'connected', '#F59E0B']
+    ];
+    $checkOutcome = $pdo->prepare("SELECT id FROM call_outcomes WHERE name = :nm");
+    $insertOutcome = $pdo->prepare("INSERT INTO call_outcomes (name, category, color_code) VALUES (:nm, :cat, :col)");
+    foreach ($standardOutcomes as $oc) {
+        $checkOutcome->execute(['nm' => $oc[0]]);
+        if (!$checkOutcome->fetch()) {
+            $insertOutcome->execute(['nm' => $oc[0], 'cat' => $oc[1], 'col' => $oc[2]]);
+        }
+    }
+} catch (Exception $e) {}
+
 // Check raw JSON body if $_GET or $_POST action is empty
 $rawInputData = null;
 if (empty($_GET['action']) && empty($_POST['action'])) {
@@ -113,11 +161,66 @@ if ($action === 'list') {
         $where[] = "l.is_qualified = :is_qualified";
         $params['is_qualified'] = (int)$isQualified;
     }
+    
+    // Additional workspace filters
+    $rowColor = trim($_GET['row_color'] ?? '');
+    if (!empty($rowColor)) {
+        if ($rowColor === 'default' || $rowColor === 'none') {
+            $where[] = "(l.row_color IS NULL OR l.row_color = '')";
+        } else {
+            $where[] = "l.row_color = :row_color";
+            $params['row_color'] = $rowColor;
+        }
+    }
+
+    $followupDate = trim($_GET['followup_date'] ?? '');
+    if (!empty($followupDate)) {
+        if ($followupDate === 'today') {
+            $where[] = "DATE(l.next_followup_at) = CURDATE()";
+        } elseif ($followupDate === 'upcoming') {
+            $where[] = "DATE(l.next_followup_at) > CURDATE()";
+        } elseif ($followupDate === 'overdue') {
+            $where[] = "(DATE(l.next_followup_at) < CURDATE() AND l.next_followup_at IS NOT NULL)";
+        } elseif ($followupDate === 'has_followup') {
+            $where[] = "l.next_followup_at IS NOT NULL";
+        } else {
+            $where[] = "DATE(l.next_followup_at) = :followup_date";
+            $params['followup_date'] = $followupDate;
+        }
+    }
+
+    // Specific Status Name Filter (e.g. 'New', 'Connected', 'Not Interested', 'Ringing', 'Not Responding', 'Invalid Number', 'Follow-up Needed', 'Calling')
+    $statusName = trim($_GET['status_name'] ?? '');
+    if (!empty($statusName)) {
+        $where[] = "ls.name = :status_name";
+        $params['status_name'] = $statusName;
+    }
+
+    // Unconnected Filter
+    if ($filter === 'unconnected') {
+        $where[] = "(l.status_id = 1 OR ls.name IN ('New', 'Pending', 'Unconnected', 'Switched Off', 'Not Reachable', 'Ringing', 'Not Responding', 'Busy') OR (SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0)";
+    }
+
     if ($callingQueue === '1') {
         if ($filter !== 'called' && $filter !== 'all' && empty($statusId)) {
             $where[] = "(DATE(l.next_followup_at) = CURDATE() OR l.status_id IN (1, 2, 3, 4, 6))";
         }
     }
+
+    // Sorting
+    $sortBy = $_GET['sort_by'] ?? 'id';
+    $sortOrder = strtoupper($_GET['sort_order'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
+    $allowedSort = [
+        'id' => 'l.id',
+        'name' => 'l.name',
+        'mobile' => 'l.mobile',
+        'company' => 'l.company_name',
+        'status' => 'ls.name',
+        'created_at' => 'l.created_at',
+        'next_followup' => 'l.next_followup_at',
+        'last_contacted' => 'l.last_contacted_at'
+    ];
+    $orderByClause = $allowedSort[$sortBy] ?? 'l.id';
 
     $whereClause = "WHERE " . implode(" AND ", $where);
 
@@ -146,7 +249,7 @@ if ($action === 'list') {
         LEFT JOIN users u_exec ON l.assigned_executive_id = u_exec.id
         LEFT JOIN users u_mgr ON l.assigned_manager_id = u_mgr.id
         $whereClause
-        ORDER BY l.id DESC
+        ORDER BY $orderByClause $sortOrder
         LIMIT :limit OFFSET :offset
     ";
 
@@ -436,6 +539,161 @@ if ($action === 'add_note') {
     $stmt->execute(['lid' => $leadId, 'uid' => $userId, 'txt' => $noteText]);
 
     echo json_encode(['success' => true, 'message' => 'Note saved successfully!']);
+    exit;
+}
+
+// 4d. UPDATE ROW COLOR (Google Sheets Style)
+if ($action === 'update_row_color') {
+    $leadId = (int)($_POST['lead_id'] ?? ($rawInputData['lead_id'] ?? 0));
+    $rowColor = trim($_POST['row_color'] ?? ($rawInputData['row_color'] ?? ''));
+
+    if (!$leadId) {
+        echo json_encode(['success' => false, 'message' => 'Lead ID required']);
+        exit;
+    }
+
+    $colorVal = empty($rowColor) || $rowColor === 'default' ? null : $rowColor;
+    $stmt = $pdo->prepare("UPDATE leads SET row_color = :col WHERE id = :id");
+    $stmt->execute(['col' => $colorVal, 'id' => $leadId]);
+
+    echo json_encode(['success' => true, 'message' => 'Row color updated successfully', 'row_color' => $colorVal]);
+    exit;
+}
+
+// 4e. UPDATE DISPOSITION & AUTOMATIC STATUS (Workspace Fast Action)
+if ($action === 'update_disposition') {
+    $leadId = (int)($_POST['lead_id'] ?? ($rawInputData['lead_id'] ?? 0));
+    $disposition = trim($_POST['disposition'] ?? ($rawInputData['disposition'] ?? ''));
+    $remarks = trim($_POST['remarks'] ?? ($rawInputData['remarks'] ?? ''));
+    $followupDate = trim($_POST['followup_date'] ?? ($rawInputData['followup_date'] ?? ''));
+    $followupTime = trim($_POST['followup_time'] ?? ($rawInputData['followup_time'] ?? ''));
+    $customRowColor = trim($_POST['row_color'] ?? ($rawInputData['row_color'] ?? ''));
+
+    if (!$leadId || empty($disposition)) {
+        echo json_encode(['success' => false, 'message' => 'Lead ID and Disposition action are required']);
+        exit;
+    }
+
+    // Mapping dispositions to lead status names and colors
+    // Supported: Calling, Call Connected, Not Interested, Ringing, Not Responding, Invalid Number, Follow-up Needed
+    $statusMap = [
+        'Calling'          => ['name' => 'Calling',          'color' => '#06B6D4'],
+        'Call Connected'   => ['name' => 'Connected',        'color' => '#10B981'],
+        'Connected'        => ['name' => 'Connected',        'color' => '#10B981'],
+        'Not Interested'   => ['name' => 'Not Interested',   'color' => '#6B7280'],
+        'Ringing'          => ['name' => 'Ringing',          'color' => '#EAB308'],
+        'Not Responding'   => ['name' => 'Not Responding',   'color' => '#F97316'],
+        'Invalid Number'   => ['name' => 'Invalid Number',   'color' => '#EF4444'],
+        'Follow-up Needed' => ['name' => 'Follow-up Needed', 'color' => '#F59E0B'],
+        'New'              => ['name' => 'New',              'color' => '#3B82F6']
+    ];
+
+    $matched = $statusMap[$disposition] ?? ['name' => 'Contacted', 'color' => '#10B981'];
+    $statusName = $matched['name'];
+    $autoColor = !empty($customRowColor) ? $customRowColor : $matched['color'];
+
+    // Retrieve or create status_id
+    $stStmt = $pdo->prepare("SELECT id FROM lead_statuses WHERE name = :nm LIMIT 1");
+    $stStmt->execute(['nm' => $statusName]);
+    $stRow = $stStmt->fetch();
+    if ($stRow) {
+        $newStatusId = (int)$stRow['id'];
+    } else {
+        $insertSt = $pdo->prepare("INSERT INTO lead_statuses (name, color_code, is_system) VALUES (:nm, :col, 1)");
+        $insertSt->execute(['nm' => $statusName, 'col' => $matched['color']]);
+        $newStatusId = (int)$pdo->lastInsertId();
+    }
+
+    // Retrieve or create call outcome
+    $ocStmt = $pdo->prepare("SELECT id FROM call_outcomes WHERE name = :nm LIMIT 1");
+    $ocStmt->execute(['nm' => $disposition]);
+    $ocRow = $ocStmt->fetch();
+    if ($ocRow) {
+        $outcomeId = (int)$ocRow['id'];
+    } else {
+        $category = in_array($disposition, ['Call Connected', 'Connected']) ? 'connected' : (in_array($disposition, ['Ringing', 'Not Responding']) ? 'not_connected' : 'unreachable');
+        $insertOc = $pdo->prepare("INSERT INTO call_outcomes (name, category, color_code) VALUES (:nm, :cat, :col)");
+        $insertOc->execute(['nm' => $disposition, 'cat' => $category, 'col' => $matched['color']]);
+        $outcomeId = (int)$pdo->lastInsertId();
+    }
+
+    // Record Call Log / Action History
+    $callLogStmt = $pdo->prepare("
+        INSERT INTO call_logs (lead_id, user_id, call_outcome_id, call_duration_seconds, remarks, called_at)
+        VALUES (:lid, :uid, :oid, 0, :rem, NOW())
+    ");
+    $callLogStmt->execute([
+        'lid' => $leadId,
+        'uid' => $userId,
+        'oid' => $outcomeId,
+        'rem' => !empty($remarks) ? $remarks : "Disposition: $disposition"
+    ]);
+
+    // Handle Follow-up scheduling if Follow-up Needed
+    $nextFollowupAt = null;
+    if ($disposition === 'Follow-up Needed' && !empty($followupDate)) {
+        $fTime = !empty($followupTime) ? $followupTime : '10:00:00';
+        $nextFollowupAt = "$followupDate $fTime";
+
+        $fuStmt = $pdo->prepare("
+            INSERT INTO followups (lead_id, user_id, followup_date, followup_time, purpose, notes, status, created_at)
+            VALUES (:lid, :uid, :fdate, :ftime, :purpose, :notes, 'Pending', NOW())
+        ");
+        $fuStmt->execute([
+            'lid' => $leadId,
+            'uid' => $userId,
+            'fdate' => $followupDate,
+            'ftime' => $fTime,
+            'purpose' => 'Follow-up Needed',
+            'notes' => $remarks
+        ]);
+    }
+
+    // Update Lead Record
+    if ($nextFollowupAt) {
+        $updLead = $pdo->prepare("
+            UPDATE leads 
+            SET status_id = :st, row_color = :col, last_contacted_at = NOW(), next_followup_at = :nfu 
+            WHERE id = :id
+        ");
+        $updLead->execute([
+            'st'  => $newStatusId,
+            'col' => $autoColor,
+            'nfu' => $nextFollowupAt,
+            'id'  => $leadId
+        ]);
+    } else {
+        $updLead = $pdo->prepare("
+            UPDATE leads 
+            SET status_id = :st, row_color = :col, last_contacted_at = NOW() 
+            WHERE id = :id
+        ");
+        $updLead->execute([
+            'st'  => $newStatusId,
+            'col' => $autoColor,
+            'id'  => $leadId
+        ]);
+    }
+
+    logActivity($pdo, 'leads', 'disposition_updated', $leadId, null, [
+        'disposition' => $disposition,
+        'status' => $statusName,
+        'remarks' => $remarks,
+        'row_color' => $autoColor
+    ]);
+
+    echo json_encode([
+        'success' => true,
+        'message' => "Lead updated to $disposition successfully!",
+        'data' => [
+            'lead_id' => $leadId,
+            'disposition' => $disposition,
+            'status_name' => $statusName,
+            'status_color' => $matched['color'],
+            'row_color' => $autoColor,
+            'next_followup_at' => $nextFollowupAt
+        ]
+    ]);
     exit;
 }
 

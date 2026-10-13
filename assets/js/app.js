@@ -1307,7 +1307,7 @@ const App = {
         const data = await res.json();
         if (data.success) {
             alert('Lead assigned successfully!');
-            this.openWorkspaceLeadModal(leadId, 'reassign');
+            this.openWorkspaceLeadModal(leadId, 'details');
             if (this.currentView === 'workspace' || !this.currentView) {
                 this.renderWorkspace();
             }
@@ -1316,8 +1316,9 @@ const App = {
         }
     },
 
-    // 3. PREMIUM VIEW LEAD DETAIL MODAL (With 4 Organized Tabs: Details, Activity, Remarks, Assign)
+    // 3. PREMIUM VIEW LEAD DETAIL MODAL
     openWorkspaceLeadModal: async function(leadId, defaultTab = 'details') {
+        if (defaultTab === 'reassign') defaultTab = 'details';
         const modal = document.getElementById('ws-view-lead-modal');
         const contentBox = document.getElementById('ws-view-lead-content');
         if (!modal || !contentBox) return;
@@ -1439,10 +1440,6 @@ const App = {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                     Remarks &amp; Notes <span class="lead-tab-count">${notes.length}</span>
                 </button>
-                <button type="button" class="lead-modal-tab-btn ${defaultTab === 'reassign' ? 'active' : ''}" id="tab-btn-reassign" onclick="App.switchLeadModalTab('reassign')">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                    Assign &amp; Team
-                </button>
             </div>
 
             <!-- TAB CONTENT CONTAINER (SCROLLABLE) -->
@@ -1482,6 +1479,14 @@ const App = {
                             <div class="lead-data-pill">
                                 <div class="lead-pill-label">Priority Level</div>
                                 <div class="lead-pill-value">${l.priority || 'Medium'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Assigned Executive</div>
+                                <div class="lead-pill-value">${l.executive_name || 'Unassigned'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Reporting Manager</div>
+                                <div class="lead-pill-value">${l.manager_name || 'General Management'}</div>
                             </div>
                             <div class="lead-data-pill">
                                 <div class="lead-pill-label">Last Contacted Timestamp</div>
@@ -1773,50 +1778,6 @@ const App = {
                             </div>
                         ` : ''}
                     </div>
-                </div>
-
-                <!-- TAB 6: ASSIGN & TEAM HANDOVER -->
-                <div class="lead-modal-tab-content" id="tab-content-reassign" style="${defaultTab === 'reassign' ? 'display:block;' : 'display:none;'}">
-                    <div style="margin-bottom:16px;">
-                        <div style="font-size:14px; font-weight:800; color:#0f172a;">Lead Assignment &amp; Team Handover</div>
-                        <div style="font-size:12px; color:#64748b;">All activities, call logs, and remarks remain permanently attached when transferring this lead</div>
-                    </div>
-
-                    <!-- Current Assigned Details -->
-                    <div class="lead-assign-grid">
-                        <div class="lead-assign-card">
-                            <div style="font-size:10.5px; font-weight:700; color:#64748b; text-transform:uppercase;">Current Calling Executive</div>
-                            <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:3px;">${l.executive_name || '<span style="color:#ef4444;">Unassigned</span>'}</div>
-                        </div>
-                        <div class="lead-assign-card">
-                            <div style="font-size:10.5px; font-weight:700; color:#64748b; text-transform:uppercase;">Reporting Manager</div>
-                            <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:3px;">${l.manager_name || 'General Management'}</div>
-                        </div>
-                    </div>
-
-                    <!-- Reassign Form -->
-                    <form onsubmit="App.submitReassignLead(event, ${l.id})" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:18px;">
-                        <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:12px;">Transfer Lead Ownership</div>
-                        
-                        <div style="margin-bottom:14px;">
-                            <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Select Calling Executive *</label>
-                            <select id="popup-reassign-exec" required class="filter-select" style="width:100%; font-size:13px; font-weight:700; padding:10px; border-radius:8px;">
-                                <option value="">-- Choose Executive --</option>
-                                ${executives.map(e => `
-                                    <option value="${e.id}" ${e.id == l.assigned_executive_id ? 'selected' : ''}>${e.name} (${e.email || 'Executive'})</option>
-                                `).join('')}
-                            </select>
-                        </div>
-
-                        <div style="margin-bottom:16px;">
-                            <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Handover Reason / Instructions (Optional)</label>
-                            <textarea id="popup-reassign-reason" class="filter-input" style="width:100%; height:65px; padding:10px; font-size:13px; border-radius:8px;" placeholder="Reason for transfer or special instructions for the new executive..."></textarea>
-                        </div>
-
-                        <div style="display:flex; justify-content:flex-end;">
-                            <button type="submit" class="btn btn-primary" style="font-weight:700; padding:9px 22px; border-radius:8px;">Confirm &amp; Transfer Lead &rarr;</button>
-                        </div>
-                    </form>
                 </div>
 
             </div>

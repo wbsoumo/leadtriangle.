@@ -17,7 +17,7 @@ if (empty($_SESSION['user_id'])) {
     <link rel="icon" type="image/png" href="assets/images/logo.png">
     <link rel="shortcut icon" type="image/png" href="assets/images/logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/main.css?v=<?= @filemtime('assets/css/main.css') ?: time() ?>">
 </head>
 <body>
 
@@ -151,6 +151,6 @@ if (empty($_SESSION['user_id'])) {
     </main>
 </div>
 
-<script src="assets/js/app.js"></script>
+<script src="assets/js/app.js?v=<?= @filemtime('assets/js/app.js') ?: time() ?>"></script>
 </body>
 </html>

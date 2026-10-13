@@ -1402,7 +1402,7 @@ const App = {
                     </div>
                 </div>
 
-                <div style="font-size:23px; font-weight:800; color:#ffffff; margin-top:2px;">${l.name}</div>
+                <div class="lead-modal-title">${l.name}</div>
                 
                 <!-- Large Phone Number -->
                 <div class="lead-modal-phone-display">
@@ -1444,8 +1444,8 @@ const App = {
                 <!-- TAB 1: LEAD DETAILS -->
                 <div class="lead-modal-tab-content" id="tab-content-details" style="${defaultTab === 'details' ? 'display:block;' : 'display:none;'}">
                     <!-- Quick Action & Disposition Banner inside Details -->
-                    <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:16px 20px;">
-                        <div style="font-size:11.5px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">
+                    <div class="lead-disposition-banner">
+                        <div style="font-size:11px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
                             ⚡ Update Disposition &amp; Next Action
                         </div>
                         <form id="popup-disp-form" onsubmit="App.submitWorkspaceDisposition(event, ${l.id})">
@@ -1493,7 +1493,7 @@ const App = {
                     <!-- Structured Lead Fields Grid -->
                     <div class="lead-detail-grid">
                         ${validFields.map(f => `
-                            <div class="lead-field-item">
+                            <div class="lead-field-item ${f.label === 'Initial Requirement' ? 'lead-field-full' : ''}">
                                 <div class="lead-field-label">${f.label}</div>
                                 <div class="lead-field-val">${f.value}</div>
                             </div>
@@ -1502,7 +1502,7 @@ const App = {
                 </div>
 
                 <!-- TAB 2: ACTIVITY & CALLS -->
-                <div class="lead-modal-tab-content" id="tab-content-activity" style="${defaultTab === 'activity' ? 'display:block;' : 'display:none;'} padding:22px 26px;">
+                <div class="lead-modal-tab-content" id="tab-content-activity" style="${defaultTab === 'activity' ? 'display:block;' : 'display:none;'}">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                         <div>
                             <div style="font-size:14px; font-weight:800; color:#0f172a;">Call Logs &amp; Activity Trail</div>
@@ -1555,7 +1555,7 @@ const App = {
                 </div>
 
                 <!-- TAB 3: REMARKS & PERSISTENT NOTES -->
-                <div class="lead-modal-tab-content" id="tab-content-remarks" style="${defaultTab === 'remarks' ? 'display:block;' : 'display:none;'} padding:22px 26px;">
+                <div class="lead-modal-tab-content" id="tab-content-remarks" style="${defaultTab === 'remarks' ? 'display:block;' : 'display:none;'}">
                     <div style="margin-bottom:16px;">
                         <div style="font-size:14px; font-weight:800; color:#0f172a;">Lead Remarks &amp; Internal Notes</div>
                         <div style="font-size:12px; color:#64748b;">Add detailed remarks, deal context, or handover instructions that will be permanently stored for this lead</div>
@@ -1601,7 +1601,7 @@ const App = {
                 </div>
 
                 <!-- TAB 4: ASSIGN & TEAM HANDOVER -->
-                <div class="lead-modal-tab-content" id="tab-content-reassign" style="${defaultTab === 'reassign' ? 'display:block;' : 'display:none;'} padding:22px 26px;">
+                <div class="lead-modal-tab-content" id="tab-content-reassign" style="${defaultTab === 'reassign' ? 'display:block;' : 'display:none;'}">
                     <div style="margin-bottom:16px;">
                         <div style="font-size:14px; font-weight:800; color:#0f172a;">Lead Assignment &amp; Team Handover</div>
                         <div style="font-size:12px; color:#64748b;">All activities, call logs, and remarks remain intact when assigning this lead to another executive</div>

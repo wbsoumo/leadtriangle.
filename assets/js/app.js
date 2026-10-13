@@ -1374,31 +1374,28 @@ const App = {
         contentBox.innerHTML = `
             <!-- MODAL HEADER -->
             <div class="lead-modal-header">
-                <button type="button" class="close-modal" style="position:absolute; top:18px; right:20px; color:#ffffff; font-size:22px; background:transparent; border:none; cursor:pointer;" onclick="App.closeModal('ws-view-lead-modal')">✕</button>
-                
-                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:11px; font-weight:800; background:rgba(255,255,255,0.15); color:#60a5fa; padding:3px 10px; border-radius:20px; text-transform:uppercase; letter-spacing:0.8px;">
-                            ${l.lead_code || 'LEAD'}
-                        </span>
-                        <span style="font-size:12px; font-weight:700; color:#cbd5e1; background:rgba(255,255,255,0.1); padding:3px 8px; border-radius:12px;">
-                            ${l.status_name || 'New'}
-                        </span>
+                <div class="lead-modal-header-top">
+                    <div class="lead-modal-badges">
+                        <span class="lead-modal-code">${l.lead_code || 'LEAD'}</span>
+                        <span class="lead-modal-status">${l.status_name || 'New'}</span>
                     </div>
 
-                    <!-- Row Color Picker inside popup -->
-                    <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.1); padding:4px 10px; border-radius:20px;">
-                        <span style="font-size:11px; color:#cbd5e1; font-weight:700;">Row Color:</span>
-                        <div style="display:flex; gap:5px; align-items:center;">
-                            <div class="color-swatch-btn" style="background:#eff6ff;" onclick="App.changeLeadRowColor(${l.id}, 'blue')" title="Blue"></div>
-                            <div class="color-swatch-btn" style="background:#f0fdf4;" onclick="App.changeLeadRowColor(${l.id}, 'green')" title="Green"></div>
-                            <div class="color-swatch-btn" style="background:#fefce8;" onclick="App.changeLeadRowColor(${l.id}, 'amber')" title="Amber"></div>
-                            <div class="color-swatch-btn" style="background:#fff7ed;" onclick="App.changeLeadRowColor(${l.id}, 'orange')" title="Orange"></div>
-                            <div class="color-swatch-btn" style="background:#fef2f2;" onclick="App.changeLeadRowColor(${l.id}, 'red')" title="Red"></div>
-                            <div class="color-swatch-btn" style="background:#faf5ff;" onclick="App.changeLeadRowColor(${l.id}, 'purple')" title="Purple"></div>
-                            <div class="color-swatch-btn" style="background:#f8fafc;" onclick="App.changeLeadRowColor(${l.id}, 'gray')" title="Gray"></div>
-                            <div class="color-swatch-btn" style="background:rgba(255,255,255,0.3); border:1px dashed #ffffff; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px;" onclick="App.changeLeadRowColor(${l.id}, 'default')" title="Clear Color">✕</div>
+                    <!-- Row Color Picker & Close Button -->
+                    <div class="lead-modal-header-right">
+                        <div class="lead-modal-color-picker">
+                            <span class="lead-modal-color-lbl">Row Color:</span>
+                            <div class="lead-modal-color-swatches">
+                                <div class="color-swatch-btn" style="background:#eff6ff;" onclick="App.changeLeadRowColor(${l.id}, 'blue')" title="Blue"></div>
+                                <div class="color-swatch-btn" style="background:#f0fdf4;" onclick="App.changeLeadRowColor(${l.id}, 'green')" title="Green"></div>
+                                <div class="color-swatch-btn" style="background:#fefce8;" onclick="App.changeLeadRowColor(${l.id}, 'amber')" title="Amber"></div>
+                                <div class="color-swatch-btn" style="background:#fff7ed;" onclick="App.changeLeadRowColor(${l.id}, 'orange')" title="Orange"></div>
+                                <div class="color-swatch-btn" style="background:#fef2f2;" onclick="App.changeLeadRowColor(${l.id}, 'red')" title="Red"></div>
+                                <div class="color-swatch-btn" style="background:#faf5ff;" onclick="App.changeLeadRowColor(${l.id}, 'purple')" title="Purple"></div>
+                                <div class="color-swatch-btn" style="background:#f8fafc;" onclick="App.changeLeadRowColor(${l.id}, 'gray')" title="Gray"></div>
+                                <div class="color-swatch-btn" style="background:rgba(255,255,255,0.3); border:1px dashed #ffffff; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px;" onclick="App.changeLeadRowColor(${l.id}, 'default')" title="Clear Color">✕</div>
+                            </div>
                         </div>
+                        <button type="button" class="lead-modal-close-btn" onclick="App.closeModal('ws-view-lead-modal')" title="Close">✕</button>
                     </div>
                 </div>
 
@@ -1450,7 +1447,7 @@ const App = {
                         </div>
                         <form id="popup-disp-form" onsubmit="App.submitWorkspaceDisposition(event, ${l.id})">
                             <input type="hidden" id="popup-disp-lead-id" value="${l.id}">
-                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-bottom:10px;">
+                            <div class="lead-disp-form-grid">
                                 <div>
                                     <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Action / Call Outcome *</label>
                                     <select id="popup-disp-action-val" required class="filter-select" style="width:100%; font-weight:700; padding:8px 10px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;" onchange="App.onDispositionActionChange(this.value, 'popup-disp-')">
@@ -1472,7 +1469,7 @@ const App = {
                             <!-- Follow-up fields container -->
                             <div id="popup-fu-fields-group" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px; margin-bottom:12px;">
                                 <div style="font-size:11px; font-weight:800; color:#b45309; margin-bottom:6px;">📅 Schedule Follow-up Callback</div>
-                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
+                                <div class="lead-fu-form-grid">
                                     <div>
                                         <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Date *</label>
                                         <input type="date" id="popup-disp-date" class="filter-input" style="width:100%;" value="${tomorrowStr}">
@@ -1608,7 +1605,7 @@ const App = {
                     </div>
 
                     <!-- Current Assigned Details -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+                    <div class="lead-assign-summary-grid">
                         <div>
                             <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Current Executive</div>
                             <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">${l.executive_name || '<span style="color:#ef4444;">Unassigned</span>'}</div>
@@ -1620,7 +1617,7 @@ const App = {
                     </div>
 
                     <!-- Reassign Form -->
-                    <form onsubmit="App.submitReassignLead(event, ${l.id})" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:14px; padding:18px;">
+                    <form onsubmit="App.submitReassignLead(event, ${l.id})" class="lead-reassign-form">
                         <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:12px;">Transfer Lead Ownership</div>
                         
                         <div style="margin-bottom:14px;">

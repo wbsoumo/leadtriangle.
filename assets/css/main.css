@@ -1171,26 +1171,142 @@ svg {
 }
 
 /* Modal Custom styling for Lead Detail */
+.lead-modal-panel,
+.lead-modal-panel *,
+.lead-modal-panel *::before,
+.lead-modal-panel *::after {
+    box-sizing: border-box;
+}
+
+/* Modal Backdrop Centering & Spacing (Desktop default) */
+#ws-view-lead-modal.modal-backdrop {
+    padding: 24px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* Modal Panel (Desktop default: centered, clean two-column layout) */
 .lead-modal-panel {
     background: #ffffff;
     border-radius: 18px;
-    max-width: 760px;
+    max-width: 780px;
     width: 100%;
-    max-height: calc(100vh - 32px);
+    max-height: min(90vh, 880px);
     margin: auto;
     box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35);
     overflow: hidden;
     border: 1px solid #cbd5e1;
     display: flex;
     flex-direction: column;
+    position: relative;
+    transform: scale(0.98);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
 }
 
+.modal-backdrop.show .lead-modal-panel {
+    transform: scale(1);
+}
+
+/* Header */
 .lead-modal-header {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     color: #ffffff;
     padding: 16px 20px 14px;
     position: relative;
     flex-shrink: 0;
+    width: 100%;
+}
+
+.lead-modal-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+    width: 100%;
+}
+
+.lead-modal-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.lead-modal-code {
+    font-size: 11px;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.15);
+    color: #60a5fa;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    white-space: nowrap;
+}
+
+.lead-modal-status {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 3px 9px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.lead-modal-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.lead-modal-color-picker {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.lead-modal-color-lbl {
+    font-size: 11px;
+    color: #cbd5e1;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.lead-modal-color-swatches {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.lead-modal-close-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.lead-modal-close-btn:hover {
+    background: rgba(255, 255, 255, 0.28);
+    transform: scale(1.06);
 }
 
 .lead-modal-title {
@@ -1199,10 +1315,12 @@ svg {
     color: #ffffff;
     margin-top: 2px;
     line-height: 1.25;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .lead-modal-phone-display {
-    font-size: 22px;
+    font-size: 21px;
     font-weight: 800;
     color: #ffffff;
     font-family: 'Space Grotesk', 'Inter', monospace;
@@ -1210,31 +1328,39 @@ svg {
     margin: 4px 0 10px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     word-break: break-all;
+    overflow-wrap: break-word;
 }
 
 .lead-modal-actions {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    width: 100%;
 }
 
-.btn-call-lg {
-    background: #2563eb;
-    color: #ffffff !important;
+.btn-call-lg,
+.btn-whatsapp-lg {
     font-size: 13.5px;
     font-weight: 700;
     padding: 8px 18px;
     border-radius: 9px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 7px;
     text-decoration: none;
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
     transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-call-lg {
+    background: #2563eb;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
 }
 
 .btn-call-lg:hover {
@@ -1245,18 +1371,7 @@ svg {
 .btn-whatsapp-lg {
     background: #16a34a;
     color: #ffffff !important;
-    font-size: 13.5px;
-    font-weight: 700;
-    padding: 8px 18px;
-    border-radius: 9px;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    text-decoration: none;
-    border: none;
-    cursor: pointer;
     box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
-    transition: all 0.2s;
 }
 
 .btn-whatsapp-lg:hover {
@@ -1264,24 +1379,23 @@ svg {
     transform: translateY(-1px);
 }
 
-/* Tabs Navigation in Lead Popup */
+/* Tabs Bar */
 .lead-modal-tabs-bar {
     display: flex;
     background: #f1f5f9;
     border-bottom: 1px solid #e2e8f0;
-    padding: 6px 12px 0;
+    padding: 6px 14px 0;
     gap: 4px;
     flex-shrink: 0;
     overflow-x: auto;
+    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: 100%;
 }
 
 .lead-modal-tabs-bar::-webkit-scrollbar {
-    height: 4px;
-}
-.lead-modal-tabs-bar::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
+    display: none;
 }
 
 .lead-modal-tab-btn {
@@ -1313,38 +1427,67 @@ svg {
     box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.04);
 }
 
+/* Modal Body Scroll Container */
 .lead-modal-body-scroll {
     overflow-y: auto;
+    overflow-x: hidden;
     flex: 1;
+    min-height: 0;
     background: #ffffff;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    width: 100%;
 }
 
+/* Modal Tab Panes */
 .lead-modal-tab-content {
     padding: 16px 20px;
+    width: 100%;
+    max-width: 100%;
 }
 
+/* Tab 1 - Disposition Banner & Form Grid */
 .lead-disposition-banner {
     background: #f8fafc;
     border-bottom: 1px solid #e2e8f0;
-    padding: 14px 18px;
+    padding: 14px 20px;
+    width: 100%;
 }
 
+.lead-disp-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+.lead-fu-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    width: 100%;
+}
+
+/* Tab 1 - Detail Cards (Desktop: clean two-column layout) */
 .lead-detail-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 8px 10px;
-    padding: 14px 18px 20px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px 14px;
+    padding: 16px 20px 24px;
     background: #ffffff;
+    width: 100%;
 }
 
 .lead-field-item {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 7px 11px;
     min-width: 0;
+    max-width: 100%;
     overflow-wrap: break-word;
+    word-break: break-word;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1355,76 +1498,182 @@ svg {
 }
 
 .lead-field-label {
-    font-size: 9.5px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     color: #64748b;
     margin-bottom: 2px;
     letter-spacing: 0.4px;
-    line-height: 1.2;
+    line-height: 1.25;
 }
 
 .lead-field-val {
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 600;
     color: #0f172a;
     line-height: 1.35;
     word-break: break-word;
+    overflow-wrap: break-word;
 }
 
-/* Mobile & Small Screens Optimization */
-@media (max-width: 640px) {
-    .modal-backdrop {
-        padding: 8px;
+/* Tab 4 - Assign Summary Grid & Form */
+.lead-assign-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    width: 100%;
+}
+
+.lead-reassign-form {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    padding: 18px;
+    width: 100%;
+}
+
+/* ========================================================
+   TABLETS & MOBILE DEVICES RESPONSIVE BREAKPOINT (<= 1024px)
+   Fit viewport width and height, single-column detail cards,
+   smooth vertical scrolling, no clipping or horizontal overflow.
+   ======================================================== */
+@media (max-width: 1024px) {
+    #ws-view-lead-modal.modal-backdrop {
+        padding: 0;
+        align-items: stretch;
+        justify-content: stretch;
     }
-    .lead-modal-panel {
-        max-height: calc(100vh - 16px);
-        border-radius: 14px;
+
+    #ws-view-lead-modal .lead-modal-panel {
+        width: 100vw;
+        max-width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
+        margin: 0;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        transform: none;
     }
+
     .lead-modal-header {
         padding: 12px 14px 10px;
     }
+
     .lead-modal-title {
-        font-size: 17px;
+        font-size: 18px;
     }
+
     .lead-modal-phone-display {
-        font-size: 19px;
+        font-size: 18px;
         margin: 2px 0 8px;
     }
-    .lead-modal-tab-content {
-        padding: 10px 12px;
+
+    .btn-call-lg,
+    .btn-whatsapp-lg {
+        flex: 1 1 calc(50% - 6px);
+        min-width: 120px;
+        padding: 9px 12px;
+        font-size: 13px;
+        justify-content: center;
     }
-    .lead-disposition-banner {
-        padding: 10px 12px;
+
+    .lead-modal-tabs-bar {
+        padding: 4px 8px 0;
+        gap: 2px;
     }
-    .lead-detail-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 6px 8px;
-        padding: 10px 12px 16px;
-    }
-    .lead-field-item {
-        padding: 5px 8px;
-        border-radius: 6px;
-    }
-    .lead-field-label {
-        font-size: 9px;
-        margin-bottom: 1px;
-    }
-    .lead-field-val {
-        font-size: 11px;
-    }
+
     .lead-modal-tab-btn {
-        padding: 7px 10px;
+        padding: 8px 11px;
         font-size: 11.5px;
     }
-    .lead-modal-tabs-bar {
-        padding: 4px 6px 0;
+
+    .lead-modal-tab-content {
+        padding: 12px 14px;
+    }
+
+    .lead-disposition-banner {
+        padding: 12px 14px;
+    }
+
+    .lead-disp-form-grid,
+    .lead-fu-form-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    /* Single column stack for detail cards on tablets and mobile */
+    .lead-detail-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px 14px 20px;
+    }
+
+    .lead-field-item {
+        padding: 7px 10px;
+        border-radius: 7px;
+    }
+
+    .lead-field-label {
+        font-size: 9.5px;
+    }
+
+    .lead-field-val {
+        font-size: 11.5px;
+    }
+
+    .lead-assign-summary-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .lead-reassign-form {
+        padding: 14px;
     }
 }
 
-@media (max-width: 360px) {
+/* Extra small mobile screens (<= 480px) */
+@media (max-width: 480px) {
+    .lead-modal-header {
+        padding: 10px 12px 8px;
+    }
+
+    .lead-modal-header-top {
+        gap: 6px;
+    }
+
+    .lead-modal-color-lbl {
+        display: none;
+    }
+
+    .lead-modal-title {
+        font-size: 16px;
+    }
+
+    .lead-modal-phone-display {
+        font-size: 17px;
+    }
+
+    .btn-call-lg,
+    .btn-whatsapp-lg {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    .lead-modal-tab-content {
+        padding: 10px 12px;
+    }
+
     .lead-detail-grid {
-        grid-template-columns: 1fr;
+        padding: 10px 12px 16px;
     }
 }
 

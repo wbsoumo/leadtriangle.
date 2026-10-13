@@ -1348,36 +1348,18 @@ const App = {
         today.setDate(today.getDate() + 1);
         const tomorrowStr = today.toISOString().split('T')[0];
 
-        // Array of optional fields: if empty, hide field and label completely
-        const candidateFields = [
-            { label: 'Status', value: l.status_name },
-            { label: 'Lead Code', value: l.lead_code },
-            { label: 'Alternate Mobile', value: l.alternate_mobile },
-            { label: 'Email Address', value: l.email },
-            { label: 'Company Name', value: l.company_name },
-            { label: 'City / Location', value: [l.city, l.state, l.location].filter(Boolean).join(', ') },
-            { label: 'Industry', value: l.industry },
-            { label: 'Lead Source', value: l.source_name },
-            { label: 'Service Interested', value: l.service_name },
-            { label: 'Priority', value: l.priority },
-            { label: 'Lead Type', value: l.lead_type },
-            { label: 'Assigned Executive', value: l.executive_name },
-            { label: 'Assigned Manager', value: l.manager_name },
-            { label: 'Scheduled Follow-up', value: l.next_followup_at },
-            { label: 'Last Contacted', value: l.last_contacted_at },
-            { label: 'Initial Requirement', value: l.initial_remark || l.initial_requirement }
-        ];
-
-        // Filter out empty / null / blank fields
-        const validFields = candidateFields.filter(f => f.value && String(f.value).trim() !== '' && String(f.value).trim() !== 'null');
+        const locationStr = [l.city, l.state, l.location].filter(Boolean).join(', ') || 'Location not specified';
+        const priorityClass = l.priority === 'High' ? 'lead-priority-high' : (l.priority === 'Low' ? 'lead-priority-low' : 'lead-priority-medium');
 
         contentBox.innerHTML = `
             <!-- MODAL HEADER -->
             <div class="lead-modal-header">
                 <div class="lead-modal-header-top">
                     <div class="lead-modal-badges">
-                        <span class="lead-modal-code">${l.lead_code || 'LEAD'}</span>
-                        <span class="lead-modal-status">${l.status_name || 'New'}</span>
+                        <span class="lead-badge-code">${l.lead_code || 'LEAD'}</span>
+                        <span class="lead-badge-status"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#38bdf8;"></span> ${l.status_name || 'New'}</span>
+                        <span class="lead-badge-priority ${priorityClass}">${l.priority || 'Medium'} Priority</span>
+                        ${l.lead_type ? `<span class="lead-badge-status" style="font-size:10.5px;">${l.lead_type}</span>` : ''}
                     </div>
 
                     <!-- Row Color Picker & Close Button -->
@@ -1392,65 +1374,266 @@ const App = {
                                 <div class="color-swatch-btn" style="background:#fef2f2;" onclick="App.changeLeadRowColor(${l.id}, 'red')" title="Red"></div>
                                 <div class="color-swatch-btn" style="background:#faf5ff;" onclick="App.changeLeadRowColor(${l.id}, 'purple')" title="Purple"></div>
                                 <div class="color-swatch-btn" style="background:#f8fafc;" onclick="App.changeLeadRowColor(${l.id}, 'gray')" title="Gray"></div>
-                                <div class="color-swatch-btn" style="background:rgba(255,255,255,0.3); border:1px dashed #ffffff; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px;" onclick="App.changeLeadRowColor(${l.id}, 'default')" title="Clear Color">✕</div>
+                                <div class="color-swatch-btn" style="background:rgba(255,255,255,0.25); border:1px dashed #ffffff; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px;" onclick="App.changeLeadRowColor(${l.id}, 'default')" title="Clear Color">✕</div>
                             </div>
                         </div>
-                        <button type="button" class="lead-modal-close-btn" onclick="App.closeModal('ws-view-lead-modal')" title="Close">✕</button>
+                        <button type="button" class="lead-modal-close-btn" onclick="App.closeModal('ws-view-lead-modal')" title="Close">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
                     </div>
                 </div>
 
-                <div class="lead-modal-title">${l.name}</div>
-                
-                <!-- Large Phone Number -->
-                <div class="lead-modal-phone-display">
-                    <span>📞 ${l.mobile}</span>
-                </div>
+                <!-- Hero Section: Name, Company, Phone, Quick Buttons -->
+                <div class="lead-hero-body">
+                    <div class="lead-hero-info">
+                        <div class="lead-modal-title">${l.name || 'Unnamed Lead'}</div>
+                        <div class="lead-modal-subline">
+                            ${l.company_name ? `<span>🏢 ${l.company_name}</span> &bull; ` : ''}
+                            <span>📍 ${locationStr}</span>
+                        </div>
+                        <div class="lead-hero-phone-chip">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            <span class="lead-phone-text">${l.mobile || 'No Mobile'}</span>
+                            <button type="button" class="lead-phone-copy-btn" onclick="App.copyLeadPhone('${l.mobile || ''}', this)" title="Copy Phone Number">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                        </div>
+                    </div>
 
-                <!-- Quick Action Buttons -->
-                <div class="lead-modal-actions">
-                    <button type="button" class="btn-call-lg" onclick="App.closeModal('ws-view-lead-modal'); App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                        Call Now
-                    </button>
-                    <a href="https://wa.me/91${cleanPhone}" target="_blank" class="btn-whatsapp-lg">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                        WhatsApp
-                    </a>
+                    <div class="lead-modal-actions">
+                        <button type="button" class="btn-call-lg" onclick="App.closeModal('ws-view-lead-modal'); App.openCallModal(${l.id}, '${(l.name || '').replace(/'/g, "\\'")}', '${l.mobile || ''}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            Call Now
+                        </button>
+                        <a href="https://wa.me/91${cleanPhone}" target="_blank" class="btn-whatsapp-lg">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                            WhatsApp
+                        </a>
+                        <button type="button" class="btn-disp-shortcut" onclick="App.switchLeadModalTab('disposition')">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            Update Action
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <!-- TAB NAVIGATION BAR -->
             <div class="lead-modal-tabs-bar">
                 <button type="button" class="lead-modal-tab-btn ${defaultTab === 'details' ? 'active' : ''}" id="tab-btn-details" onclick="App.switchLeadModalTab('details')">
-                    📋 Lead Details
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    Lead Profile
+                </button>
+                <button type="button" class="lead-modal-tab-btn ${defaultTab === 'contact' ? 'active' : ''}" id="tab-btn-contact" onclick="App.switchLeadModalTab('contact')">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    Company &amp; Contact
+                </button>
+                <button type="button" class="lead-modal-tab-btn ${defaultTab === 'disposition' ? 'active' : ''}" id="tab-btn-disposition" onclick="App.switchLeadModalTab('disposition')">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    Update Action
                 </button>
                 <button type="button" class="lead-modal-tab-btn ${defaultTab === 'activity' ? 'active' : ''}" id="tab-btn-activity" onclick="App.switchLeadModalTab('activity')">
-                    ⚡ Activity &amp; Calls (${calls.length})
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    Calls &amp; History <span class="lead-tab-count">${calls.length}</span>
                 </button>
                 <button type="button" class="lead-modal-tab-btn ${defaultTab === 'remarks' ? 'active' : ''}" id="tab-btn-remarks" onclick="App.switchLeadModalTab('remarks')">
-                    💬 Remarks &amp; Notes (${notes.length})
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    Remarks &amp; Notes <span class="lead-tab-count">${notes.length}</span>
                 </button>
                 <button type="button" class="lead-modal-tab-btn ${defaultTab === 'reassign' ? 'active' : ''}" id="tab-btn-reassign" onclick="App.switchLeadModalTab('reassign')">
-                    👥 Assign &amp; Team
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    Assign &amp; Team
                 </button>
             </div>
 
             <!-- TAB CONTENT CONTAINER (SCROLLABLE) -->
             <div class="lead-modal-body-scroll">
                 
-                <!-- TAB 1: LEAD DETAILS -->
+                <!-- TAB 1: LEAD PROFILE & QUALIFICATION -->
                 <div class="lead-modal-tab-content" id="tab-content-details" style="${defaultTab === 'details' ? 'display:block;' : 'display:none;'}">
-                    <!-- Quick Action & Disposition Banner inside Details -->
-                    <div class="lead-disposition-banner">
-                        <div style="font-size:11px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
-                            ⚡ Update Disposition &amp; Next Action
+                    <div class="lead-card-box">
+                        <div class="lead-card-header">
+                            <div class="lead-card-heading">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                Lead Classification &amp; Lifecycle
+                            </div>
+                            <span class="badge ${l.priority === 'High' ? 'badge-red' : (l.priority === 'Low' ? 'badge-green' : 'badge-amber')}">${l.priority || 'Medium'} Priority</span>
                         </div>
+                        <div class="lead-grid-fields">
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Lifecycle Status</div>
+                                <div class="lead-pill-value" style="color:#2563eb; font-weight:700;">${l.status_name || 'New Lead'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Lead Reference Code</div>
+                                <div class="lead-pill-value" style="font-family:'Space Grotesk',monospace; font-weight:700;">${l.lead_code || 'LEAD'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Acquisition Channel / Source</div>
+                                <div class="lead-pill-value">${l.source_name || 'Direct / Cold Calling'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Service / Product Interested</div>
+                                <div class="lead-pill-value">${l.service_name || 'General Inquiry'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Lead Nature / Type</div>
+                                <div class="lead-pill-value">${l.lead_type || 'Outbound'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Priority Level</div>
+                                <div class="lead-pill-value">${l.priority || 'Medium'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Last Contacted Timestamp</div>
+                                <div class="lead-pill-value">${l.last_contacted_at || 'Not contacted yet'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Next Scheduled Follow-up</div>
+                                <div class="lead-pill-value" style="color:${l.next_followup_at ? '#b45309' : '#64748b'}; font-weight:${l.next_followup_at ? '700' : '500'};">
+                                    ${l.next_followup_at || 'None scheduled'}
+                                </div>
+                            </div>
+                        </div>
+
+                        ${(l.initial_remark || l.initial_requirement) ? `
+                            <div class="lead-intake-box">
+                                <div class="lead-intake-label">Initial Intake Requirement / Client Brief</div>
+                                <div class="lead-intake-text">${l.initial_remark || l.initial_requirement}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Shortcut to update action -->
+                    <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                        <div>
+                            <div style="font-size:13px; font-weight:700; color:#0f172a;">Ready to log outcome or update lead status?</div>
+                            <div style="font-size:12px; color:#64748b;">Set disposition, schedule callbacks, or record customer replies.</div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="App.switchLeadModalTab('disposition')" style="font-weight:700; padding:8px 16px;">
+                            ⚡ Update Action &amp; Status &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB 2: COMPANY & CONTACT DETAILS -->
+                <div class="lead-modal-tab-content" id="tab-content-contact" style="${defaultTab === 'contact' ? 'display:block;' : 'display:none;'}">
+                    <div class="lead-card-box">
+                        <div class="lead-card-header">
+                            <div class="lead-card-heading">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                Individual Contact Information
+                            </div>
+                        </div>
+                        <div class="lead-grid-fields">
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Contact Person Name</div>
+                                <div class="lead-pill-value" style="font-weight:700; font-size:13px;">${l.name || 'Not provided'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Primary Mobile Number</div>
+                                <div class="lead-pill-value">
+                                    ${l.mobile ? `<a href="tel:${l.mobile}">📞 ${l.mobile}</a>` : '<span style="color:#94a3b8;">None provided</span>'}
+                                </div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Alternate Contact Number</div>
+                                <div class="lead-pill-value">
+                                    ${l.alternate_mobile ? `<a href="tel:${l.alternate_mobile}">📞 ${l.alternate_mobile}</a>` : '<span style="color:#94a3b8;">None provided</span>'}
+                                </div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Official / Personal Email</div>
+                                <div class="lead-pill-value">
+                                    ${l.email ? `<a href="mailto:${l.email}">✉️ ${l.email}</a>` : '<span style="color:#94a3b8;">None provided</span>'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lead-card-box">
+                        <div class="lead-card-header">
+                            <div class="lead-card-heading">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                                Company &amp; Geographic Details
+                            </div>
+                        </div>
+                        <div class="lead-grid-fields">
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Company / Business Name</div>
+                                <div class="lead-pill-value" style="font-weight:700; color:#0f172a;">${l.company_name || 'Individual / Not specified'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Industry / Domain</div>
+                                <div class="lead-pill-value">${l.industry || 'General Business'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">City &amp; State</div>
+                                <div class="lead-pill-value">${[l.city, l.state].filter(Boolean).join(', ') || 'Not specified'}</div>
+                            </div>
+                            <div class="lead-data-pill">
+                                <div class="lead-pill-label">Full Location / Address</div>
+                                <div class="lead-pill-value">${locationStr}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direct communication action buttons -->
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="App.closeModal('ws-view-lead-modal'); App.openCallModal(${l.id}, '${(l.name || '').replace(/'/g, "\\'")}', '${l.mobile || ''}')" style="display:inline-flex; align-items:center; gap:6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            Call Primary Number
+                        </button>
+                        ${cleanPhone ? `
+                            <a href="https://wa.me/91${cleanPhone}" target="_blank" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:6px; color:#15803d; border-color:#86efac; background:#f0fdf4;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                                Send WhatsApp Message
+                            </a>
+                        ` : ''}
+                        ${l.email ? `
+                            <a href="mailto:${l.email}" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:6px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                                Compose Email
+                            </a>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- TAB 3: UPDATE ACTION & DISPOSITION -->
+                <div class="lead-modal-tab-content" id="tab-content-disposition" style="${defaultTab === 'disposition' ? 'display:block;' : 'display:none;'}">
+                    <!-- Current Status Snapshot Banner -->
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Current Disposition Status</div>
+                            <div style="font-size:15px; font-weight:800; color:#0f172a; margin-top:2px;">${l.status_name || 'New'}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Scheduled Follow-up</div>
+                            <div style="font-size:13px; font-weight:700; color:${l.next_followup_at ? '#b45309' : '#64748b'}; margin-top:2px;">${l.next_followup_at || 'None scheduled'}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Last Contact</div>
+                            <div style="font-size:13px; font-weight:600; color:#475569; margin-top:2px;">${l.last_contacted_at || 'Never'}</div>
+                        </div>
+                    </div>
+
+                    <!-- Disposition Form -->
+                    <div class="lead-disp-card">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+                            <div style="width:28px; height:28px; border-radius:8px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            </div>
+                            <div>
+                                <div style="font-size:14px; font-weight:800; color:#0f172a;">Log Call Outcome &amp; Set Next Action</div>
+                                <div style="font-size:12px; color:#64748b;">Update the lead status and schedule automated callback reminders</div>
+                            </div>
+                        </div>
+
                         <form id="popup-disp-form" onsubmit="App.submitWorkspaceDisposition(event, ${l.id})">
                             <input type="hidden" id="popup-disp-lead-id" value="${l.id}">
                             <div class="lead-disp-form-grid">
                                 <div>
-                                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Action / Call Outcome *</label>
-                                    <select id="popup-disp-action-val" required class="filter-select" style="width:100%; font-weight:700; padding:8px 10px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;" onchange="App.onDispositionActionChange(this.value, 'popup-disp-')">
+                                    <label style="display:block; font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px; text-transform:uppercase;">Action / Call Outcome *</label>
+                                    <select id="popup-disp-action-val" required class="filter-select" style="width:100%; font-weight:700; padding:10px 12px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;" onchange="App.onDispositionActionChange(this.value, 'popup-disp-')">
                                         <option value="Calling">Calling</option>
                                         <option value="Call Connected">Call Connected</option>
                                         <option value="Not Interested">Not Interested</option>
@@ -1461,85 +1644,80 @@ const App = {
                                     </select>
                                 </div>
                                 <div>
-                                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Remarks / Quick Outcome Note</label>
-                                    <input type="text" id="popup-disp-remarks" class="filter-input" style="width:100%; padding:8px 10px; border-radius:8px;" placeholder="Outcome notes, customer reply...">
+                                    <label style="display:block; font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px; text-transform:uppercase;">Remarks / Outcome Notes</label>
+                                    <input type="text" id="popup-disp-remarks" class="filter-input" style="width:100%; padding:10px 12px; border-radius:8px;" placeholder="Outcome notes, customer reply, next steps...">
                                 </div>
                             </div>
 
                             <!-- Follow-up fields container -->
-                            <div id="popup-fu-fields-group" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px; margin-bottom:12px;">
-                                <div style="font-size:11px; font-weight:800; color:#b45309; margin-bottom:6px;">📅 Schedule Follow-up Callback</div>
+                            <div id="popup-fu-fields-group" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px; margin-bottom:14px;">
+                                <div style="font-size:12px; font-weight:800; color:#b45309; margin-bottom:8px;">📅 Schedule Follow-up Callback Task</div>
                                 <div class="lead-fu-form-grid">
                                     <div>
-                                        <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Date *</label>
-                                        <input type="date" id="popup-disp-date" class="filter-input" style="width:100%;" value="${tomorrowStr}">
+                                        <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:3px;">Callback Date *</label>
+                                        <input type="date" id="popup-disp-date" class="filter-input" style="width:100%; padding:8px 10px;" value="${tomorrowStr}">
                                     </div>
                                     <div>
-                                        <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:2px;">Time *</label>
-                                        <input type="time" id="popup-disp-time" class="filter-input" style="width:100%;" value="${11}:00">
+                                        <label style="display:block; font-size:11px; font-weight:700; color:#78350f; margin-bottom:3px;">Callback Time *</label>
+                                        <input type="time" id="popup-disp-time" class="filter-input" style="width:100%; padding:8px 10px;" value="11:00">
                                     </div>
                                 </div>
                             </div>
 
-                            <div style="display:flex; justify-content:flex-end;">
-                                <button type="submit" class="btn btn-primary btn-sm" style="padding:8px 20px; font-weight:700; border-radius:8px;">Save Action &amp; Update Status &rarr;</button>
+                            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                                <button type="submit" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:8px; box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+                                    Save Action &amp; Update Status &rarr;
+                                </button>
                             </div>
                         </form>
                     </div>
-
-                    <!-- Structured Lead Fields Grid -->
-                    <div class="lead-detail-grid">
-                        ${validFields.map(f => `
-                            <div class="lead-field-item ${f.label === 'Initial Requirement' ? 'lead-field-full' : ''}">
-                                <div class="lead-field-label">${f.label}</div>
-                                <div class="lead-field-val">${f.value}</div>
-                            </div>
-                        `).join('')}
-                    </div>
                 </div>
 
-                <!-- TAB 2: ACTIVITY & CALLS -->
+                <!-- TAB 4: CALLS & ACTIVITY -->
                 <div class="lead-modal-tab-content" id="tab-content-activity" style="${defaultTab === 'activity' ? 'display:block;' : 'display:none;'}">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                         <div>
                             <div style="font-size:14px; font-weight:800; color:#0f172a;">Call Logs &amp; Activity Trail</div>
-                            <div style="font-size:12px; color:#64748b;">Complete history of every dial and status update</div>
+                            <div style="font-size:12px; color:#64748b;">Complete history of every dial, outcome, and status change</div>
                         </div>
-                        <button type="button" class="btn btn-primary btn-sm" onclick="App.closeModal('ws-view-lead-modal'); App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.mobile}')">+ Log New Call</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="App.closeModal('ws-view-lead-modal'); App.openCallModal(${l.id}, '${(l.name || '').replace(/'/g, "\\'")}', '${l.mobile || ''}')" style="display:inline-flex; align-items:center; gap:6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            Log New Call
+                        </button>
                     </div>
 
                     ${calls.length === 0 ? `
-                        <div style="text-align:center; padding:40px 20px; color:#94a3b8; font-size:13px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">
-                            No calls logged yet for this lead. Click "Call Now" or "+ Log New Call" to record the first interaction.
+                        <div style="text-align:center; padding:36px 20px; color:#94a3b8; font-size:13px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; margin-bottom:16px;">
+                            No calls logged yet for this lead. Click "Call Now" or "Log New Call" to record the first interaction.
                         </div>
                     ` : `
-                        <div style="display:flex; flex-direction:column; gap:10px;">
+                        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
                             ${calls.map(c => `
-                                <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                                <div class="lead-activity-item">
                                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                                         <div style="display:flex; align-items:center; gap:8px;">
                                             <span style="font-weight:800; font-size:13px; color:#0f172a;">${c.outcome_name || 'Call Logged'}</span>
-                                            <span style="font-size:11px; background:#eff6ff; color:#2563eb; font-weight:700; padding:2px 8px; border-radius:12px;">By ${c.agent_name || 'Agent'}</span>
+                                            <span style="font-size:11px; background:#eff6ff; color:#2563eb; font-weight:700; padding:2px 8px; border-radius:12px;">By ${c.agent_name || 'Executive'}</span>
                                         </div>
                                         <div style="font-size:11px; color:#64748b; font-weight:600;">
                                             📅 ${(c.called_at || '').replace(/:\d\d$/, '')}
                                         </div>
                                     </div>
-                                    ${c.remarks ? `<div style="margin-top:6px; font-size:12.5px; color:#475569; background:#f8fafc; padding:8px 12px; border-radius:8px; border:1px solid #f1f5f9;">${c.remarks}</div>` : ''}
+                                    ${c.remarks ? `<div style="margin-top:8px; font-size:12.5px; color:#475569; background:#f8fafc; padding:8px 12px; border-radius:8px; border:1px solid #f1f5f9;">${c.remarks}</div>` : ''}
                                 </div>
                             `).join('')}
                         </div>
                     `}
 
                     <!-- Follow-ups scheduled under activity -->
-                    <div style="margin-top:24px; border-top:1px solid #f1f5f9; padding-top:18px;">
+                    <div style="border-top:1px solid #e2e8f0; padding-top:16px;">
                         <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;">Scheduled Callback Tasks (${followups.length})</div>
                         ${followups.length === 0 ? `
-                            <div style="font-size:12.5px; color:#94a3b8;">No pending follow-ups scheduled.</div>
+                            <div style="font-size:12.5px; color:#94a3b8; background:#f8fafc; padding:12px; border-radius:8px;">No pending follow-ups scheduled.</div>
                         ` : `
                             <div style="display:flex; flex-direction:column; gap:8px;">
                                 ${followups.map(f => `
-                                    <div style="display:flex; justify-content:space-between; align-items:center; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:8px 14px; font-size:12px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; font-size:12px;">
                                         <div>
                                             <strong style="color:#b45309;">📅 ${f.followup_date} at ${f.followup_time || '10:00'}</strong> &bull; <span style="color:#78350f;">${f.notes || f.purpose || 'Follow-up'}</span>
                                         </div>
@@ -1551,17 +1729,17 @@ const App = {
                     </div>
                 </div>
 
-                <!-- TAB 3: REMARKS & PERSISTENT NOTES -->
+                <!-- TAB 5: REMARKS & PERSISTENT NOTES -->
                 <div class="lead-modal-tab-content" id="tab-content-remarks" style="${defaultTab === 'remarks' ? 'display:block;' : 'display:none;'}">
                     <div style="margin-bottom:16px;">
                         <div style="font-size:14px; font-weight:800; color:#0f172a;">Lead Remarks &amp; Internal Notes</div>
-                        <div style="font-size:12px; color:#64748b;">Add detailed remarks, deal context, or handover instructions that will be permanently stored for this lead</div>
+                        <div style="font-size:12px; color:#64748b;">Add permanent remarks, client preferences, or handover details that remain stored for this lead</div>
                     </div>
 
                     <!-- Add Note Input Form -->
                     <form onsubmit="App.submitLeadNote(event, ${l.id})" style="margin-bottom:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
                         <label style="display:block; font-size:11px; font-weight:800; color:#334155; margin-bottom:6px; text-transform:uppercase;">Add New Remark / Note</label>
-                        <textarea id="new-lead-note-text" required class="filter-input" style="width:100%; height:75px; padding:10px; font-size:13px; background:#ffffff; margin-bottom:8px;" placeholder="Write specific client requirements, budget details, next steps..."></textarea>
+                        <textarea id="new-lead-note-text" required class="filter-input" style="width:100%; height:75px; padding:10px; font-size:13px; background:#ffffff; margin-bottom:10px;" placeholder="Write specific client requirements, budget details, next steps..."></textarea>
                         <div style="display:flex; justify-content:flex-end;">
                             <button type="submit" class="btn btn-primary btn-sm" style="font-weight:700;">+ Save Remark</button>
                         </div>
@@ -1570,59 +1748,59 @@ const App = {
                     <!-- Stored Notes List -->
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         ${(l.initial_remark || l.initial_requirement) ? `
-                            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 14px;">
+                            <div class="lead-intake-box" style="margin-top:0;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                    <span style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">Initial Intake Requirement</span>
+                                    <span class="lead-intake-label">Initial Intake Requirement</span>
                                     <span style="font-size:11px; color:#60a5fa;">Creation Time</span>
                                 </div>
-                                <div style="font-size:13px; color:#1e3a8a;">${l.initial_remark || l.initial_requirement}</div>
+                                <div class="lead-intake-text">${l.initial_remark || l.initial_requirement}</div>
                             </div>
                         ` : ''}
 
                         ${notes.map(n => `
-                            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <div class="lead-note-item">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                                     <span style="font-size:12px; font-weight:800; color:#0f172a;">${n.author_name || 'Agent'}</span>
                                     <span style="font-size:11px; color:#94a3b8;">📅 ${(n.created_at || '').replace(/:\d\d$/, '')}</span>
                                 </div>
-                                <div style="font-size:13px; color:#334155; white-space:pre-wrap;">${n.note_text}</div>
+                                <div style="font-size:13px; color:#334155; white-space:pre-wrap; line-height:1.4;">${n.note_text}</div>
                             </div>
                         `).join('')}
 
                         ${notes.length === 0 && !l.initial_remark && !l.initial_requirement ? `
-                            <div style="text-align:center; padding:30px; color:#94a3b8; font-size:13px;">
+                            <div style="text-align:center; padding:30px; color:#94a3b8; font-size:13px; background:#f8fafc; border-radius:10px;">
                                 No remarks saved yet. Enter a note above to store permanent context.
                             </div>
                         ` : ''}
                     </div>
                 </div>
 
-                <!-- TAB 4: ASSIGN & TEAM HANDOVER -->
+                <!-- TAB 6: ASSIGN & TEAM HANDOVER -->
                 <div class="lead-modal-tab-content" id="tab-content-reassign" style="${defaultTab === 'reassign' ? 'display:block;' : 'display:none;'}">
                     <div style="margin-bottom:16px;">
                         <div style="font-size:14px; font-weight:800; color:#0f172a;">Lead Assignment &amp; Team Handover</div>
-                        <div style="font-size:12px; color:#64748b;">All activities, call logs, and remarks remain intact when assigning this lead to another executive</div>
+                        <div style="font-size:12px; color:#64748b;">All activities, call logs, and remarks remain permanently attached when transferring this lead</div>
                     </div>
 
                     <!-- Current Assigned Details -->
-                    <div class="lead-assign-summary-grid">
-                        <div>
-                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Current Executive</div>
-                            <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">${l.executive_name || '<span style="color:#ef4444;">Unassigned</span>'}</div>
+                    <div class="lead-assign-grid">
+                        <div class="lead-assign-card">
+                            <div style="font-size:10.5px; font-weight:700; color:#64748b; text-transform:uppercase;">Current Calling Executive</div>
+                            <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:3px;">${l.executive_name || '<span style="color:#ef4444;">Unassigned</span>'}</div>
                         </div>
-                        <div>
-                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Assigned Manager</div>
-                            <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">${l.manager_name || 'General Pool'}</div>
+                        <div class="lead-assign-card">
+                            <div style="font-size:10.5px; font-weight:700; color:#64748b; text-transform:uppercase;">Reporting Manager</div>
+                            <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:3px;">${l.manager_name || 'General Management'}</div>
                         </div>
                     </div>
 
                     <!-- Reassign Form -->
-                    <form onsubmit="App.submitReassignLead(event, ${l.id})" class="lead-reassign-form">
+                    <form onsubmit="App.submitReassignLead(event, ${l.id})" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:18px;">
                         <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:12px;">Transfer Lead Ownership</div>
                         
                         <div style="margin-bottom:14px;">
                             <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Select Calling Executive *</label>
-                            <select id="popup-reassign-exec" required class="filter-select" style="width:100%; font-size:13px; font-weight:700; padding:10px;">
+                            <select id="popup-reassign-exec" required class="filter-select" style="width:100%; font-size:13px; font-weight:700; padding:10px; border-radius:8px;">
                                 <option value="">-- Choose Executive --</option>
                                 ${executives.map(e => `
                                     <option value="${e.id}" ${e.id == l.assigned_executive_id ? 'selected' : ''}>${e.name} (${e.email || 'Executive'})</option>
@@ -1632,11 +1810,11 @@ const App = {
 
                         <div style="margin-bottom:16px;">
                             <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Handover Reason / Instructions (Optional)</label>
-                            <textarea id="popup-reassign-reason" class="filter-input" style="width:100%; height:65px; padding:10px; font-size:13px;" placeholder="Reason for transfer or special instructions for the new executive..."></textarea>
+                            <textarea id="popup-reassign-reason" class="filter-input" style="width:100%; height:65px; padding:10px; font-size:13px; border-radius:8px;" placeholder="Reason for transfer or special instructions for the new executive..."></textarea>
                         </div>
 
                         <div style="display:flex; justify-content:flex-end;">
-                            <button type="submit" class="btn btn-primary" style="font-weight:700; padding:9px 20px;">Confirm &amp; Transfer Lead &rarr;</button>
+                            <button type="submit" class="btn btn-primary" style="font-weight:700; padding:9px 22px; border-radius:8px;">Confirm &amp; Transfer Lead &rarr;</button>
                         </div>
                     </form>
                 </div>
@@ -3876,6 +4054,37 @@ const App = {
             } else {
                 el.style.display = 'none';
             }
+        }
+    },
+
+    copyLeadPhone: function(phone, btnEl) {
+        if (!phone) return;
+        const copySuccess = () => {
+            if (btnEl) {
+                const orig = btnEl.innerHTML;
+                btnEl.innerHTML = '<span style="font-size:10px; color:#4ade80; font-weight:800; white-space:nowrap;">COPIED!</span>';
+                setTimeout(() => { btnEl.innerHTML = orig; }, 1600);
+            }
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(phone).then(copySuccess).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = phone;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                copySuccess();
+            });
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = phone;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            copySuccess();
         }
     }
 };

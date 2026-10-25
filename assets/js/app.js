@@ -353,20 +353,42 @@ const App = {
             }
         });
 
-        // View dispatch
-        if (view === 'dashboard') this.renderDashboard();
-        else if (view === 'workspace') this.renderWorkspace();
-        else if (view === 'leads') this.renderLeads();
-        else if (view === 'calling_queue' || view === 'calling-queue') this.renderCallingQueue();
-        else if (view === 'followups') this.renderFollowups();
-        else if (view === 'meetings') this.renderMeetings();
-        else if (view === 'funnel') this.renderFunnel();
-        else if (view === 'projects') this.renderProjects();
-        else if (view === 'reports') this.renderReports();
-        else if (view === 'users') this.renderUsers();
-        else if (view === 'settings') this.renderSettings();
-        else if (view === 'import') this.renderImport();
-        else this.renderDashboard();
+        // View dispatch with async rejection safety net
+        let renderPromise = null;
+        try {
+            if (view === 'dashboard') renderPromise = this.renderDashboard();
+            else if (view === 'workspace') renderPromise = this.renderWorkspace();
+            else if (view === 'leads') renderPromise = this.renderLeads();
+            else if (view === 'calling_queue' || view === 'calling-queue') renderPromise = this.renderCallingQueue();
+            else if (view === 'followups') renderPromise = this.renderFollowups();
+            else if (view === 'meetings') renderPromise = this.renderMeetings();
+            else if (view === 'funnel') renderPromise = this.renderFunnel();
+            else if (view === 'projects') renderPromise = this.renderProjects();
+            else if (view === 'reports') renderPromise = this.renderReports();
+            else if (view === 'users') renderPromise = this.renderUsers();
+            else if (view === 'settings') renderPromise = this.renderSettings();
+            else if (view === 'import') renderPromise = this.renderImport();
+            else renderPromise = this.renderDashboard();
+        } catch (syncErr) {
+            console.error(`Synchronous error rendering view "${view}":`, syncErr);
+            container.innerHTML = `
+                <div class="alert alert-danger m-3 shadow-sm">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Failed to render ${titles[view] || view}: ${syncErr.message || syncErr}.
+                    <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.navigate('${view}')">Retry</button>
+                </div>`;
+            return;
+        }
+
+        if (renderPromise && typeof renderPromise.catch === 'function') {
+            renderPromise.catch(asyncErr => {
+                console.error(`Asynchronous error rendering view "${view}":`, asyncErr);
+                container.innerHTML = `
+                    <div class="alert alert-danger m-3 shadow-sm">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Failed to load ${titles[view] || view}: ${asyncErr.message || asyncErr}.
+                        <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.navigate('${view}')">Retry</button>
+                    </div>`;
+            });
+        }
     },
 
     renderAccessDenied: function(attemptedView) {
@@ -942,14 +964,22 @@ const App = {
     // 6. MODULE: LEADS & WORKSPACE
     // ==========================================
     renderLeads: async function(page = 1, filters = {}) {
-        this.leadsFilterState = { ...this.leadsFilterState, ...filters, page: page };
-        const queryParams = new URLSearchParams(this.leadsFilterState).toString();
-        const res = await fetch(`api/leads?${queryParams}`);
-        const data = await res.json();
-        if (!data.success) return;
+        try {
+            this.leadsFilterState = { ...this.leadsFilterState, ...filters, page: page };
+            const queryParams = new URLSearchParams(this.leadsFilterState).toString();
+            const res = await fetch(`api/leads?${queryParams}`);
+            const data = await res.json();
+            if (!data || !data.success) {
+                document.getElementById('content-viewport').innerHTML = `
+                    <div class="alert alert-danger m-3">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Failed to load leads database: ${data && data.message ? data.message : 'Unknown error'}.
+                        <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderLeads(1)">Retry</button>
+                    </div>`;
+                return;
+            }
 
-        const p = data.pagination || { total: 0, page: 1, total_pages: 1 };
-        const leads = data.data || [];
+            const leads = Array.isArray(data.data) ? data.data : (data.data && Array.isArray(data.data.leads) ? data.data.leads : (Array.isArray(data.leads) ? data.leads : []));
+            const p = data.pagination || (data.data && data.data.pagination) || { total: leads.length, page: 1, total_pages: 1 };
 
         // Update badge count
         const badgeLeads = document.getElementById('badge-leads-count');
@@ -1098,6 +1128,14 @@ const App = {
         `;
 
         document.getElementById('content-viewport').innerHTML = html;
+        } catch (err) {
+            console.error('Error rendering leads:', err);
+            document.getElementById('content-viewport').innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Error loading leads: ${err.message}.
+                    <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderLeads(1)">Retry</button>
+                </div>`;
+        }
     },
 
     toggleSelectAllLeads: function(masterCb) {
@@ -1177,124 +1215,184 @@ const App = {
 
     // Daily Operator Workspace
     renderWorkspace: async function(page = 1, filters = {}) {
-        this.workspaceFilterState = { ...this.workspaceFilterState, ...filters, page: page };
-        const queryParams = new URLSearchParams(this.workspaceFilterState).toString();
-        const res = await fetch(`api/leads?${queryParams}&action=workspace`);
-        const data = await res.json();
-        if (!data.success) return;
+        try {
+            this.workspaceFilterState = { ...this.workspaceFilterState, ...filters, page: page };
+            const queryParams = new URLSearchParams(this.workspaceFilterState).toString();
+            const res = await fetch(`api/leads?${queryParams}&action=workspace`);
+            const data = await res.json();
+            if (!data || !data.success) {
+                document.getElementById('content-viewport').innerHTML = `
+                    <div class="alert alert-danger m-3">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Failed to load workspace: ${data && data.message ? data.message : 'Unknown server response'}.
+                        <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderWorkspace(1)">Retry</button>
+                    </div>`;
+                return;
+            }
 
-        const p = data.pagination || { total: 0, page: 1, total_pages: 1 };
-        const leads = data.data || [];
+            const leads = Array.isArray(data.data) ? data.data : (data.data && Array.isArray(data.data.leads) ? data.data.leads : (Array.isArray(data.leads) ? data.leads : []));
+            const p = data.pagination || (data.data && data.data.pagination) || { total: leads.length, page: 1, total_pages: 1 };
 
-        let html = `
-            <div class="card card-info card-outline shadow-sm">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h3 class="card-title font-weight-bold">
-                        <i class="fas fa-laptop mr-1 text-info"></i> Daily Operator Working Table
-                    </h3>
-                    <div class="card-tools ml-auto">
-                        <button class="btn btn-outline-secondary btn-sm" onclick="App.renderWorkspace(1)" title="Refresh Workspace">
-                            <i class="fas fa-sync-alt mr-1"></i> Refresh
-                        </button>
+            let html = `
+                <div class="card card-info card-outline shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap" style="gap: 10px;">
+                        <h3 class="card-title font-weight-bold mb-0">
+                            <i class="fas fa-laptop mr-1 text-info"></i> Daily Operator Working Table (${p.total} Active)
+                        </h3>
+                        <div class="card-tools ml-auto d-flex align-items-center" style="gap: 8px;">
+                            <button class="btn btn-primary btn-sm font-weight-bold" onclick="App.openCreateLeadModal()">
+                                <i class="fas fa-plus mr-1"></i> Add Lead
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="App.renderWorkspace(1)" title="Refresh Workspace">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover text-sm mb-0">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>Lead Contact</th>
-                                    <th>Phone</th>
-                                    <th>Status</th>
-                                    <th>Source</th>
-                                    <th>Follow-up Date</th>
-                                    <th>Last Remark</th>
-                                    <th class="text-center" style="width: 140px;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${leads.length === 0 ? '<tr><td colspan="8" class="text-center py-4 text-muted">No assigned active workspace leads.</td></tr>' : leads.map((l, i) => `
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover text-sm mb-0">
+                                <thead class="thead-light">
                                     <tr>
-                                        <td>${i + 1}</td>
-                                        <td><strong>${l.name}</strong></td>
-                                        <td><a href="tel:${l.phone}"><i class="fas fa-phone mr-1 text-success"></i>${l.phone}</a></td>
-                                        <td><span class="badge badge-info">${l.status_name}</span></td>
-                                        <td>${l.source_name || 'Inbound'}</td>
-                                        <td class="text-xs font-weight-bold text-danger">${l.next_followup_date || 'None'}</td>
-                                        <td class="text-xs text-muted" style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${l.last_remarks || '-'}</td>
-                                        <td class="text-center">
-                                            <button class="btn btn-primary btn-xs font-weight-bold" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.phone}', ${l.status_id})">
-                                                <i class="fas fa-phone-alt mr-1"></i>Update
-                                            </button>
-                                        </td>
+                                        <th>#</th>
+                                        <th>Lead Contact</th>
+                                        <th>Phone</th>
+                                        <th>Status</th>
+                                        <th>Source</th>
+                                        <th>Follow-up Date</th>
+                                        <th>Last Remark</th>
+                                        <th class="text-center" style="width: 140px;">Action</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    ${leads.length === 0 ? '<tr><td colspan="8" class="text-center py-4 text-muted">No assigned active workspace leads.</td></tr>' : leads.map((l, i) => {
+                                        const phone = l.phone || l.mobile || '-';
+                                        const followup = l.next_followup_at || l.next_followup_date || 'None';
+                                        const remarks = l.last_remarks || l.latest_call_outcome || l.initial_remark || '-';
+                                        return `
+                                        <tr>
+                                            <td>${i + 1}</td>
+                                            <td>
+                                                <strong><a href="javascript:void(0)" onclick="App.openLeadDetailModal(${l.id})">${l.name}</a></strong>
+                                                ${l.company_name ? `<div class="text-xs text-muted">${l.company_name}</div>` : ''}
+                                            </td>
+                                            <td><a href="tel:${phone}"><i class="fas fa-phone mr-1 text-success"></i>${phone}</a></td>
+                                            <td><span class="badge badge-info" style="background-color: ${l.status_color || '#17a2b8'}">${l.status_name}</span></td>
+                                            <td><span class="badge badge-light border text-xs">${l.source_name || 'Inbound'}</span></td>
+                                            <td class="text-xs font-weight-bold text-danger">${followup}</td>
+                                            <td class="text-xs text-muted" style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${remarks}</td>
+                                            <td class="text-center">
+                                                <button class="btn btn-primary btn-xs font-weight-bold mr-1" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${phone}', ${l.status_id})">
+                                                    <i class="fas fa-phone-alt mr-1"></i>Update
+                                                </button>
+                                                <button class="btn btn-default btn-xs" onclick="App.openLeadDetailModal(${l.id})" title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Pagination Footer -->
+                    <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap">
+                        <div class="text-xs text-muted">
+                            Page <strong>${p.page}</strong> of <strong>${p.total_pages}</strong> &bull; Total <strong>${p.total}</strong> records
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-default" ${p.page <= 1 ? 'disabled' : ''} onclick="App.renderWorkspace(${p.page - 1})">
+                                <i class="fas fa-chevron-left mr-1"></i> Previous
+                            </button>
+                            <button class="btn btn-default" ${p.page >= p.total_pages ? 'disabled' : ''} onclick="App.renderWorkspace(${p.page + 1})">
+                                Next <i class="fas fa-chevron-right ml-1"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
 
-        document.getElementById('content-viewport').innerHTML = html;
+            document.getElementById('content-viewport').innerHTML = html;
+        } catch (err) {
+            console.error('Error rendering workspace:', err);
+            document.getElementById('content-viewport').innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Error loading workspace: ${err.message}.
+                    <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderWorkspace(1)">Retry</button>
+                </div>`;
+        }
     },
 
     // ==========================================
     // 7. MODULE: CALLING QUEUE & MODAL
     // ==========================================
     renderCallingQueue: async function() {
-        const res = await fetch('api/calls?action=queue');
-        const data = await res.json();
-        if (!data.success) return;
+        try {
+            const res = await fetch('api/calls?action=queue');
+            const data = await res.json();
+            if (!data || !data.success) {
+                document.getElementById('content-viewport').innerHTML = `
+                    <div class="alert alert-danger m-3">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Failed to load calling queue: ${data && data.message ? data.message : 'Unknown error'}.
+                        <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderCallingQueue()">Retry</button>
+                    </div>`;
+                return;
+            }
 
-        const queue = data.data || [];
+            const queue = Array.isArray(data.data) ? data.data : [];
 
-        let html = `
-            <div class="card card-warning card-outline shadow-sm">
-                <div class="card-header">
-                    <h3 class="card-title font-weight-bold">
-                        <i class="fas fa-headset mr-1 text-warning"></i> Telecalling Live Queue (${queue.length} Leads Waiting)
-                    </h3>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover table-striped text-sm mb-0">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>Client Name</th>
-                                    <th>Phone Number</th>
-                                    <th>Service Needed</th>
-                                    <th>Status</th>
-                                    <th>Assigned Agent</th>
-                                    <th class="text-center" style="width: 150px;">Dialer Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${queue.length === 0 ? '<tr><td colspan="7" class="text-center py-4 text-muted">Calling queue is currently clear! Excellent work.</td></tr>' : queue.map((q, i) => `
+            let html = `
+                <div class="card card-warning card-outline shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title font-weight-bold">
+                            <i class="fas fa-headset mr-1 text-warning"></i> Telecalling Live Queue (${queue.length} Leads Waiting)
+                        </h3>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-striped text-sm mb-0">
+                                <thead class="thead-light">
                                     <tr>
-                                        <td>${i + 1}</td>
-                                        <td><strong>${q.name}</strong></td>
-                                        <td><a href="tel:${q.phone}" class="font-weight-bold text-dark">${q.phone}</a></td>
-                                        <td><span class="badge badge-light border">${q.service_name || 'General Inquiry'}</span></td>
-                                        <td><span class="badge badge-info">${q.status_name}</span></td>
-                                        <td>${q.assigned_name || 'Queue Pool'}</td>
-                                        <td class="text-center">
-                                            <button class="btn btn-success btn-xs font-weight-bold px-3" onclick="App.openCallModal(${q.id}, '${q.name.replace(/'/g, "\\'")}', '${q.phone}', ${q.status_id})">
-                                                <i class="fas fa-phone mr-1"></i> Call Now
-                                            </button>
-                                        </td>
+                                        <th>#</th>
+                                        <th>Client Name</th>
+                                        <th>Phone Number</th>
+                                        <th>Service Needed</th>
+                                        <th>Status</th>
+                                        <th>Assigned Agent</th>
+                                        <th class="text-center" style="width: 150px;">Dialer Action</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    ${queue.length === 0 ? '<tr><td colspan="7" class="text-center py-4 text-muted">Calling queue is currently clear! Excellent work.</td></tr>' : queue.map((q, i) => `
+                                        <tr>
+                                            <td>${i + 1}</td>
+                                            <td><strong>${q.name}</strong></td>
+                                            <td><a href="tel:${q.phone}" class="font-weight-bold text-dark">${q.phone}</a></td>
+                                            <td><span class="badge badge-light border">${q.service_name || 'General Inquiry'}</span></td>
+                                            <td><span class="badge badge-info">${q.status_name}</span></td>
+                                            <td>${q.assigned_name || 'Queue Pool'}</td>
+                                            <td class="text-center">
+                                                <button class="btn btn-success btn-xs font-weight-bold px-3" onclick="App.openCallModal(${q.id}, '${q.name.replace(/'/g, "\\'")}', '${q.phone}', ${q.status_id})">
+                                                    <i class="fas fa-phone mr-1"></i> Call Now
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
 
-        document.getElementById('content-viewport').innerHTML = html;
+            document.getElementById('content-viewport').innerHTML = html;
+        } catch (err) {
+            console.error('Error rendering calling queue:', err);
+            document.getElementById('content-viewport').innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Error loading calling queue: ${err.message}.
+                    <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderCallingQueue()">Retry</button>
+                </div>`;
+        }
     },
 
     openCallModal: function(leadId, leadName, phone, currentStatusId = 0) {
@@ -1747,55 +1845,76 @@ const App = {
     // 10. MODULE: FOLLOW-UPS & MEETINGS
     // ==========================================
     renderFollowups: async function() {
-        const res = await fetch('api/followups?action=list');
-        const data = await res.json();
-        const items = data.data || [];
+        try {
+            const res = await fetch('api/followups?action=list');
+            const data = await res.json();
+            if (!data || !data.success) {
+                document.getElementById('content-viewport').innerHTML = `
+                    <div class="alert alert-danger m-3">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Failed to load follow-ups: ${data && data.message ? data.message : 'Unknown error'}.
+                        <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderFollowups()">Retry</button>
+                    </div>`;
+                return;
+            }
 
-        let html = `
-            <div class="card card-warning card-outline shadow-sm">
-                <div class="card-header">
-                    <h3 class="card-title font-weight-bold">
-                        <i class="fas fa-clock mr-1 text-warning"></i> Scheduled Follow-ups &amp; Reminders
-                    </h3>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover text-sm mb-0">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>Lead Name</th>
-                                    <th>Phone</th>
-                                    <th>Follow-up Date / Time</th>
-                                    <th>Notes</th>
-                                    <th>Assigned Agent</th>
-                                    <th class="text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${items.length === 0 ? '<tr><td colspan="7" class="text-center py-4 text-muted">No pending follow-ups scheduled.</td></tr>' : items.map((f, i) => `
+            const items = Array.isArray(data.data) ? data.data : [];
+
+            let html = `
+                <div class="card card-warning card-outline shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title font-weight-bold">
+                            <i class="fas fa-clock mr-1 text-warning"></i> Scheduled Follow-ups &amp; Reminders
+                        </h3>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover text-sm mb-0">
+                                <thead class="thead-light">
                                     <tr>
-                                        <td>${i + 1}</td>
-                                        <td><strong>${f.lead_name}</strong></td>
-                                        <td><a href="tel:${f.phone}">${f.phone}</a></td>
-                                        <td class="text-danger font-weight-bold">${f.scheduled_at || '-'}</td>
-                                        <td class="text-xs text-muted">${f.notes || '-'}</td>
-                                        <td>${f.assigned_name || 'Self'}</td>
-                                        <td class="text-center">
-                                            <button class="btn btn-primary btn-xs font-weight-bold" onclick="App.openCallModal(${f.lead_id}, '${f.lead_name.replace(/'/g, "\\'")}', '${f.phone}')">
-                                                <i class="fas fa-phone mr-1"></i> Call & Complete
-                                            </button>
-                                        </td>
+                                        <th>#</th>
+                                        <th>Lead Name</th>
+                                        <th>Phone</th>
+                                        <th>Follow-up Date / Time</th>
+                                        <th>Notes</th>
+                                        <th>Assigned Agent</th>
+                                        <th class="text-center">Action</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    ${items.length === 0 ? '<tr><td colspan="7" class="text-center py-4 text-muted">No pending follow-ups scheduled.</td></tr>' : items.map((f, i) => {
+                                        const phone = f.phone || f.lead_mobile || '-';
+                                        const scheduled = f.scheduled_at || (f.followup_date + ' ' + (f.followup_time || ''));
+                                        return `
+                                        <tr>
+                                            <td>${i + 1}</td>
+                                            <td><strong>${f.lead_name}</strong></td>
+                                            <td><a href="tel:${phone}">${phone}</a></td>
+                                            <td class="text-danger font-weight-bold">${scheduled}</td>
+                                            <td class="text-xs text-muted">${f.notes || f.purpose || '-'}</td>
+                                            <td>${f.assigned_name || f.agent_name || 'Self'}</td>
+                                            <td class="text-center">
+                                                <button class="btn btn-primary btn-xs font-weight-bold" onclick="App.openCallModal(${f.lead_id}, '${f.lead_name.replace(/'/g, "\\'")}', '${phone}')">
+                                                    <i class="fas fa-phone mr-1"></i> Call & Complete
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `}).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
 
-        document.getElementById('content-viewport').innerHTML = html;
+            document.getElementById('content-viewport').innerHTML = html;
+        } catch (err) {
+            console.error('Error rendering follow-ups:', err);
+            document.getElementById('content-viewport').innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Error loading follow-ups: ${err.message}.
+                    <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderFollowups()">Retry</button>
+                </div>`;
+        }
     },
 
     meetingsState: {

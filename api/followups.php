@@ -2,7 +2,9 @@
 // api/followups.php - Followup Management API
 
 header('Content-Type: application/json');
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -38,7 +40,7 @@ if ($action === 'list') {
     $whereClause = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
 
     $stmt = $pdo->prepare("
-        SELECT f.*, l.id as lead_id, l.name as lead_name, l.mobile as lead_mobile, l.company_name, l.lead_code, u.name as agent_name
+        SELECT f.*, l.id as lead_id, l.name as lead_name, l.mobile as lead_mobile, l.mobile as phone, l.company_name, l.lead_code, u.name as agent_name, u.name as assigned_name, CONCAT(f.followup_date, ' ', COALESCE(f.followup_time, '')) as scheduled_at
         FROM followups f
         JOIN leads l ON f.lead_id = l.id
         JOIN users u ON f.user_id = u.id

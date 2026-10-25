@@ -2,7 +2,9 @@
 // api/leads.php - Lead Management API with Full Specification (CRUD, Search, Filters, RBAC, Auto-Assign & CSV Export)
 
 header('Content-Type: application/json');
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -91,8 +93,8 @@ function logActivity($pdo, $module, $action, $recordId, $oldVal = null, $newVal 
     } catch (Exception $e) {}
 }
 
-// 1. LIST LEADS
-if ($action === 'list') {
+// 1. LIST & WORKSPACE LEADS
+if ($action === 'list' || $action === 'workspace') {
     $page = max(1, (int)($_GET['page'] ?? 1));
     $limit = min(100, max(10, (int)($_GET['limit'] ?? 15)));
     $offset = ($page - 1) * $limit;
@@ -281,22 +283,34 @@ if ($action === 'list') {
     $cStmt->execute($countsParams);
     $summaryCounts = $cStmt->fetch();
 
+    foreach ($leads as &$leadItem) {
+        if (!isset($leadItem['phone']) && isset($leadItem['mobile'])) {
+            $leadItem['phone'] = $leadItem['mobile'];
+        }
+        if (!isset($leadItem['next_followup_date']) && isset($leadItem['next_followup_at'])) {
+            $leadItem['next_followup_date'] = $leadItem['next_followup_at'];
+        }
+        if (!isset($leadItem['last_remarks'])) {
+            $leadItem['last_remarks'] = $leadItem['latest_call_outcome'] ?? $leadItem['initial_remark'] ?? '-';
+        }
+    }
+    unset($leadItem);
+
     echo json_encode([
         'success' => true,
-        'data' => [
-            'leads' => $leads,
-            'counts' => [
-                'to_call' => (int)($summaryCounts['to_call_count'] ?? 0),
-                'followups' => (int)($summaryCounts['followups_count'] ?? 0),
-                'called' => (int)($summaryCounts['called_count'] ?? 0),
-                'all' => (int)($summaryCounts['total_count'] ?? 0),
-            ],
-            'pagination' => [
-                'total' => $totalRecords,
-                'page' => $page,
-                'limit' => $limit,
-                'total_pages' => ceil($totalRecords / $limit)
-            ]
+        'data' => $leads,
+        'leads' => $leads,
+        'pagination' => [
+            'total' => $totalRecords,
+            'page' => $page,
+            'limit' => $limit,
+            'total_pages' => ceil($totalRecords / $limit)
+        ],
+        'counts' => [
+            'to_call' => (int)($summaryCounts['to_call_count'] ?? 0),
+            'followups' => (int)($summaryCounts['followups_count'] ?? 0),
+            'called' => (int)($summaryCounts['called_count'] ?? 0),
+            'all' => (int)($summaryCounts['total_count'] ?? 0),
         ]
     ]);
     exit;

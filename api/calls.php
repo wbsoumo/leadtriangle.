@@ -2,7 +2,9 @@
 // api/calls.php - Calling Operations API
 
 header('Content-Type: application/json');
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -445,3 +447,44 @@ if ($action === 'log_background_call') {
     }
     exit;
 }
+
+// 7. CALLING QUEUE LIST
+if ($action === 'queue') {
+    $where = ["l.is_archived = 0"];
+    $params = [];
+    if ($roleName === 'operation_executive') {
+        $where[] = "(l.assigned_executive_id = :uid OR l.assigned_executive_id IS NULL)";
+        $params['uid'] = $userId;
+    }
+    // Queue criteria: New, Contacting, Follow-up Required, or next_followup_at <= NOW()
+    $where[] = "(l.status_id IN (1, 2, 3, 4, 6, 17, 18) OR (l.next_followup_at IS NOT NULL AND DATE(l.next_followup_at) <= CURDATE()))";
+
+    $whereSql = "WHERE " . implode(" AND ", $where);
+    $stmt = $pdo->prepare("
+        SELECT 
+            l.id, l.name, l.mobile as phone, l.priority, l.status_id,
+            ls.name as status_name, ls.color_code as status_color,
+            srv.name as service_name,
+            u.name as assigned_name,
+            l.next_followup_at
+        FROM leads l
+        LEFT JOIN lead_statuses ls ON l.status_id = ls.id
+        LEFT JOIN services srv ON l.service_id = srv.id
+        LEFT JOIN users u ON l.assigned_executive_id = u.id
+        $whereSql
+        ORDER BY 
+            CASE WHEN l.priority = 'high' THEN 1 WHEN l.priority = 'medium' THEN 2 ELSE 3 END,
+            l.id DESC
+        LIMIT 50
+    ");
+    $stmt->execute($params);
+    $queue = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode([
+        'success' => true,
+        'data' => $queue,
+        'count' => count($queue)
+    ]);
+    exit;
+}
+

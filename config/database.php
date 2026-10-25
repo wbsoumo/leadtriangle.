@@ -20,7 +20,7 @@ function startThirtyDaySession() {
 }
 startThirtyDaySession();
 
-define('DB_HOST', 'localhost');
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', 'helnovexaa_leadtriangle');
 define('DB_USER', 'helnovexaa_leadtriangle');
 define('DB_PASS', 'Soumojit1234@');

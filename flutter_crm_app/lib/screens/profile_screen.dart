@@ -85,12 +85,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadProfileData,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: _isLoading
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 120),
+                    child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+                  ),
+                )
+              : SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                 // 1. Top Header (Title + Settings Gear)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

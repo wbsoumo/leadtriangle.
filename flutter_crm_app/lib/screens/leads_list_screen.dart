@@ -6,7 +6,9 @@ import 'lead_detail_screen.dart';
 import 'call_outcome_modal.dart';
 
 class LeadsListScreen extends StatefulWidget {
-  const LeadsListScreen({super.key});
+  final String initialFilterPill;
+
+  const LeadsListScreen({super.key, this.initialFilterPill = 'to_call'});
 
   @override
   State<LeadsListScreen> createState() => _LeadsListScreenState();
@@ -20,7 +22,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
   List<LeadModel> _filteredLeads = [];
   bool _isLoading = true;
 
-  String _selectedTopPill = 'to_call'; // 'to_call', 'followups', 'called', 'all'
+  late String _selectedTopPill; // 'to_call', 'followups', 'called', 'all'
   String _searchQuery = '';
 
   // Filter Modal Controls
@@ -41,6 +43,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTopPill = widget.initialFilterPill;
     _fetchLeadsData();
   }
 

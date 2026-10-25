@@ -651,6 +651,44 @@ if ($action === 'update_row_color') {
     exit;
 }
 
+// 4d-2. DIRECT UPDATE LEAD STATUS
+if ($action === 'update_status') {
+    $leadId = (int)($_POST['lead_id'] ?? $_POST['id'] ?? ($rawInputData['lead_id'] ?? ($rawInputData['id'] ?? 0)));
+    $statusId = (int)($_POST['status_id'] ?? ($rawInputData['status_id'] ?? 0));
+    $remarks = trim($_POST['remarks'] ?? ($rawInputData['remarks'] ?? ''));
+
+    if (!$leadId || !$statusId) {
+        echo json_encode(['success' => false, 'message' => 'Lead ID and status ID required']);
+        exit;
+    }
+
+    $stStmt = $pdo->prepare("SELECT name, color_code FROM lead_statuses WHERE id = :sid");
+    $stStmt->execute(['sid' => $statusId]);
+    $statusInfo = $stStmt->fetch();
+    if (!$statusInfo) {
+        echo json_encode(['success' => false, 'message' => 'Invalid status ID']);
+        exit;
+    }
+
+    $updateStmt = $pdo->prepare("UPDATE leads SET status_id = :sid WHERE id = :lid");
+    $updateStmt->execute(['sid' => $statusId, 'lid' => $leadId]);
+
+    $logMsg = "Status updated to " . $statusInfo['name'];
+    if (!empty($remarks)) {
+        $logMsg .= ": " . $remarks;
+    }
+    logActivity($pdo, 'leads', 'status_updated', $leadId, null, $logMsg);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Lead status updated to ' . $statusInfo['name'],
+        'status_id' => $statusId,
+        'status_name' => $statusInfo['name'],
+        'status_color' => $statusInfo['color_code']
+    ]);
+    exit;
+}
+
 // 4e. UPDATE DISPOSITION & AUTOMATIC STATUS (Workspace Fast Action)
 if ($action === 'update_disposition') {
     $leadId = (int)($_POST['lead_id'] ?? ($rawInputData['lead_id'] ?? 0));

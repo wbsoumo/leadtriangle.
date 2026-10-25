@@ -126,16 +126,23 @@ class ApiService {
     }
   }
 
-  // Save Call Outcome & Schedule Followup/Meeting
+  // Save Call Outcome & Schedule Followup/Meeting with Status Update
   Future<bool> logCallOutcome({
     required int leadId,
     required int callOutcomeId,
     required int durationSeconds,
     required String remarks,
+    int? statusId,
+    String? disqualificationReason,
     bool scheduleFollowup = false,
     String? followupDate,
     String? followupTime,
     String? followupPurpose,
+    bool scheduleMeeting = false,
+    String? meetingDatetime,
+    String? meetingTitle,
+    String? meetingMode,
+    String? meetingLink,
   }) async {
     try {
       final headers = await _getHeaders();
@@ -144,10 +151,18 @@ class ApiService {
         'call_outcome_id': callOutcomeId.toString(),
         'call_duration': durationSeconds.toString(),
         'remarks': remarks,
+        if (statusId != null && statusId > 0) 'status_id': statusId.toString(),
+        if (disqualificationReason != null && disqualificationReason.isNotEmpty)
+          'disqualification_reason': disqualificationReason,
         'schedule_followup': scheduleFollowup ? '1' : '0',
         if (followupDate != null) 'followup_date': followupDate,
         if (followupTime != null) 'followup_time': followupTime,
         if (followupPurpose != null) 'followup_purpose': followupPurpose,
+        'schedule_meeting': scheduleMeeting ? '1' : '0',
+        if (meetingDatetime != null) 'meeting_datetime': meetingDatetime,
+        if (meetingTitle != null) 'meeting_title': meetingTitle,
+        if (meetingMode != null) 'meeting_mode': meetingMode,
+        if (meetingLink != null) 'meeting_link': meetingLink,
       };
 
       final res = await http.post(
@@ -159,6 +174,29 @@ class ApiService {
       return data['success'] == true;
     } catch (e) {
       return false;
+    }
+  }
+
+  // Direct Update Lead Status
+  Future<Map<String, dynamic>> updateLeadStatus({
+    required int leadId,
+    required int statusId,
+    String remarks = '',
+  }) async {
+    try {
+      final headers = await _getHeaders();
+      final res = await http.post(
+        Uri.parse('$baseUrl/leads.php?action=update_status'),
+        headers: headers,
+        body: {
+          'lead_id': leadId.toString(),
+          'status_id': statusId.toString(),
+          'remarks': remarks,
+        },
+      );
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error updating lead status.'};
     }
   }
 

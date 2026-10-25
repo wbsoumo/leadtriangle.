@@ -383,4 +383,98 @@ table.dataTable th, table.dataTable td {
     margin-bottom: 4px;
 }
 
+/* Call Lead Modal & Viewport Responsiveness */
+#call-modal .modal-dialog {
+    max-width: 680px;
+    margin: 1.5rem auto;
+}
+
+#call-modal .modal-content {
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.25) !important;
+    overflow: hidden;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#call-modal .modal-header {
+    padding: 0.85rem 1.25rem;
+    flex-shrink: 0;
+    align-items: center;
+}
+
+#call-modal .modal-body {
+    padding: 1.25rem;
+    overflow-y: auto;
+    max-height: calc(92vh - 125px);
+    -webkit-overflow-scrolling: touch;
+}
+
+#call-modal .modal-footer {
+    padding: 0.75rem 1.25rem;
+    flex-shrink: 0;
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+#call-modal .modal-label-contrast {
+    color: #2b3035 !important;
+    font-weight: 600 !important;
+    font-size: 0.825rem !important;
+    margin-bottom: 0.35rem;
+    display: flex;
+    align-items: center;
+}
+
+#call-modal .form-control, #call-modal .custom-select {
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+#call-modal .card-outline {
+    border-width: 1px;
+    box-shadow: none;
+}
+
+@media (max-width: 576px) {
+    #call-modal .modal-dialog {
+        margin: 0.5rem;
+        max-width: 100%;
+    }
+    #call-modal .modal-content {
+        max-height: 96vh;
+    }
+    #call-modal .modal-body {
+        padding: 0.85rem;
+        max-height: calc(96vh - 120px);
+    }
+}
+
+/* Empty State / No Results UI */
+.lead-empty-state {
+    padding: 40px 20px;
+    text-align: center;
+}
+.lead-empty-state .empty-icon {
+    font-size: 44px;
+    color: #6c757d;
+    opacity: 0.65;
+    margin-bottom: 12px;
+}
+.lead-empty-state .empty-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #343a40;
+    margin-bottom: 6px;
+}
+.lead-empty-state .empty-desc {
+    font-size: 0.875rem;
+    color: #6c757d;
+    max-width: 400px;
+    margin: 0 auto 16px auto;
+}
+
+
 

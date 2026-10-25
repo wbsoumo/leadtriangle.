@@ -7,6 +7,9 @@ if (empty($_SESSION['user_id'])) {
     header('Location: /login');
     exit;
 }
+
+$userRole = $_SESSION['role_name'] ?? '';
+$canAddLead = in_array($userRole, ['super_admin', 'admin', 'manager']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,11 +58,13 @@ if (empty($_SESSION['user_id'])) {
                     <i class="fas fa-bars"></i>
                 </a>
             </li>
+            <?php if ($canAddLead): ?>
             <li class="nav-item d-none d-sm-inline-block ml-2 admin-manager-only" id="top-add-lead-btn">
                 <button class="btn btn-primary btn-sm font-weight-bold" onclick="App.openCreateLeadModal()">
                     <i class="fas fa-plus-circle mr-1"></i> Add Lead
                 </button>
             </li>
+            <?php endif; ?>
         </ul>
 
         <!-- Global Quick Search -->

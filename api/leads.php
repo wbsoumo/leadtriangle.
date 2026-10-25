@@ -15,9 +15,9 @@ if (empty($_SESSION['user_id'])) {
 }
 
 $pdo = Database::getInstance();
-$userId = $_SESSION['user_id'];
-$roleName = $_SESSION['role_name'];
-$teamId = $_SESSION['team_id'];
+$userId = $_SESSION['user_id'] ?? 0;
+$roleName = $_SESSION['role_name'] ?? '';
+$teamId = $_SESSION['team_id'] ?? 0;
 
 // Auto-migration: ensure row_color column exists on leads table
 try {
@@ -99,221 +99,244 @@ if ($action === 'list' || $action === 'workspace') {
     $limit = min(100, max(10, (int)($_GET['limit'] ?? 15)));
     $offset = ($page - 1) * $limit;
 
-    $filter = $_GET['filter'] ?? 'all';
-    $search = trim($_GET['search'] ?? '');
-    $statusId = $_GET['status_id'] ?? null;
-    $sourceId = $_GET['source_id'] ?? null;
-    $serviceId = $_GET['service_id'] ?? null;
-    $priority = $_GET['priority'] ?? null;
-    $managerId = $_GET['manager_id'] ?? null;
-    $executiveId = $_GET['executive_id'] ?? null;
-    $isQualified = $_GET['is_qualified'] ?? null;
-    $callingQueue = $_GET['calling_queue'] ?? null;
+    try {
+        $filter = $_GET['filter'] ?? 'all';
+        $search = trim($_GET['search'] ?? '');
+        $statusId = $_GET['status_id'] ?? null;
+        $sourceId = $_GET['source_id'] ?? null;
+        $serviceId = $_GET['service_id'] ?? null;
+        $priority = $_GET['priority'] ?? null;
+        $managerId = $_GET['manager_id'] ?? null;
+        $executiveId = $_GET['executive_id'] ?? null;
+        $isQualified = $_GET['is_qualified'] ?? null;
+        $callingQueue = $_GET['calling_queue'] ?? null;
 
-    $where = ["l.is_archived = 0"];
-    $params = [];
+        $where = ["l.is_archived = 0"];
+        $params = [];
 
-    // Role-based visibility scoping
-    if ($roleName === 'operation_executive') {
-        $where[] = "l.assigned_executive_id = :rbac_exec_id";
-        $params['rbac_exec_id'] = $userId;
-    } elseif ($roleName === 'manager') {
-        $where[] = "(l.assigned_manager_id = :rbac_mgr_id OR l.assigned_executive_id IN (SELECT id FROM users WHERE team_id = :rbac_team_id))";
-        $params['rbac_mgr_id'] = $userId;
-        $params['rbac_team_id'] = $teamId;
-    }
-
-    if ($filter === 'to_call') {
-        $where[] = "((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0 AND l.last_contacted_at IS NULL)";
-    } elseif ($filter === 'followups' || $filter === 'followup') {
-        $where[] = "(l.status_id = 6 OR EXISTS (SELECT 1 FROM followups f WHERE f.lead_id = l.id AND f.status = 'Pending') OR EXISTS (SELECT 1 FROM call_logs cl WHERE cl.lead_id = l.id AND cl.call_outcome_id IN (3, 6)))";
-    } elseif ($filter === 'called') {
-        $where[] = "((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) > 0 OR l.last_contacted_at IS NOT NULL)";
-    }
-
-    if (!empty($search)) {
-        $where[] = "(l.name LIKE :search OR l.mobile LIKE :search OR l.email LIKE :search OR l.company_name LIKE :search OR l.lead_code LIKE :search)";
-        $params['search'] = "%$search%";
-    }
-    if (!empty($statusId)) {
-        $where[] = "l.status_id = :status_id";
-        $params['status_id'] = $statusId;
-    }
-    if (!empty($sourceId)) {
-        $where[] = "l.lead_source_id = :source_id";
-        $params['source_id'] = $sourceId;
-    }
-    if (!empty($serviceId)) {
-        $where[] = "l.service_id = :service_id";
-        $params['service_id'] = $serviceId;
-    }
-    if (!empty($priority)) {
-        $where[] = "l.priority = :priority";
-        $params['priority'] = $priority;
-    }
-    if (!empty($managerId)) {
-        $where[] = "l.assigned_manager_id = :manager_id";
-        $params['manager_id'] = $managerId;
-    }
-    if (!empty($executiveId)) {
-        $where[] = "l.assigned_executive_id = :executive_id";
-        $params['executive_id'] = $executiveId;
-    }
-    if ($isQualified !== null && $isQualified !== '') {
-        $where[] = "l.is_qualified = :is_qualified";
-        $params['is_qualified'] = (int)$isQualified;
-    }
-    
-    // Additional workspace filters
-    $rowColor = trim($_GET['row_color'] ?? '');
-    if (!empty($rowColor)) {
-        if ($rowColor === 'default' || $rowColor === 'none') {
-            $where[] = "(l.row_color IS NULL OR l.row_color = '')";
-        } else {
-            $where[] = "l.row_color = :row_color";
-            $params['row_color'] = $rowColor;
+        // Role-based visibility scoping
+        if ($roleName === 'operation_executive') {
+            $where[] = "l.assigned_executive_id = :rbac_exec_id";
+            $params['rbac_exec_id'] = $userId;
+        } elseif ($roleName === 'manager') {
+            $where[] = "(l.assigned_manager_id = :rbac_mgr_id OR l.assigned_executive_id IN (SELECT id FROM users WHERE team_id = :rbac_team_id))";
+            $params['rbac_mgr_id'] = $userId;
+            $params['rbac_team_id'] = $teamId;
         }
-    }
 
-    $followupDate = trim($_GET['followup_date'] ?? '');
-    if (!empty($followupDate)) {
-        if ($followupDate === 'today') {
-            $where[] = "DATE(l.next_followup_at) = CURDATE()";
-        } elseif ($followupDate === 'upcoming') {
-            $where[] = "DATE(l.next_followup_at) > CURDATE()";
-        } elseif ($followupDate === 'overdue') {
-            $where[] = "(DATE(l.next_followup_at) < CURDATE() AND l.next_followup_at IS NOT NULL)";
-        } elseif ($followupDate === 'has_followup') {
-            $where[] = "l.next_followup_at IS NOT NULL";
-        } else {
-            $where[] = "DATE(l.next_followup_at) = :followup_date";
-            $params['followup_date'] = $followupDate;
+        if ($filter === 'to_call') {
+            $where[] = "((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0 AND l.last_contacted_at IS NULL)";
+        } elseif ($filter === 'followups' || $filter === 'followup') {
+            $where[] = "(l.status_id = 6 OR EXISTS (SELECT 1 FROM followups f WHERE f.lead_id = l.id AND f.status = 'Pending') OR EXISTS (SELECT 1 FROM call_logs cl WHERE cl.lead_id = l.id AND cl.call_outcome_id IN (3, 6)))";
+        } elseif ($filter === 'called') {
+            $where[] = "((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) > 0 OR l.last_contacted_at IS NOT NULL)";
         }
-    }
 
-    // Specific Status Name Filter (e.g. 'New', 'Connected', 'Not Interested', 'Ringing', 'Not Responding', 'Invalid Number', 'Follow-up Needed', 'Calling')
-    $statusName = trim($_GET['status_name'] ?? '');
-    if (!empty($statusName)) {
-        $where[] = "ls.name = :status_name";
-        $params['status_name'] = $statusName;
-    }
-
-    // Unconnected Filter
-    if ($filter === 'unconnected') {
-        $where[] = "(l.status_id = 1 OR ls.name IN ('New', 'Pending', 'Unconnected', 'Switched Off', 'Not Reachable', 'Ringing', 'Not Responding', 'Busy') OR (SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0)";
-    }
-
-    if ($callingQueue === '1') {
-        if ($filter !== 'called' && $filter !== 'all' && empty($statusId)) {
-            $where[] = "(DATE(l.next_followup_at) = CURDATE() OR l.status_id IN (1, 2, 3, 4, 6))";
+        if (!empty($search)) {
+            $where[] = "(l.name LIKE :search1 OR l.mobile LIKE :search2 OR l.email LIKE :search3 OR l.company_name LIKE :search4 OR l.lead_code LIKE :search5)";
+            $searchParam = "%$search%";
+            $params['search1'] = $searchParam;
+            $params['search2'] = $searchParam;
+            $params['search3'] = $searchParam;
+            $params['search4'] = $searchParam;
+            $params['search5'] = $searchParam;
         }
-    }
-
-    // Sorting
-    $sortBy = $_GET['sort_by'] ?? 'id';
-    $sortOrder = strtoupper($_GET['sort_order'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
-    $allowedSort = [
-        'id' => 'l.id',
-        'name' => 'l.name',
-        'mobile' => 'l.mobile',
-        'company' => 'l.company_name',
-        'status' => 'ls.name',
-        'created_at' => 'l.created_at',
-        'next_followup' => 'l.next_followup_at',
-        'last_contacted' => 'l.last_contacted_at'
-    ];
-    $orderByClause = $allowedSort[$sortBy] ?? 'l.id';
-
-    $whereClause = "WHERE " . implode(" AND ", $where);
-
-    // Count Total
-    $countSql = "SELECT COUNT(*) as total FROM leads l $whereClause";
-    $countStmt = $pdo->prepare($countSql);
-    $countStmt->execute($params);
-    $totalRecords = (int)$countStmt->fetch()['total'];
-
-    // Fetch Records with Latest Call Outcome
-    $sql = "
-        SELECT 
-            l.*, 
-            ls.name as status_name, ls.color_code as status_color,
-            src.name as source_name,
-            srv.name as service_name,
-            u_exec.name as executive_name,
-            u_mgr.name as manager_name,
-            (SELECT co.name FROM call_logs cl JOIN call_outcomes co ON cl.call_outcome_id = co.id WHERE cl.lead_id = l.id ORDER BY cl.id DESC LIMIT 1) as latest_call_outcome,
-            (SELECT cl.called_at FROM call_logs cl WHERE cl.lead_id = l.id ORDER BY cl.id DESC LIMIT 1) as latest_call_at,
-            (SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) as call_count
-        FROM leads l
-        LEFT JOIN lead_statuses ls ON l.status_id = ls.id
-        LEFT JOIN lead_sources src ON l.lead_source_id = src.id
-        LEFT JOIN services srv ON l.service_id = srv.id
-        LEFT JOIN users u_exec ON l.assigned_executive_id = u_exec.id
-        LEFT JOIN users u_mgr ON l.assigned_manager_id = u_mgr.id
-        $whereClause
-        ORDER BY $orderByClause $sortOrder
-        LIMIT :limit OFFSET :offset
-    ";
-
-    $stmt = $pdo->prepare($sql);
-    foreach ($params as $k => $v) {
-        $stmt->bindValue(":$k", $v);
-    }
-    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $stmt->execute();
-    $leads = $stmt->fetchAll();
-
-    // Summary counts for tabs
-    $countsWhere = "WHERE l.is_archived = 0";
-    $countsParams = [];
-    if ($roleName === 'operation_executive') {
-        $countsWhere .= " AND l.assigned_executive_id = :exec_id";
-        $countsParams['exec_id'] = $userId;
-    }
-    $countsSql = "
-        SELECT 
-            COUNT(*) as total_count,
-            SUM(CASE WHEN ((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0 AND l.last_contacted_at IS NULL) THEN 1 ELSE 0 END) as to_call_count,
-            SUM(CASE WHEN (l.status_id = 6 OR EXISTS (SELECT 1 FROM followups f WHERE f.lead_id = l.id AND f.status = 'Pending') OR EXISTS (SELECT 1 FROM call_logs cl WHERE cl.lead_id = l.id AND cl.call_outcome_id IN (3, 6))) THEN 1 ELSE 0 END) as followups_count,
-            SUM(CASE WHEN ((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) > 0 OR l.last_contacted_at IS NOT NULL) THEN 1 ELSE 0 END) as called_count
-        FROM leads l $countsWhere
-    ";
-    $cStmt = $pdo->prepare($countsSql);
-    $cStmt->execute($countsParams);
-    $summaryCounts = $cStmt->fetch();
-
-    foreach ($leads as &$leadItem) {
-        if (!isset($leadItem['phone']) && isset($leadItem['mobile'])) {
-            $leadItem['phone'] = $leadItem['mobile'];
+        if (!empty($statusId)) {
+            $where[] = "l.status_id = :status_id";
+            $params['status_id'] = $statusId;
         }
-        if (!isset($leadItem['next_followup_date']) && isset($leadItem['next_followup_at'])) {
-            $leadItem['next_followup_date'] = $leadItem['next_followup_at'];
+        if (!empty($sourceId)) {
+            $where[] = "l.lead_source_id = :source_id";
+            $params['source_id'] = $sourceId;
         }
-        if (!isset($leadItem['last_remarks'])) {
-            $leadItem['last_remarks'] = $leadItem['latest_call_outcome'] ?? $leadItem['initial_remark'] ?? '-';
+        if (!empty($serviceId)) {
+            $where[] = "l.service_id = :service_id";
+            $params['service_id'] = $serviceId;
         }
-    }
-    unset($leadItem);
+        if (!empty($priority)) {
+            $where[] = "l.priority = :priority";
+            $params['priority'] = $priority;
+        }
+        if (!empty($managerId)) {
+            $where[] = "l.assigned_manager_id = :manager_id";
+            $params['manager_id'] = $managerId;
+        }
+        if (!empty($executiveId)) {
+            $where[] = "l.assigned_executive_id = :executive_id";
+            $params['executive_id'] = $executiveId;
+        }
+        if ($isQualified !== null && $isQualified !== '') {
+            $where[] = "l.is_qualified = :is_qualified";
+            $params['is_qualified'] = (int)$isQualified;
+        }
+        
+        // Additional workspace filters
+        $rowColor = trim($_GET['row_color'] ?? '');
+        if (!empty($rowColor)) {
+            if ($rowColor === 'default' || $rowColor === 'none') {
+                $where[] = "(l.row_color IS NULL OR l.row_color = '')";
+            } else {
+                $where[] = "l.row_color = :row_color";
+                $params['row_color'] = $rowColor;
+            }
+        }
 
-    echo json_encode([
-        'success' => true,
-        'data' => $leads,
-        'leads' => $leads,
-        'pagination' => [
-            'total' => $totalRecords,
-            'page' => $page,
-            'limit' => $limit,
-            'total_pages' => ceil($totalRecords / $limit)
-        ],
-        'counts' => [
-            'to_call' => (int)($summaryCounts['to_call_count'] ?? 0),
-            'followups' => (int)($summaryCounts['followups_count'] ?? 0),
-            'called' => (int)($summaryCounts['called_count'] ?? 0),
-            'all' => (int)($summaryCounts['total_count'] ?? 0),
-        ]
-    ]);
-    exit;
+        $followupDate = trim($_GET['followup_date'] ?? '');
+        if (!empty($followupDate)) {
+            if ($followupDate === 'today') {
+                $where[] = "DATE(l.next_followup_at) = CURDATE()";
+            } elseif ($followupDate === 'upcoming') {
+                $where[] = "DATE(l.next_followup_at) > CURDATE()";
+            } elseif ($followupDate === 'overdue') {
+                $where[] = "(DATE(l.next_followup_at) < CURDATE() AND l.next_followup_at IS NOT NULL)";
+            } elseif ($followupDate === 'has_followup') {
+                $where[] = "l.next_followup_at IS NOT NULL";
+            } else {
+                $where[] = "DATE(l.next_followup_at) = :followup_date";
+                $params['followup_date'] = $followupDate;
+            }
+        }
+
+        // Specific Status Name Filter
+        $statusName = trim($_GET['status_name'] ?? '');
+        if (!empty($statusName)) {
+            $where[] = "ls.name = :status_name";
+            $params['status_name'] = $statusName;
+        }
+
+        // Unconnected Filter
+        if ($filter === 'unconnected') {
+            $where[] = "(l.status_id = 1 OR ls.name IN ('New', 'Pending', 'Unconnected', 'Switched Off', 'Not Reachable', 'Ringing', 'Not Responding', 'Busy') OR (SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0)";
+        }
+
+        if ($callingQueue === '1') {
+            if ($filter !== 'called' && $filter !== 'all' && empty($statusId)) {
+                $where[] = "(DATE(l.next_followup_at) = CURDATE() OR l.status_id IN (1, 2, 3, 4, 6))";
+            }
+        }
+
+        // Sorting
+        $sortBy = $_GET['sort_by'] ?? 'id';
+        $sortOrder = strtoupper($_GET['sort_order'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
+        $allowedSort = [
+            'id' => 'l.id',
+            'name' => 'l.name',
+            'mobile' => 'l.mobile',
+            'company' => 'l.company_name',
+            'status' => 'ls.name',
+            'created_at' => 'l.created_at',
+            'next_followup' => 'l.next_followup_at',
+            'last_contacted' => 'l.last_contacted_at'
+        ];
+        $orderByClause = $allowedSort[$sortBy] ?? 'l.id';
+
+        $whereClause = "WHERE " . implode(" AND ", $where);
+
+        // Count Total with lead_statuses joined to support ls.name filters safely
+        $countSql = "SELECT COUNT(*) as total FROM leads l LEFT JOIN lead_statuses ls ON l.status_id = ls.id $whereClause";
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->execute($params);
+        $totalRecords = (int)$countStmt->fetch()['total'];
+
+        // Fetch Records with Latest Call Outcome
+        $sql = "
+            SELECT 
+                l.*, 
+                ls.name as status_name, ls.color_code as status_color,
+                src.name as source_name,
+                srv.name as service_name,
+                u_exec.name as executive_name,
+                u_mgr.name as manager_name,
+                (SELECT co.name FROM call_logs cl JOIN call_outcomes co ON cl.call_outcome_id = co.id WHERE cl.lead_id = l.id ORDER BY cl.id DESC LIMIT 1) as latest_call_outcome,
+                (SELECT cl.called_at FROM call_logs cl WHERE cl.lead_id = l.id ORDER BY cl.id DESC LIMIT 1) as latest_call_at,
+                (SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) as call_count
+            FROM leads l
+            LEFT JOIN lead_statuses ls ON l.status_id = ls.id
+            LEFT JOIN lead_sources src ON l.lead_source_id = src.id
+            LEFT JOIN services srv ON l.service_id = srv.id
+            LEFT JOIN users u_exec ON l.assigned_executive_id = u_exec.id
+            LEFT JOIN users u_mgr ON l.assigned_manager_id = u_mgr.id
+            $whereClause
+            ORDER BY $orderByClause $sortOrder
+            LIMIT :limit OFFSET :offset
+        ";
+
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue(":$k", $v);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $leads = $stmt->fetchAll();
+
+        // Summary counts for tabs
+        $countsWhere = "WHERE l.is_archived = 0";
+        $countsParams = [];
+        if ($roleName === 'operation_executive') {
+            $countsWhere .= " AND l.assigned_executive_id = :exec_id";
+            $countsParams['exec_id'] = $userId;
+        } elseif ($roleName === 'manager') {
+            $countsWhere .= " AND (l.assigned_manager_id = :rbac_mgr_id OR l.assigned_executive_id IN (SELECT id FROM users WHERE team_id = :rbac_team_id))";
+            $countsParams['rbac_mgr_id'] = $userId;
+            $countsParams['rbac_team_id'] = $teamId;
+        }
+        $countsSql = "
+            SELECT 
+                COUNT(*) as total_count,
+                SUM(CASE WHEN ((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) = 0 AND l.last_contacted_at IS NULL) THEN 1 ELSE 0 END) as to_call_count,
+                SUM(CASE WHEN (l.status_id = 6 OR EXISTS (SELECT 1 FROM followups f WHERE f.lead_id = l.id AND f.status = 'Pending') OR EXISTS (SELECT 1 FROM call_logs cl WHERE cl.lead_id = l.id AND cl.call_outcome_id IN (3, 6))) THEN 1 ELSE 0 END) as followups_count,
+                SUM(CASE WHEN ((SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) > 0 OR l.last_contacted_at IS NOT NULL) THEN 1 ELSE 0 END) as called_count
+            FROM leads l $countsWhere
+        ";
+        $cStmt = $pdo->prepare($countsSql);
+        $cStmt->execute($countsParams);
+        $summaryCounts = $cStmt->fetch();
+
+        foreach ($leads as &$leadItem) {
+            if (!isset($leadItem['phone']) && isset($leadItem['mobile'])) {
+                $leadItem['phone'] = $leadItem['mobile'];
+            }
+            if (!isset($leadItem['next_followup_date']) && isset($leadItem['next_followup_at'])) {
+                $leadItem['next_followup_date'] = $leadItem['next_followup_at'];
+            }
+            if (!isset($leadItem['last_remarks'])) {
+                $leadItem['last_remarks'] = $leadItem['latest_call_outcome'] ?? $leadItem['initial_remark'] ?? '-';
+            }
+        }
+        unset($leadItem);
+
+        echo json_encode([
+            'success' => true,
+            'data' => $leads,
+            'leads' => $leads,
+            'pagination' => [
+                'total' => $totalRecords,
+                'page' => $page,
+                'limit' => $limit,
+                'total_pages' => max(1, (int)ceil($totalRecords / $limit))
+            ],
+            'counts' => [
+                'to_call' => (int)($summaryCounts['to_call_count'] ?? 0),
+                'followups' => (int)($summaryCounts['followups_count'] ?? 0),
+                'called' => (int)($summaryCounts['called_count'] ?? 0),
+                'all' => (int)($summaryCounts['total_count'] ?? 0),
+            ]
+        ]);
+        exit;
+    } catch (Throwable $e) {
+        error_log("Error in api/leads list: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Database query error: ' . $e->getMessage(),
+            'data' => [],
+            'leads' => [],
+            'pagination' => ['total' => 0, 'page' => $page, 'limit' => $limit, 'total_pages' => 1],
+            'counts' => ['to_call' => 0, 'followups' => 0, 'called' => 0, 'all' => 0]
+        ]);
+        exit;
+    }
 }
 
 // 2. CHECK DUPLICATE

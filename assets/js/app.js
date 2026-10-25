@@ -83,11 +83,48 @@ const App = {
         }
     },
 
+    escapeHtml: function(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    },
+
     handleGlobalSearch: function(query) {
-        if (!query || !query.trim()) return;
-        this.leadsFilterState.search = query.trim();
-        this.navigate('leads');
-        this.renderLeads(1, { search: query.trim() });
+        const q = (query || '').trim();
+        this.leadsFilterState.search = q;
+        this.leadsFilterState.page = 1;
+
+        const topSearch = document.getElementById('top-global-search');
+        if (topSearch && topSearch.value !== q) topSearch.value = q;
+
+        if (this.currentView !== 'leads') {
+            this.navigate('leads', true, { search: q });
+        } else {
+            this.renderLeads(1, { search: q });
+        }
+    },
+
+    clearLeadsSearch: function() {
+        this.leadsFilterState.search = '';
+        this.leadsFilterState.page = 1;
+        const topSearch = document.getElementById('top-global-search');
+        if (topSearch) topSearch.value = '';
+        const leadSearch = document.getElementById('lead-search-input');
+        if (leadSearch) leadSearch.value = '';
+        this.renderLeads(1, { search: '' });
+    },
+
+    clearAllLeadsFilters: function() {
+        this.leadsFilterState = { page: 1, limit: 25, search: '' };
+        const topSearch = document.getElementById('top-global-search');
+        if (topSearch) topSearch.value = '';
+        const leadSearch = document.getElementById('lead-search-input');
+        if (leadSearch) leadSearch.value = '';
+        this.renderLeads(1);
     },
 
     renderUserUI: function() {
@@ -311,7 +348,7 @@ const App = {
     // ==========================================
     // 3. NAVIGATION & ROUTING
     // ==========================================
-    navigate: function(view, updateHistory = true) {
+    navigate: function(view, updateHistory = true, viewParams = null) {
         // Enforce page-level permissions
         const isSuperAdmin = (this.currentUser && this.currentUser.role_name === 'super_admin');
         if (this.currentUser && this.currentUser.allowed_pages && !isSuperAdmin) {
@@ -393,7 +430,7 @@ const App = {
         try {
             if (view === 'dashboard') renderPromise = this.renderDashboard();
             else if (view === 'workspace') renderPromise = this.renderWorkspace();
-            else if (view === 'leads') renderPromise = this.renderLeads();
+            else if (view === 'leads') renderPromise = this.renderLeads(1, viewParams || {});
             else if (view === 'calling_queue' || view === 'calling-queue') renderPromise = this.renderCallingQueue();
             else if (view === 'followups') renderPromise = this.renderFollowups();
             else if (view === 'meetings') renderPromise = this.renderMeetings();
@@ -1067,16 +1104,61 @@ const App = {
     // 6. MODULE: LEADS & WORKSPACE
     // ==========================================
     renderLeads: async function(page = 1, filters = {}) {
+        this.leadSearchSeq = (this.leadSearchSeq || 0) + 1;
+        const currentSeq = this.leadSearchSeq;
+
         try {
             this.leadsFilterState = { ...this.leadsFilterState, ...filters, page: page };
-            const queryParams = new URLSearchParams(this.leadsFilterState).toString();
-            const res = await fetch(`api/leads?${queryParams}`);
-            const data = await res.json();
-            if (!data || !data.success) {
+
+            // Synchronize top global search input
+            const topSearch = document.getElementById('top-global-search');
+            if (topSearch && this.leadsFilterState.search !== undefined) {
+                topSearch.value = this.leadsFilterState.search || '';
+            }
+
+            const queryParams = new URLSearchParams();
+            for (const key in this.leadsFilterState) {
+                const val = this.leadsFilterState[key];
+                if (val !== null && val !== undefined && val !== '') {
+                    queryParams.append(key, val);
+                }
+            }
+
+            const res = await fetch(`api/leads?${queryParams.toString()}`);
+            const rawText = await res.text();
+            let data = null;
+
+            try {
+                data = JSON.parse(rawText);
+            } catch (jsonErr) {
+                console.error("Non-JSON API response from api/leads:", rawText);
+                if (currentSeq !== this.leadSearchSeq) return;
                 document.getElementById('content-viewport').innerHTML = `
-                    <div class="alert alert-danger m-3">
-                        <i class="fas fa-exclamation-triangle mr-1"></i> Failed to load leads database: ${data && data.message ? data.message : 'Unknown error'}.
-                        <button class="btn btn-outline-danger btn-sm ml-2" onclick="App.renderLeads(1)">Retry</button>
+                    <div class="alert alert-danger m-3 shadow-sm">
+                        <h5 class="font-weight-bold mb-1"><i class="fas fa-exclamation-triangle mr-2"></i> Failed to Load Leads</h5>
+                        <p class="mb-2 text-sm">The server returned an unexpected response format. Please retry or contact support if the issue persists.</p>
+                        <div class="p-2 bg-white rounded border text-monospace text-xs text-muted mb-3" style="max-height: 100px; overflow-y: auto;">
+                            ${App.escapeHtml(rawText.substring(0, 300))}
+                        </div>
+                        <button class="btn btn-outline-danger btn-sm font-weight-bold" onclick="App.renderLeads(${page})">
+                            <i class="fas fa-redo mr-1"></i> Retry
+                        </button>
+                    </div>`;
+                return;
+            }
+
+            // Discard stale response
+            if (currentSeq !== this.leadSearchSeq) return;
+
+            if (!res.ok || !data || !data.success) {
+                const errMsg = (data && data.message) ? data.message : `Server returned HTTP ${res.status}`;
+                document.getElementById('content-viewport').innerHTML = `
+                    <div class="alert alert-danger m-3 shadow-sm">
+                        <h5 class="font-weight-bold mb-1"><i class="fas fa-exclamation-triangle mr-2"></i> Error Loading Leads</h5>
+                        <p class="mb-3 text-sm">${App.escapeHtml(errMsg)}</p>
+                        <button class="btn btn-outline-danger btn-sm font-weight-bold" onclick="App.renderLeads(${page})">
+                            <i class="fas fa-redo mr-1"></i> Retry
+                        </button>
                     </div>`;
                 return;
             }
@@ -1084,66 +1166,78 @@ const App = {
             const leads = Array.isArray(data.data) ? data.data : (data.data && Array.isArray(data.data.leads) ? data.data.leads : (Array.isArray(data.leads) ? data.leads : []));
             const p = data.pagination || (data.data && data.data.pagination) || { total: leads.length, page: 1, total_pages: 1 };
 
-        // Update badge count
-        const badgeLeads = document.getElementById('badge-leads-count');
-        if (badgeLeads) badgeLeads.innerText = p.total;
+            // Update badge count
+            const badgeLeads = document.getElementById('badge-leads-count');
+            if (badgeLeads) badgeLeads.innerText = p.total;
 
-        const isOperator = !!(this.currentUser && this.currentUser.role_name === 'operation_executive');
-        const canAddLead = !isOperator;
+            const isOperator = !!(this.currentUser && this.currentUser.role_name === 'operation_executive');
+            const canAddLead = !isOperator;
 
-        let html = `
-            <div class="card card-primary card-outline shadow-sm">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap" style="gap: 10px;">
-                        <h3 class="card-title font-weight-bold mb-0">
-                            <i class="fas fa-address-book mr-1 text-primary"></i> All Leads Database (${p.total})
-                        </h3>
-                        <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
-                            ${canAddLead ? `
-                            <button class="btn btn-primary btn-sm font-weight-bold" onclick="App.openCreateLeadModal()">
-                                <i class="fas fa-plus mr-1"></i> Add Lead
-                            </button>` : ''}
-                            <button class="btn btn-outline-secondary btn-sm" onclick="App.renderLeads(App.leadsFilterState.page || 1, {}); App.fetchNotifications();" title="Refresh Table & Badges">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
+            let html = `
+                <div class="card card-primary card-outline shadow-sm">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap" style="gap: 10px;">
+                            <h3 class="card-title font-weight-bold mb-0">
+                                <i class="fas fa-address-book mr-1 text-primary"></i> All Leads Database (${p.total})
+                            </h3>
+                            <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                                ${canAddLead ? `
+                                <button class="btn btn-primary btn-sm font-weight-bold" onclick="App.openCreateLeadModal()">
+                                    <i class="fas fa-plus mr-1"></i> Add Lead
+                                </button>` : ''}
+                                <button class="btn btn-outline-secondary btn-sm font-weight-bold" onclick="App.renderLeads(App.leadsFilterState.page || 1, {}); App.fetchNotifications();" title="Refresh Table & Badges">
+                                    <i class="fas fa-sync-alt mr-1"></i> Refresh
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Filter Controls Toolbar -->
-                <div class="card-body bg-light border-bottom py-3">
-                    <div class="form-row align-items-center">
-                        <div class="col-md-3 col-12 mb-2 mb-md-0">
-                            <input type="text" id="lead-search-input" class="form-control form-control-sm" placeholder="Search name, phone, email, company..." value="${this.leadsFilterState.search || ''}" onkeyup="if(event.key==='Enter') App.renderLeads(1, {search: this.value})">
-                        </div>
-                        <div class="col-md-2 col-6 mb-2 mb-md-0">
-                            <select class="form-control form-control-sm" onchange="App.renderLeads(1, {filter: this.value})">
-                                <option value="">All Call States</option>
-                                <option value="pending" ${this.leadsFilterState.filter === 'pending' ? 'selected' : ''}>Pending Calls</option>
-                                <option value="called" ${this.leadsFilterState.filter === 'called' ? 'selected' : ''}>Already Contacted</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2 col-6 mb-2 mb-md-0">
-                            <select class="form-control form-control-sm" onchange="App.renderLeads(1, {priority: this.value})">
-                                <option value="">All Priorities</option>
-                                <option value="high" ${this.leadsFilterState.priority === 'high' ? 'selected' : ''}>High Priority</option>
-                                <option value="medium" ${this.leadsFilterState.priority === 'medium' ? 'selected' : ''}>Medium</option>
-                                <option value="low" ${this.leadsFilterState.priority === 'low' ? 'selected' : ''}>Low</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3 col-8 mb-2 mb-md-0">
-                            <select class="form-control form-control-sm" onchange="App.renderLeads(1, {status_id: this.value})">
-                                <option value="">All Lead Statuses</option>
-                                ${(this.dropdowns.statuses || []).map(s => `<option value="${s.id}" ${this.leadsFilterState.status_id == s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="col-md-2 col-4 text-right">
-                            <button class="btn btn-outline-danger btn-sm font-weight-bold" onclick="App.leadsFilterState = {page:1, limit:25}; App.renderLeads(1);">
-                                <i class="fas fa-times mr-1"></i> Clear
-                            </button>
+                    <!-- Filter Controls Toolbar -->
+                    <div class="card-body bg-light border-bottom py-3">
+                        <div class="form-row align-items-center">
+                            <div class="col-md-3 col-12 mb-2 mb-md-0">
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="lead-search-input" class="form-control" placeholder="Search name, phone, email, company..." value="${App.escapeHtml(this.leadsFilterState.search || '')}" onkeyup="if(event.key==='Enter') App.renderLeads(1, {search: this.value})">
+                                    <div class="input-group-append">
+                                        <button class="btn btn-default" type="button" onclick="App.renderLeads(1, {search: document.getElementById('lead-search-input').value})">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                        ${this.leadsFilterState.search ? `
+                                            <button class="btn btn-default text-danger" type="button" title="Clear Search" onclick="App.clearLeadsSearch()">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2 col-6 mb-2 mb-md-0">
+                                <select class="form-control form-control-sm" onchange="App.renderLeads(1, {filter: this.value})">
+                                    <option value="">All Call States</option>
+                                    <option value="pending" ${this.leadsFilterState.filter === 'pending' ? 'selected' : ''}>Pending Calls</option>
+                                    <option value="called" ${this.leadsFilterState.filter === 'called' ? 'selected' : ''}>Already Contacted</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 col-6 mb-2 mb-md-0">
+                                <select class="form-control form-control-sm" onchange="App.renderLeads(1, {priority: this.value})">
+                                    <option value="">All Priorities</option>
+                                    <option value="high" ${this.leadsFilterState.priority === 'high' ? 'selected' : ''}>High Priority</option>
+                                    <option value="medium" ${this.leadsFilterState.priority === 'medium' ? 'selected' : ''}>Medium</option>
+                                    <option value="low" ${this.leadsFilterState.priority === 'low' ? 'selected' : ''}>Low</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-8 mb-2 mb-md-0">
+                                <select class="form-control form-control-sm" onchange="App.renderLeads(1, {status_id: this.value})">
+                                    <option value="">All Lead Statuses</option>
+                                    ${(this.dropdowns.statuses || []).map(s => `<option value="${s.id}" ${this.leadsFilterState.status_id == s.id ? 'selected' : ''}>${App.escapeHtml(s.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="col-md-2 col-4 text-right">
+                                <button class="btn btn-outline-danger btn-sm font-weight-bold" onclick="App.clearAllLeadsFilters()">
+                                    <i class="fas fa-times mr-1"></i> Clear
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
 
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -1163,7 +1257,26 @@ const App = {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${leads.length === 0 ? '<tr><td colspan="10" class="text-center py-4 text-muted">No lead records found matching criteria.</td></tr>' : leads.map(l => {
+                                ${leads.length === 0 ? `
+                                    <tr>
+                                        <td colspan="10" class="p-0 border-0">
+                                            <div class="lead-empty-state">
+                                                <div class="empty-icon"><i class="fas fa-search"></i></div>
+                                                <div class="empty-title">No results found</div>
+                                                <div class="empty-desc">
+                                                    ${this.leadsFilterState.search 
+                                                        ? `No leads matched your search query "<strong>${App.escapeHtml(this.leadsFilterState.search)}</strong>".`
+                                                        : 'No lead records found matching the active filter criteria.'}
+                                                </div>
+                                                ${(this.leadsFilterState.search || this.leadsFilterState.filter || this.leadsFilterState.status_id || this.leadsFilterState.priority) ? `
+                                                    <button class="btn btn-outline-primary btn-sm font-weight-bold shadow-sm" onclick="App.clearAllLeadsFilters()">
+                                                        <i class="fas fa-times mr-1"></i> Clear Search &amp; Filters
+                                                    </button>
+                                                ` : ''}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ` : leads.map(l => {
                                     const phone = l.phone || l.mobile || '-';
                                     return `
                                     <tr>
@@ -1568,131 +1681,146 @@ const App = {
             : '01:15';
 
         const modalHtml = `
-            <div class="modal fade" id="call-modal" tabindex="-1" role="dialog" aria-hidden="true">
-                <div class="modal-dialog modal-md" role="document">
-                    <div class="modal-content shadow-lg">
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title font-weight-bold">
-                                <i class="fas fa-phone-volume mr-2"></i> Log Phone Call &bull; ${leadName}
+            <div class="modal fade" id="call-modal" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document">
+                    <div class="modal-content shadow-lg border-0">
+                        <div class="modal-header bg-primary text-white py-2 px-3">
+                            <h5 class="modal-title font-weight-bold d-flex align-items-center mb-0" style="font-size: 1.05rem;">
+                                <i class="fas fa-phone-volume mr-2"></i> Log Phone Call &bull; ${App.escapeHtml(leadName)}
                             </h5>
-                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                            <button type="button" class="close text-white shadow-none" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
-                        <form onsubmit="App.submitCallLog(event, ${leadId})">
-                            <div class="modal-body p-4">
-                                <!-- Lead Header & Redial -->
-                                <div class="alert alert-light border d-flex justify-content-between align-items-center mb-3">
-                                    <div>
-                                        <div class="font-weight-bold text-dark">${leadName}</div>
-                                        <div class="text-xs text-muted"><a href="tel:${phone}"><i class="fas fa-phone-alt text-success mr-1"></i>${phone}</a></div>
+                        <form onsubmit="App.submitCallLog(event, ${leadId})" class="d-flex flex-column m-0" style="overflow: hidden;">
+                            <div class="modal-body p-3" style="overflow-y: auto; max-height: calc(85vh - 120px);">
+                                <!-- Lead Header & Redial Card -->
+                                <div class="card card-outline card-secondary mb-3 bg-light shadow-none">
+                                    <div class="card-body p-2 d-flex justify-content-between align-items-center flex-wrap" style="gap: 8px;">
+                                        <div class="d-flex align-items-center">
+                                            <div class="user-avatar-sm mr-2 bg-primary text-white"><i class="fas fa-user"></i></div>
+                                            <div>
+                                                <div class="font-weight-bold text-dark text-sm">${App.escapeHtml(leadName)}</div>
+                                                <div class="text-xs text-muted d-inline-flex align-items-center mt-1">
+                                                    <i class="fas fa-phone-alt text-success mr-1"></i>
+                                                    <a href="tel:${phone}" class="font-weight-bold text-dark">${phone}</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <a href="tel:${phone}" class="btn btn-outline-success btn-xs font-weight-bold ml-auto px-2 py-1">
+                                            <i class="fas fa-phone-alt mr-1"></i> Redial
+                                        </a>
                                     </div>
-                                    <a href="tel:${phone}" class="btn btn-outline-success btn-sm font-weight-bold">
-                                        <i class="fas fa-phone-alt mr-1"></i> Redial
-                                    </a>
                                 </div>
 
-                                <!-- Duration Capture Section -->
-                                <div class="card p-3 bg-light mb-3 border">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <label class="modal-label-contrast mb-0">Call Duration</label>
+                                <!-- Duration Capture & Outcome (Clean 2-Column Row) -->
+                                <div class="form-row">
+                                    <div class="form-group col-md-6 col-12 mb-3">
+                                        <label class="modal-label-contrast d-flex justify-content-between align-items-center">
+                                            <span><i class="fas fa-stopwatch text-info mr-1"></i> Call Duration</span>
+                                            ${isActiveCall ? `
+                                                <span class="badge badge-success px-2 py-1"><i class="fas fa-satellite-dish mr-1"></i> Auto-Captured</span>
+                                            ` : `
+                                                <span class="badge badge-secondary px-2 py-1"><i class="fas fa-keyboard mr-1"></i> Manual</span>
+                                            `}
+                                        </label>
                                         ${isActiveCall ? `
-                                            <span class="badge badge-success px-2 py-1"><i class="fas fa-satellite-dish mr-1"></i> Auto-Captured</span>
+                                            <div class="d-flex align-items-center justify-content-between p-2 bg-light border rounded">
+                                                <div class="font-weight-bold text-success" style="font-size: 1.1rem;">
+                                                    <i class="fas fa-stopwatch mr-1"></i> <span id="call-duration-label">${autoDurationFormatted}</span>
+                                                </div>
+                                                <input type="hidden" name="call_duration" id="call-duration-input" value="${autoDuration}">
+                                                <span class="badge badge-light border text-muted">telephony sync</span>
+                                            </div>
                                         ` : `
-                                            <span class="badge badge-secondary px-2 py-1"><i class="fas fa-keyboard mr-1"></i> Manual Entry</span>
+                                            <div class="input-group input-group-sm">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text"><i class="fas fa-stopwatch text-secondary"></i></span>
+                                                </div>
+                                                <input type="text" name="call_duration_display" id="call-duration-display" class="form-control" placeholder="e.g. 02:30 or 150 (sec)" oninput="App.onManualDurationInput(this)">
+                                                <input type="hidden" name="call_duration" id="call-duration-input" value="60">
+                                            </div>
+                                            <div class="text-xs text-muted mt-1">Format: MM:SS or seconds (default 60s)</div>
                                         `}
                                     </div>
-                                    ${isActiveCall ? `
-                                        <div class="d-flex align-items-center justify-content-between mt-1">
-                                            <div class="font-weight-bold text-success" style="font-size: 1.15rem;">
-                                                <i class="fas fa-stopwatch mr-1"></i> <span id="call-duration-label">${autoDurationFormatted}</span>
-                                            </div>
-                                            <input type="hidden" name="call_duration" id="call-duration-input" value="${autoDuration}">
-                                            <div class="text-xs text-muted font-italic">Auto-captured from telephony session</div>
-                                        </div>
-                                    ` : `
-                                        <div class="input-group input-group-sm mt-1">
-                                            <div class="input-group-prepend">
-                                                <span class="input-group-text"><i class="fas fa-stopwatch"></i></span>
-                                            </div>
-                                            <input type="text" name="call_duration_display" id="call-duration-display" class="form-control" placeholder="e.g. 02:30 or 150 (sec)" oninput="App.onManualDurationInput(this)">
-                                            <input type="hidden" name="call_duration" id="call-duration-input" value="60">
-                                        </div>
-                                        <div class="text-xs text-muted mt-1">Format: MM:SS or total seconds (default 60s)</div>
-                                    `}
+
+                                    <div class="form-group col-md-6 col-12 mb-3">
+                                        <label class="modal-label-contrast"><i class="fas fa-headset text-primary mr-1"></i> Call Outcome *</label>
+                                        <select name="outcome_id" id="call-outcome-select" class="form-control form-control-sm font-weight-bold" required onchange="App.onCallOutcomeChanged(this)">
+                                            <option value="">Select Outcome...</option>
+                                            ${outcomes.map(o => `<option value="${o.id}" data-cat="${o.category || ''}" data-name="${App.escapeHtml(o.name)}">${App.escapeHtml(o.name)}</option>`).join('')}
+                                        </select>
+                                    </div>
                                 </div>
 
-                                <!-- Call Outcome Dropdown -->
-                                <div class="form-group">
-                                    <label class="modal-label-contrast">Call Outcome *</label>
-                                    <select name="outcome_id" id="call-outcome-select" class="form-control font-weight-bold" required onchange="App.onCallOutcomeChanged(this)">
-                                        <option value="">Select Outcome...</option>
-                                        ${outcomes.map(o => `<option value="${o.id}" data-cat="${o.category || ''}" data-name="${o.name}">${o.name}</option>`).join('')}
-                                    </select>
-                                </div>
-
-                                <!-- Branch: Interested Branch (Follow-up vs Meeting) -->
-                                <div id="call-branch-interested" class="card p-3 border-info mb-3 bg-light" style="display: none;">
-                                    <div class="font-weight-bold text-primary mb-2 text-sm">
-                                        <i class="fas fa-star mr-1 text-warning"></i> Interested Lead - Next Step Action
+                                <!-- Dynamic Branch: Interested -->
+                                <div id="call-branch-interested" class="card card-outline card-success mb-3 bg-light shadow-none" style="display: none;">
+                                    <div class="card-header py-2 px-3 border-bottom-0 bg-transparent">
+                                        <h6 class="card-title text-success font-weight-bold text-sm mb-0">
+                                            <i class="fas fa-star text-warning mr-1"></i> Interested Lead - Next Step Action
+                                        </h6>
                                     </div>
-                                    <div class="d-flex mb-3" style="gap: 15px;">
-                                        <div class="custom-control custom-radio">
-                                            <input type="radio" id="action-followup" name="interested_action" class="custom-control-input" value="followup" checked onchange="App.onInterestedActionToggle(this.value)">
-                                            <label class="custom-control-label font-weight-bold text-sm" for="action-followup">Schedule Follow-up</label>
-                                        </div>
-                                        <div class="custom-control custom-radio">
-                                            <input type="radio" id="action-meeting" name="interested_action" class="custom-control-input" value="meeting" onchange="App.onInterestedActionToggle(this.value)">
-                                            <label class="custom-control-label font-weight-bold text-sm" for="action-meeting">Schedule Client Meeting / Demo</label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Sub-branch: Followup -->
-                                    <div id="subbranch-followup">
-                                        <div class="form-group mb-2">
-                                            <label class="modal-label-contrast">Follow-up Date &amp; Time *</label>
-                                            <input type="datetime-local" name="next_followup_date" id="call-followup-dt" class="form-control form-control-sm">
-                                        </div>
-                                        <div class="form-group mb-0">
-                                            <label class="modal-label-contrast">Follow-up Purpose</label>
-                                            <input type="text" name="followup_purpose" class="form-control form-control-sm" placeholder="e.g. Detailed price quote review">
-                                        </div>
-                                    </div>
-
-                                    <!-- Sub-branch: Meeting -->
-                                    <div id="subbranch-meeting" style="display: none;">
-                                        <div class="form-group mb-2">
-                                            <label class="modal-label-contrast">Meeting Title *</label>
-                                            <input type="text" name="meeting_title" class="form-control form-control-sm" value="Product Demo - ${leadName}">
-                                        </div>
-                                        <div class="form-row">
-                                            <div class="col-md-7 mb-2">
-                                                <label class="modal-label-contrast">Meeting Date &amp; Time *</label>
-                                                <input type="datetime-local" name="meeting_datetime" id="call-meeting-dt" class="form-control form-control-sm">
+                                    <div class="card-body p-3 pt-0">
+                                        <div class="d-flex mb-3 flex-wrap" style="gap: 16px;">
+                                            <div class="custom-control custom-radio">
+                                                <input type="radio" id="action-followup" name="interested_action" class="custom-control-input" value="followup" checked onchange="App.onInterestedActionToggle(this.value)">
+                                                <label class="custom-control-label font-weight-bold text-sm" for="action-followup">Schedule Follow-up</label>
                                             </div>
-                                            <div class="col-md-5 mb-2">
-                                                <label class="modal-label-contrast">Meeting Mode</label>
-                                                <select name="meeting_mode" class="form-control form-control-sm">
-                                                    <option value="Google Meet">Google Meet</option>
-                                                    <option value="Zoom">Zoom</option>
-                                                    <option value="In-Person">In-Person</option>
-                                                    <option value="Phone Call">Phone Call</option>
-                                                </select>
+                                            <div class="custom-control custom-radio">
+                                                <input type="radio" id="action-meeting" name="interested_action" class="custom-control-input" value="meeting" onchange="App.onInterestedActionToggle(this.value)">
+                                                <label class="custom-control-label font-weight-bold text-sm" for="action-meeting">Schedule Client Meeting / Demo</label>
                                             </div>
                                         </div>
-                                        <div class="form-group mb-0">
-                                            <label class="modal-label-contrast">Meeting Link / Room (Optional)</label>
-                                            <input type="url" name="meeting_link" class="form-control form-control-sm" placeholder="https://meet.google.com/xyz-abcd">
+
+                                        <!-- Sub-branch: Follow-up -->
+                                        <div id="subbranch-followup">
+                                            <div class="form-group mb-2">
+                                                <label class="modal-label-contrast"><i class="fas fa-calendar-alt text-warning mr-1"></i> Follow-up Date &amp; Time *</label>
+                                                <input type="datetime-local" name="next_followup_date" id="call-followup-dt" class="form-control form-control-sm">
+                                            </div>
+                                            <div class="form-group mb-0">
+                                                <label class="modal-label-contrast"><i class="fas fa-bullseye text-secondary mr-1"></i> Follow-up Purpose</label>
+                                                <input type="text" name="followup_purpose" class="form-control form-control-sm" placeholder="e.g. Detailed price quote review, decision maker discussion">
+                                            </div>
+                                        </div>
+
+                                        <!-- Sub-branch: Meeting -->
+                                        <div id="subbranch-meeting" style="display: none;">
+                                            <div class="form-group mb-2">
+                                                <label class="modal-label-contrast"><i class="fas fa-heading text-primary mr-1"></i> Meeting Title *</label>
+                                                <input type="text" name="meeting_title" class="form-control form-control-sm" value="Product Demo - ${App.escapeHtml(leadName)}">
+                                            </div>
+                                            <div class="form-row">
+                                                <div class="col-md-7 col-12 mb-2">
+                                                    <label class="modal-label-contrast"><i class="fas fa-calendar-check text-success mr-1"></i> Meeting Date &amp; Time *</label>
+                                                    <input type="datetime-local" name="meeting_datetime" id="call-meeting-dt" class="form-control form-control-sm">
+                                                </div>
+                                                <div class="col-md-5 col-12 mb-2">
+                                                    <label class="modal-label-contrast"><i class="fas fa-video text-info mr-1"></i> Meeting Mode</label>
+                                                    <select name="meeting_mode" class="form-control form-control-sm">
+                                                        <option value="Google Meet">Google Meet</option>
+                                                        <option value="Zoom">Zoom</option>
+                                                        <option value="In-Person">In-Person</option>
+                                                        <option value="Phone Call">Phone Call</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="form-group mb-0">
+                                                <label class="modal-label-contrast"><i class="fas fa-link text-secondary mr-1"></i> Meeting Link / Room (Optional)</label>
+                                                <input type="url" name="meeting_link" class="form-control form-control-sm" placeholder="https://meet.google.com/xyz-abcd">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Branch: Not Interested Disqualification Reason -->
-                                <div id="call-branch-not-interested" class="card p-3 border-danger mb-3 bg-light" style="display: none;">
-                                    <div class="font-weight-bold text-danger mb-2 text-sm">
-                                        <i class="fas fa-times-circle mr-1"></i> Disqualification Reason *
+                                <!-- Dynamic Branch: Not Interested -->
+                                <div id="call-branch-not-interested" class="card card-outline card-danger mb-3 bg-light shadow-none" style="display: none;">
+                                    <div class="card-header py-2 px-3 border-bottom-0 bg-transparent">
+                                        <h6 class="card-title text-danger font-weight-bold text-sm mb-0">
+                                            <i class="fas fa-times-circle mr-1"></i> Disqualification Reason *
+                                        </h6>
                                     </div>
-                                    <div class="form-group mb-0">
+                                    <div class="card-body p-3 pt-0">
                                         <select name="disqualification_reason" id="call-disqualify-reason" class="form-control form-control-sm">
                                             <option value="">Select Reason for Disqualification...</option>
                                             <option value="Budget Constraint / Too Expensive">Budget Constraint / Too Expensive</option>
@@ -1706,29 +1834,38 @@ const App = {
                                     </div>
                                 </div>
 
-                                <!-- Branch: Standard Follow-up Option for Ringing / Connected -->
-                                <div id="call-branch-standard-followup" class="form-group" style="display: none;">
-                                    <label class="modal-label-contrast">Schedule Next Follow-up (Optional)</label>
-                                    <input type="datetime-local" name="simple_followup_date" class="form-control">
+                                <!-- Dynamic Branch: Standard Follow-up Option -->
+                                <div id="call-branch-standard-followup" class="card card-outline card-warning mb-3 bg-light shadow-none" style="display: none;">
+                                    <div class="card-header py-2 px-3 border-bottom-0 bg-transparent">
+                                        <h6 class="card-title text-dark font-weight-bold text-sm mb-0">
+                                            <i class="fas fa-clock mr-1 text-warning"></i> Schedule Next Follow-up (Optional)
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-3 pt-0">
+                                        <input type="datetime-local" name="simple_followup_date" class="form-control form-control-sm">
+                                    </div>
                                 </div>
 
-                                <!-- Lead Status Select -->
-                                <div class="form-group">
-                                    <label class="modal-label-contrast">Update Lead Status *</label>
-                                    <select name="status_id" id="call-status-select" class="form-control" required>
-                                        ${statuses.map(s => `<option value="${s.id}" ${s.id == currentStatusId ? 'selected' : ''}>${s.name}</option>`).join('')}
+                                <!-- Lead Status & Remarks -->
+                                <div class="form-group mb-3">
+                                    <label class="modal-label-contrast"><i class="fas fa-exchange-alt text-info mr-1"></i> Update Lead Status *</label>
+                                    <select name="status_id" id="call-status-select" class="form-control form-control-sm font-weight-bold" required>
+                                        ${statuses.map(s => `<option value="${s.id}" ${s.id == currentStatusId ? 'selected' : ''}>${App.escapeHtml(s.name)}</option>`).join('')}
                                     </select>
                                 </div>
 
-                                <!-- Discussion Remarks -->
-                                <div class="form-group">
-                                    <label class="modal-label-contrast">Discussion Remarks *</label>
-                                    <textarea name="remarks" id="call-remarks" class="form-control" rows="3" placeholder="Enter detailed notes and client feedback..." required></textarea>
+                                <div class="form-group mb-0">
+                                    <label class="modal-label-contrast"><i class="fas fa-comment-dots text-secondary mr-1"></i> Discussion Remarks *</label>
+                                    <textarea name="remarks" id="call-remarks" class="form-control form-control-sm" rows="3" placeholder="Enter detailed notes and client feedback..." required></textarea>
                                 </div>
                             </div>
-                            <div class="modal-footer bg-light">
-                                <button type="button" class="btn btn-default font-weight-bold" data-dismiss="modal">Close</button>
-                                <button type="submit" class="btn btn-primary font-weight-bold">
+
+                            <!-- Fixed Accessible Footer -->
+                            <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                                <button type="button" class="btn btn-default btn-sm font-weight-bold" data-dismiss="modal">
+                                    <i class="fas fa-times mr-1"></i> Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary btn-sm font-weight-bold" id="btn-save-call-log">
                                     <i class="fas fa-save mr-1"></i> Save Call Remarks
                                 </button>
                             </div>
@@ -1857,22 +1994,41 @@ const App = {
             formData.set('next_followup_date', simpleFu.value);
         }
 
-        const res = await fetch('api/calls', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.success) {
-            $('#call-modal').modal('hide');
-            $('.modal-backdrop').remove();
-            $('body').removeClass('modal-open').css('padding-right', '');
-            if (this.currentView === 'calling_queue') this.renderCallingQueue();
-            else if (this.currentView === 'workspace') this.renderWorkspace();
-            else if (this.currentView === 'leads') this.renderLeads(this.leadsFilterState.page || 1);
-            else if (this.currentView === 'dashboard') this.renderDashboard();
-            this.fetchNotifications();
-            setTimeout(() => {
-                alert(data.message || 'Call logged successfully.');
-            }, 50);
-        } else {
-            alert(data.message || 'Failed to log call.');
+        const saveBtn = document.getElementById('btn-save-call-log');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving...';
+        }
+
+        try {
+            const res = await fetch('api/calls', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                $('#call-modal').modal('hide');
+                $('.modal-backdrop').remove();
+                $('body').removeClass('modal-open').css('padding-right', '');
+                if (this.currentView === 'calling_queue') this.renderCallingQueue();
+                else if (this.currentView === 'workspace') this.renderWorkspace();
+                else if (this.currentView === 'leads') this.renderLeads(this.leadsFilterState.page || 1);
+                else if (this.currentView === 'dashboard') this.renderDashboard();
+                this.fetchNotifications();
+                setTimeout(() => {
+                    alert(data.message || 'Call logged successfully.');
+                }, 50);
+            } else {
+                alert(data.message || 'Failed to log call.');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="fas fa-save mr-1"></i> Save Call Remarks';
+                }
+            }
+        } catch (fetchErr) {
+            console.error('Call logging error:', fetchErr);
+            alert('Failed to connect to server. Please try again.');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save mr-1"></i> Save Call Remarks';
+            }
         }
     },
 
@@ -2983,6 +3139,11 @@ const App = {
     // 14. MODAL: CREATE SINGLE LEAD
     // ==========================================
     openCreateLeadModal: function() {
+        if (this.currentUser && (this.currentUser.role_name === 'operation_executive' || this.currentUser.role_name === 'telecaller')) {
+            alert('Permission denied: Only Administrators and Managers can add new leads.');
+            return;
+        }
+
         const statuses = this.dropdowns.statuses || [];
         const sources = this.dropdowns.sources || [];
         const users = this.dropdowns.users || [];

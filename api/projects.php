@@ -2,7 +2,9 @@
 // api/projects.php - Project Management Workspace, Conversion, Files, Tasks, & Financial Payments API
 
 header('Content-Type: application/json');
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -41,8 +43,10 @@ if ($action === 'list') {
         $params['stage_id'] = $stageId;
     }
     if (!empty($search)) {
-        $where[] = "(p.project_code LIKE :search OR p.client_name LIKE :search OR p.company_name LIKE :search)";
-        $params['search'] = "%$search%";
+        $where[] = "(p.project_code LIKE :search1 OR p.client_name LIKE :search2 OR p.company_name LIKE :search3)";
+        $params['search1'] = "%$search%";
+        $params['search2'] = "%$search%";
+        $params['search3'] = "%$search%";
     }
 
     $whereClause = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";

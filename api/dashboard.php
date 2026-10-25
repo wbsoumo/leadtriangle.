@@ -2,7 +2,9 @@
 // api/dashboard.php - Dynamic Dashboard API with RBAC & Date/User Filters
 
 header('Content-Type: application/json');
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
 

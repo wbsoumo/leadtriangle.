@@ -448,34 +448,61 @@ if ($action === 'log_background_call') {
     exit;
 }
 
-// 7. CALLING QUEUE LIST
+// 7. CALLING QUEUE LIST (Automated Daily Telecalling Queue)
 if ($action === 'queue') {
     $where = ["l.is_archived = 0"];
     $params = [];
+    
+    // 1. Role-based scoping: Telecallers only see leads strictly assigned to them
     if ($roleName === 'operation_executive') {
-        $where[] = "(l.assigned_executive_id = :uid OR l.assigned_executive_id IS NULL)";
+        $where[] = "l.assigned_executive_id = :uid";
         $params['uid'] = $userId;
+    } elseif ($roleName === 'manager') {
+        $teamId = $_SESSION['team_id'] ?? null;
+        $where[] = "(l.assigned_manager_id = :mgr_id OR l.assigned_executive_id IN (SELECT id FROM users WHERE team_id = :team_id))";
+        $params['mgr_id'] = $userId;
+        $params['team_id'] = $teamId;
     }
-    // Queue criteria: New, Contacting, Follow-up Required, or next_followup_at <= NOW()
-    $where[] = "(l.status_id IN (1, 2, 3, 4, 6, 17, 18) OR (l.next_followup_at IS NOT NULL AND DATE(l.next_followup_at) <= CURDATE()))";
+
+    // 2. Queue Exit Rules: Disqualified, Converted, Lost, and Scheduled Meetings leave the queue
+    // 7 = Meeting Scheduled, 11 = Converted, 12 = Lost, 13 = Not Interested, 14 = Invalid Number
+    $where[] = "l.status_id NOT IN (7, 11, 12, 13, 14)";
+
+    // 3. Queue Entry Rules:
+    // - Fresh / New / Contacting / Assigned leads
+    // - OR Callbacks / Follow-ups due today or overdue
+    // - Future follow-ups (next_followup_at > today) stay out of queue until due date
+    $where[] = "(
+        (l.status_id IN (1, 2, 3, 4) AND (l.next_followup_at IS NULL OR DATE(l.next_followup_at) <= CURDATE()))
+        OR (l.status_id IN (6, 17, 18) AND (l.next_followup_at IS NULL OR DATE(l.next_followup_at) <= CURDATE()))
+        OR (l.next_followup_at IS NOT NULL AND DATE(l.next_followup_at) <= CURDATE())
+    )";
 
     $whereSql = "WHERE " . implode(" AND ", $where);
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT DISTINCT
             l.id, l.name, l.mobile as phone, l.priority, l.status_id,
+            l.company_name,
             ls.name as status_name, ls.color_code as status_color,
             srv.name as service_name,
             u.name as assigned_name,
-            l.next_followup_at
+            l.next_followup_at,
+            l.last_contacted_at
         FROM leads l
         LEFT JOIN lead_statuses ls ON l.status_id = ls.id
         LEFT JOIN services srv ON l.service_id = srv.id
         LEFT JOIN users u ON l.assigned_executive_id = u.id
         $whereSql
         ORDER BY 
-            CASE WHEN l.priority = 'high' THEN 1 WHEN l.priority = 'medium' THEN 2 ELSE 3 END,
+            CASE 
+                WHEN LOWER(l.priority) = 'urgent' THEN 1 
+                WHEN LOWER(l.priority) = 'high' THEN 2 
+                WHEN LOWER(l.priority) = 'medium' THEN 3 
+                ELSE 4 
+            END ASC,
+            CASE WHEN l.next_followup_at IS NOT NULL AND DATE(l.next_followup_at) <= CURDATE() THEN 0 ELSE 1 END ASC,
             l.id DESC
-        LIMIT 50
+        LIMIT 100
     ");
     $stmt->execute($params);
     $queue = $stmt->fetchAll(PDO::FETCH_ASSOC);

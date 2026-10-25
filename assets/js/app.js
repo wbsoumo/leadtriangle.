@@ -70,11 +70,24 @@ const App = {
             }
         });
 
+        // Ensure any Bootstrap modal close removes leftover backdrops and unlocks body
+        $(document).on('hidden.bs.modal', '.modal', function () {
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open').css('padding-right', '');
+        });
+
         // Initialize URL path from current location
         const path = window.location.pathname.replace(/^\//, '').trim();
         if (path && path !== 'app' && path !== 'index.php') {
             this.currentView = path;
         }
+    },
+
+    handleGlobalSearch: function(query) {
+        if (!query || !query.trim()) return;
+        this.leadsFilterState.search = query.trim();
+        this.navigate('leads');
+        this.renderLeads(1, { search: query.trim() });
     },
 
     renderUserUI: function() {
@@ -109,6 +122,22 @@ const App = {
         // Role-based visibility
         const isSuperAdmin = (this.currentUser.role_name === 'super_admin');
         const isManager = (this.currentUser.role_name === 'manager');
+        const isOperator = (this.currentUser.role_name === 'operation_executive');
+
+        // Admin & Manager only elements (hide from Telecallers / Operations Executives)
+        if (isOperator) {
+            document.querySelectorAll('.admin-manager-only').forEach(el => {
+                el.style.display = 'none';
+            });
+            const topAddBtn = document.getElementById('top-add-lead-btn');
+            if (topAddBtn) topAddBtn.style.display = 'none';
+        } else {
+            document.querySelectorAll('.admin-manager-only').forEach(el => {
+                el.style.display = '';
+            });
+            const topAddBtn = document.getElementById('top-add-lead-btn');
+            if (topAddBtn) topAddBtn.style.display = '';
+        }
 
         // By default, hide admin-only elements for basic users
         if (!isSuperAdmin) {
@@ -353,6 +382,12 @@ const App = {
             }
         });
 
+        // Role permission block for Funnel (Telecallers cannot access Sales Funnel)
+        if (view === 'funnel' && this.currentUser && this.currentUser.role_name === 'operation_executive') {
+            this.renderAccessDenied('Sales Funnel');
+            return;
+        }
+
         // View dispatch with async rejection safety net
         let renderPromise = null;
         try {
@@ -446,69 +481,135 @@ const App = {
 
             <!-- Top 4 AdminLTE Small-Box KPI Cards -->
             <div class="row">
-                <!-- KPI 1: Revenue (Admin/Manager) or Today's Assigned (Operator) -->
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-info">
-                        <div class="inner">
-                            <h3>${!isOperator ? '₹' + parseFloat(d.total_project_value || 0).toLocaleString('en-IN') : (d.total_leads || 0)}</h3>
-                            <p>${!isOperator ? 'Total Won Revenue' : 'Assigned Leads'}</p>
+                ${isOperator ? `
+                    <!-- Operator KPI 1: Fresh Leads -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-info">
+                            <div class="inner">
+                                <h3>${d.fresh_leads || 0}</h3>
+                                <p>Fresh Leads (Uncontacted)</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-user-clock"></i>
+                            </div>
+                            <a href="javascript:void(0)" onclick="App.renderLeads(1, {filter:'pending'})" class="small-box-footer">
+                                View Fresh Leads <i class="fas fa-arrow-circle-right ml-1"></i>
+                            </a>
                         </div>
-                        <div class="icon">
-                            <i class="${!isOperator ? 'fas fa-rupee-sign' : 'fas fa-address-book'}"></i>
-                        </div>
-                        <a href="javascript:void(0)" onclick="App.navigate('${!isOperator ? 'projects' : 'leads'}')" class="small-box-footer">
-                            View Details <i class="fas fa-arrow-circle-right ml-1"></i>
-                        </a>
                     </div>
-                </div>
 
-                <!-- KPI 2: Total Leads In Funnel -->
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h3>${d.total_leads || 0}</h3>
-                            <p>Active Leads Pipeline</p>
+                    <!-- Operator KPI 2: Connected Leads -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-success">
+                            <div class="inner">
+                                <h3>${d.connected_leads || 0}</h3>
+                                <p>Connected Leads</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-phone-volume"></i>
+                            </div>
+                            <a href="javascript:void(0)" onclick="App.renderLeads(1, {filter:'called'})" class="small-box-footer">
+                                View Connected <i class="fas fa-arrow-circle-right ml-1"></i>
+                            </a>
                         </div>
-                        <div class="icon">
-                            <i class="fas fa-filter"></i>
-                        </div>
-                        <a href="javascript:void(0)" onclick="App.navigate('leads')" class="small-box-footer">
-                            Manage Leads <i class="fas fa-arrow-circle-right ml-1"></i>
-                        </a>
                     </div>
-                </div>
 
-                <!-- KPI 3: Total Calling Operations -->
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-warning">
-                        <div class="inner text-dark">
-                            <h3>${d.total_calls || 0}</h3>
-                            <p>Total Calls Executed</p>
+                    <!-- Operator KPI 3: Required Callbacks -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-warning">
+                            <div class="inner text-dark">
+                                <h3>${d.callbacks_required || 0}</h3>
+                                <p>Required Callbacks</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-reply-all"></i>
+                            </div>
+                            <a href="javascript:void(0)" onclick="App.navigate('calling_queue')" class="small-box-footer text-dark">
+                                Open Calling Queue <i class="fas fa-arrow-circle-right ml-1"></i>
+                            </a>
                         </div>
-                        <div class="icon">
-                            <i class="fas fa-headset"></i>
-                        </div>
-                        <a href="javascript:void(0)" onclick="App.navigate('calling_queue')" class="small-box-footer text-dark">
-                            Open Queue <i class="fas fa-arrow-circle-right ml-1"></i>
-                        </a>
                     </div>
-                </div>
 
-                <!-- KPI 4: Pending Follow-ups / Won Deals -->
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-danger">
-                        <div class="inner">
-                            <h3>${d.pending_followups || d.completed_projects || 0}</h3>
-                            <p>${d.pending_followups ? 'Pending Follow-ups' : 'Converted Projects'}</p>
+                    <!-- Operator KPI 4: Today's Follow-ups Due -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-danger">
+                            <div class="inner">
+                                <h3>${d.followups_today || 0}</h3>
+                                <p>Today's Follow-ups Due</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <a href="javascript:void(0)" onclick="App.navigate('followups')" class="small-box-footer">
+                                View Today's Reminders <i class="fas fa-arrow-circle-right ml-1"></i>
+                            </a>
                         </div>
-                        <div class="icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <a href="javascript:void(0)" onclick="App.navigate('followups')" class="small-box-footer">
-                            Check Reminders <i class="fas fa-arrow-circle-right ml-1"></i>
-                        </a>
                     </div>
-                </div>
+                ` : `
+                    <!-- Manager/Admin KPI 1: Revenue -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-info">
+                            <div class="inner">
+                                <h3>₹${parseFloat(d.total_project_value || 0).toLocaleString('en-IN')}</h3>
+                                <p>Total Won Revenue</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-rupee-sign"></i>
+                            </div>
+                            <a href="javascript:void(0)" onclick="App.navigate('projects')" class="small-box-footer">
+                                View Details <i class="fas fa-arrow-circle-right ml-1"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Manager/Admin KPI 2: Total Leads In Funnel -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-success">
+                            <div class="inner">
+                                <h3>${d.total_leads || 0}</h3>
+                                <p>Active Leads Pipeline</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-filter"></i>
+                            </div>
+                            <a href="javascript:void(0)" onclick="App.navigate('leads')" class="small-box-footer">
+                                Manage Leads <i class="fas fa-arrow-circle-right ml-1"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Manager/Admin KPI 3: Total Calling Operations -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-warning">
+                            <div class="inner text-dark">
+                                <h3>${d.total_calls || 0}</h3>
+                                <p>Total Calls Executed</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-headset"></i>
+                            </div>
+                            <a href="javascript:void(0)" onclick="App.navigate('calling_queue')" class="small-box-footer text-dark">
+                                Open Queue <i class="fas fa-arrow-circle-right ml-1"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Manager/Admin KPI 4: Today's Follow-ups & Reminders -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-danger">
+                            <div class="inner">
+                                <h3>${d.followups_today || 0}</h3>
+                                <p>Today's Follow-ups Due</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <a href="javascript:void(0)" onclick="App.navigate('followups')" class="small-box-footer">
+                                Check Reminders <i class="fas fa-arrow-circle-right ml-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                `}
             </div>
 
             <!-- Two-Column Operational Section -->
@@ -539,23 +640,23 @@ const App = {
                                     <tbody>
                                         <tr>
                                             <td><span class="badge badge-primary mr-2 font-weight-bold">New</span> Fresh Inbound / Uncalled</td>
-                                            <td class="text-center font-weight-bold">${d.new_leads || 0}</td>
+                                            <td class="text-center font-weight-bold">${d.fresh_leads || d.new_leads || 0}</td>
                                             <td class="text-right"><button class="btn btn-xs btn-outline-primary" onclick="App.renderLeads(1, {filter:'pending'})">Open</button></td>
                                         </tr>
                                         <tr>
                                             <td><span class="badge badge-info mr-2 font-weight-bold">Contacted</span> Connected Leads</td>
-                                            <td class="text-center font-weight-bold">${d.contacted_leads || 0}</td>
+                                            <td class="text-center font-weight-bold">${d.connected_leads || d.contacted_leads || 0}</td>
                                             <td class="text-right"><button class="btn btn-xs btn-outline-info" onclick="App.renderLeads(1, {filter:'called'})">Open</button></td>
                                         </tr>
                                         <tr>
                                             <td><span class="badge badge-warning mr-2 font-weight-bold">Follow-up</span> Requires Callback</td>
-                                            <td class="text-center font-weight-bold">${d.pending_followups || 0}</td>
+                                            <td class="text-center font-weight-bold">${d.callbacks_required || d.pending_followups || 0}</td>
                                             <td class="text-right"><button class="btn btn-xs btn-outline-warning" onclick="App.navigate('followups')">Open</button></td>
                                         </tr>
                                         <tr>
                                             <td><span class="badge badge-success mr-2 font-weight-bold">Converted</span> Deals Won / Active</td>
                                             <td class="text-center font-weight-bold">${d.converted_leads || 0}</td>
-                                            <td class="text-right"><button class="btn btn-xs btn-outline-success" onclick="App.navigate('funnel')">Open</button></td>
+                                            <td class="text-right"><button class="btn btn-xs btn-outline-success" onclick="${!isOperator ? "App.navigate('funnel')" : "App.navigate('workspace')"}">Open</button></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -593,6 +694,7 @@ const App = {
                                     <i class="fas fa-chevron-right text-muted"></i>
                                 </button>
 
+                                ${!isOperator ? `
                                 <button class="btn btn-outline-success btn-block text-left d-flex align-items-center justify-content-between p-3" onclick="App.openCreateLeadModal()">
                                     <div>
                                         <div class="font-weight-bold"><i class="fas fa-user-plus mr-2 text-success"></i> Add Single Lead</div>
@@ -600,6 +702,7 @@ const App = {
                                     </div>
                                     <i class="fas fa-chevron-right text-muted"></i>
                                 </button>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -985,6 +1088,9 @@ const App = {
         const badgeLeads = document.getElementById('badge-leads-count');
         if (badgeLeads) badgeLeads.innerText = p.total;
 
+        const isOperator = !!(this.currentUser && this.currentUser.role_name === 'operation_executive');
+        const canAddLead = !isOperator;
+
         let html = `
             <div class="card card-primary card-outline shadow-sm">
                 <div class="card-header">
@@ -993,10 +1099,11 @@ const App = {
                             <i class="fas fa-address-book mr-1 text-primary"></i> All Leads Database (${p.total})
                         </h3>
                         <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                            ${canAddLead ? `
                             <button class="btn btn-primary btn-sm font-weight-bold" onclick="App.openCreateLeadModal()">
                                 <i class="fas fa-plus mr-1"></i> Add Lead
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="App.renderLeads(1, {})" title="Refresh">
+                            </button>` : ''}
+                            <button class="btn btn-outline-secondary btn-sm" onclick="App.renderLeads(App.leadsFilterState.page || 1, {}); App.fetchNotifications();" title="Refresh Table & Badges">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
                         </div>
@@ -1052,11 +1159,12 @@ const App = {
                                     <th>Assigned Agent</th>
                                     <th>Priority</th>
                                     <th>Created</th>
-                                    <th class="text-center" style="width: 140px;">Actions</th>
+                                    <th class="text-center" style="width: 120px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${leads.length === 0 ? '<tr><td colspan="10" class="text-center py-4 text-muted">No lead records found matching criteria.</td></tr>' : leads.map(l => {
+                                    const phone = l.phone || l.mobile || '-';
                                     return `
                                     <tr>
                                         <td><input type="checkbox" class="lead-row-checkbox" value="${l.id}" onchange="App.updateBulkSelectionState()"></td>
@@ -1064,7 +1172,12 @@ const App = {
                                             <strong><a href="javascript:void(0)" onclick="App.openLeadDetailModal(${l.id})">${l.name}</a></strong>
                                             ${l.company_name ? `<div class="text-xs text-muted">${l.company_name}</div>` : ''}
                                         </td>
-                                        <td><a href="tel:${l.phone}">${l.phone}</a></td>
+                                        <td>
+                                            <div class="phone-cell-horizontal">
+                                                <i class="fas fa-phone-alt text-success"></i>
+                                                <a href="tel:${phone}">${phone}</a>
+                                            </div>
+                                        </td>
                                         <td>${l.email ? `<a href="mailto:${l.email}">${l.email}</a>` : '<span class="text-muted">-</span>'}</td>
                                         <td><span class="badge badge-light border text-xs">${l.source_name || 'Direct'}</span></td>
                                         <td><span class="badge badge-info text-xs font-weight-bold" style="background-color:${l.status_color || '#17a2b8'}">${l.status_name}</span></td>
@@ -1072,12 +1185,27 @@ const App = {
                                         <td><span class="badge badge-${l.priority === 'high' ? 'danger' : (l.priority === 'medium' ? 'warning text-dark' : 'secondary')} text-xs">${l.priority || 'Normal'}</span></td>
                                         <td class="text-xs text-muted">${l.created_at ? l.created_at.substring(0, 10) : '-'}</td>
                                         <td class="text-center">
-                                            <button class="btn btn-primary btn-xs font-weight-bold mr-1" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.phone}', ${l.status_id})" title="Dial & Update Call">
-                                                <i class="fas fa-phone-alt mr-1"></i>Call
-                                            </button>
-                                            <button class="btn btn-default btn-xs" onclick="App.openLeadDetailModal(${l.id})" title="Details">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
+                                            <div class="dropdown">
+                                                <button class="btn btn-default btn-xs dropdown-toggle font-weight-bold shadow-none" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                    Action
+                                                </button>
+                                                <div class="dropdown-menu dropdown-menu-right shadow-sm text-xs">
+                                                    <a class="dropdown-item py-1" href="javascript:void(0)" onclick="App.openLeadDetailModal(${l.id})">
+                                                        <i class="fas fa-eye mr-2 text-info"></i> View Lead
+                                                    </a>
+                                                    <a class="dropdown-item py-1" href="javascript:void(0)" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${phone}', ${l.status_id})">
+                                                        <i class="fas fa-phone-alt mr-2 text-primary"></i> Update Lead / Call
+                                                    </a>
+                                                    <a class="dropdown-item py-1" href="javascript:void(0)" onclick="App.openScheduleMeetingModal(${l.id}, '${l.name.replace(/'/g, "\\'")}')">
+                                                        <i class="fas fa-calendar-plus mr-2 text-success"></i> Schedule Meeting
+                                                    </a>
+                                                    ${canAddLead ? `
+                                                    <div class="dropdown-divider my-1"></div>
+                                                    <a class="dropdown-item py-1 text-danger" href="javascript:void(0)" onclick="App.deleteLead(${l.id})">
+                                                        <i class="fas fa-trash-alt mr-2"></i> Delete Lead
+                                                    </a>` : ''}
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                     `;
@@ -1232,17 +1360,22 @@ const App = {
             const leads = Array.isArray(data.data) ? data.data : (data.data && Array.isArray(data.data.leads) ? data.data.leads : (Array.isArray(data.leads) ? data.leads : []));
             const p = data.pagination || (data.data && data.data.pagination) || { total: leads.length, page: 1, total_pages: 1 };
 
+            const isOperator = !!(this.currentUser && this.currentUser.role_name === 'operation_executive');
+            const canAddLead = !isOperator;
+
             let html = `
                 <div class="card card-info card-outline shadow-sm">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap" style="gap: 10px;">
                         <h3 class="card-title font-weight-bold mb-0">
                             <i class="fas fa-laptop mr-1 text-info"></i> Daily Operator Working Table (${p.total} Active)
                         </h3>
-                        <div class="card-tools ml-auto d-flex align-items-center" style="gap: 8px;">
+                        <div class="card-tools ml-auto d-flex align-items-center flex-wrap" style="gap: 8px;">
+                            <input type="text" class="form-control form-control-sm" style="width: 220px;" placeholder="Search in workspace..." value="${this.workspaceFilterState.search || ''}" onkeyup="if(event.key==='Enter') App.renderWorkspace(1, {search: this.value})">
+                            ${canAddLead ? `
                             <button class="btn btn-primary btn-sm font-weight-bold" onclick="App.openCreateLeadModal()">
                                 <i class="fas fa-plus mr-1"></i> Add Lead
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="App.renderWorkspace(1)" title="Refresh Workspace">
+                            </button>` : ''}
+                            <button class="btn btn-outline-secondary btn-sm font-weight-bold" onclick="App.renderWorkspace(App.workspaceFilterState.page || 1); App.fetchNotifications();" title="Refresh Workspace & Badges">
                                 <i class="fas fa-sync-alt mr-1"></i> Refresh
                             </button>
                         </div>
@@ -1259,7 +1392,7 @@ const App = {
                                         <th>Source</th>
                                         <th>Follow-up Date</th>
                                         <th>Last Remark</th>
-                                        <th class="text-center" style="width: 140px;">Action</th>
+                                        <th class="text-center" style="width: 120px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1274,18 +1407,33 @@ const App = {
                                                 <strong><a href="javascript:void(0)" onclick="App.openLeadDetailModal(${l.id})">${l.name}</a></strong>
                                                 ${l.company_name ? `<div class="text-xs text-muted">${l.company_name}</div>` : ''}
                                             </td>
-                                            <td><a href="tel:${phone}"><i class="fas fa-phone mr-1 text-success"></i>${phone}</a></td>
+                                            <td>
+                                                <div class="phone-cell-horizontal">
+                                                    <i class="fas fa-phone-alt text-success"></i>
+                                                    <a href="tel:${phone}">${phone}</a>
+                                                </div>
+                                            </td>
                                             <td><span class="badge badge-info" style="background-color: ${l.status_color || '#17a2b8'}">${l.status_name}</span></td>
                                             <td><span class="badge badge-light border text-xs">${l.source_name || 'Inbound'}</span></td>
                                             <td class="text-xs font-weight-bold text-danger">${followup}</td>
                                             <td class="text-xs text-muted" style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${remarks}</td>
                                             <td class="text-center">
-                                                <button class="btn btn-primary btn-xs font-weight-bold mr-1" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${phone}', ${l.status_id})">
-                                                    <i class="fas fa-phone-alt mr-1"></i>Update
-                                                </button>
-                                                <button class="btn btn-default btn-xs" onclick="App.openLeadDetailModal(${l.id})" title="View Details">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-default btn-xs dropdown-toggle font-weight-bold shadow-none" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                        Action
+                                                    </button>
+                                                    <div class="dropdown-menu dropdown-menu-right shadow-sm text-xs">
+                                                        <a class="dropdown-item py-1" href="javascript:void(0)" onclick="App.openLeadDetailModal(${l.id})">
+                                                            <i class="fas fa-eye mr-2 text-info"></i> View Lead
+                                                        </a>
+                                                        <a class="dropdown-item py-1" href="javascript:void(0)" onclick="App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${phone}', ${l.status_id})">
+                                                            <i class="fas fa-phone-alt mr-2 text-primary"></i> Update Lead / Call
+                                                        </a>
+                                                        <a class="dropdown-item py-1" href="javascript:void(0)" onclick="App.openScheduleMeetingModal(${l.id}, '${l.name.replace(/'/g, "\\'")}')">
+                                                            <i class="fas fa-calendar-plus mr-2 text-success"></i> Schedule Meeting
+                                                        </a>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                         `;
@@ -1341,11 +1489,21 @@ const App = {
             const queue = Array.isArray(data.data) ? data.data : [];
 
             let html = `
+                <div class="alert alert-light border border-warning shadow-sm mb-3 p-3 text-xs">
+                    <i class="fas fa-info-circle text-warning mr-1"></i> <strong>Calling Queue Lifecycle:</strong> 
+                    Leads enter your calling queue when assigned to you and awaiting initial contact, or when a scheduled callback/follow-up is due today. 
+                    Leads exit the active queue once scheduled for a meeting, converted to a project, rescheduled to a future date, or marked not interested/lost.
+                </div>
                 <div class="card card-warning card-outline shadow-sm">
-                    <div class="card-header">
-                        <h3 class="card-title font-weight-bold">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                        <h3 class="card-title font-weight-bold mb-0">
                             <i class="fas fa-headset mr-1 text-warning"></i> Telecalling Live Queue (${queue.length} Leads Waiting)
                         </h3>
+                        <div class="card-tools ml-auto">
+                            <button class="btn btn-outline-secondary btn-sm font-weight-bold" onclick="App.renderCallingQueue(); App.fetchNotifications();" title="Refresh Queue & Badges">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -1366,7 +1524,12 @@ const App = {
                                         <tr>
                                             <td>${i + 1}</td>
                                             <td><strong>${q.name}</strong></td>
-                                            <td><a href="tel:${q.phone}" class="font-weight-bold text-dark">${q.phone}</a></td>
+                                            <td>
+                                                <div class="phone-cell-horizontal">
+                                                    <i class="fas fa-phone-alt text-success"></i>
+                                                    <a href="tel:${q.phone}" class="font-weight-bold text-dark">${q.phone}</a>
+                                                </div>
+                                            </td>
                                             <td><span class="badge badge-light border">${q.service_name || 'General Inquiry'}</span></td>
                                             <td><span class="badge badge-info">${q.status_name}</span></td>
                                             <td>${q.assigned_name || 'Queue Pool'}</td>
@@ -1430,9 +1593,9 @@ const App = {
                                 </div>
 
                                 <!-- Duration Capture Section -->
-                                <div class="card p-2 bg-light mb-3 border">
+                                <div class="card p-3 bg-light mb-3 border">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <label class="text-xs font-weight-bold text-muted mb-0">Call Duration</label>
+                                        <label class="modal-label-contrast mb-0">Call Duration</label>
                                         ${isActiveCall ? `
                                             <span class="badge badge-success px-2 py-1"><i class="fas fa-satellite-dish mr-1"></i> Auto-Captured</span>
                                         ` : `
@@ -1461,7 +1624,7 @@ const App = {
 
                                 <!-- Call Outcome Dropdown -->
                                 <div class="form-group">
-                                    <label class="text-xs font-weight-bold text-muted">Call Outcome *</label>
+                                    <label class="modal-label-contrast">Call Outcome *</label>
                                     <select name="outcome_id" id="call-outcome-select" class="form-control font-weight-bold" required onchange="App.onCallOutcomeChanged(this)">
                                         <option value="">Select Outcome...</option>
                                         ${outcomes.map(o => `<option value="${o.id}" data-cat="${o.category || ''}" data-name="${o.name}">${o.name}</option>`).join('')}
@@ -1487,11 +1650,11 @@ const App = {
                                     <!-- Sub-branch: Followup -->
                                     <div id="subbranch-followup">
                                         <div class="form-group mb-2">
-                                            <label class="text-xs font-weight-bold text-muted">Follow-up Date &amp; Time *</label>
+                                            <label class="modal-label-contrast">Follow-up Date &amp; Time *</label>
                                             <input type="datetime-local" name="next_followup_date" id="call-followup-dt" class="form-control form-control-sm">
                                         </div>
                                         <div class="form-group mb-0">
-                                            <label class="text-xs font-weight-bold text-muted">Follow-up Purpose</label>
+                                            <label class="modal-label-contrast">Follow-up Purpose</label>
                                             <input type="text" name="followup_purpose" class="form-control form-control-sm" placeholder="e.g. Detailed price quote review">
                                         </div>
                                     </div>
@@ -1499,16 +1662,16 @@ const App = {
                                     <!-- Sub-branch: Meeting -->
                                     <div id="subbranch-meeting" style="display: none;">
                                         <div class="form-group mb-2">
-                                            <label class="text-xs font-weight-bold text-muted">Meeting Title *</label>
+                                            <label class="modal-label-contrast">Meeting Title *</label>
                                             <input type="text" name="meeting_title" class="form-control form-control-sm" value="Product Demo - ${leadName}">
                                         </div>
                                         <div class="form-row">
                                             <div class="col-md-7 mb-2">
-                                                <label class="text-xs font-weight-bold text-muted">Meeting Date &amp; Time *</label>
+                                                <label class="modal-label-contrast">Meeting Date &amp; Time *</label>
                                                 <input type="datetime-local" name="meeting_datetime" id="call-meeting-dt" class="form-control form-control-sm">
                                             </div>
                                             <div class="col-md-5 mb-2">
-                                                <label class="text-xs font-weight-bold text-muted">Meeting Mode</label>
+                                                <label class="modal-label-contrast">Meeting Mode</label>
                                                 <select name="meeting_mode" class="form-control form-control-sm">
                                                     <option value="Google Meet">Google Meet</option>
                                                     <option value="Zoom">Zoom</option>
@@ -1518,7 +1681,7 @@ const App = {
                                             </div>
                                         </div>
                                         <div class="form-group mb-0">
-                                            <label class="text-xs font-weight-bold text-muted">Meeting Link / Room (Optional)</label>
+                                            <label class="modal-label-contrast">Meeting Link / Room (Optional)</label>
                                             <input type="url" name="meeting_link" class="form-control form-control-sm" placeholder="https://meet.google.com/xyz-abcd">
                                         </div>
                                     </div>
@@ -1545,13 +1708,13 @@ const App = {
 
                                 <!-- Branch: Standard Follow-up Option for Ringing / Connected -->
                                 <div id="call-branch-standard-followup" class="form-group" style="display: none;">
-                                    <label class="text-xs font-weight-bold text-muted">Schedule Next Follow-up (Optional)</label>
+                                    <label class="modal-label-contrast">Schedule Next Follow-up (Optional)</label>
                                     <input type="datetime-local" name="simple_followup_date" class="form-control">
                                 </div>
 
                                 <!-- Lead Status Select -->
                                 <div class="form-group">
-                                    <label class="text-xs font-weight-bold text-muted">Update Lead Status *</label>
+                                    <label class="modal-label-contrast">Update Lead Status *</label>
                                     <select name="status_id" id="call-status-select" class="form-control" required>
                                         ${statuses.map(s => `<option value="${s.id}" ${s.id == currentStatusId ? 'selected' : ''}>${s.name}</option>`).join('')}
                                     </select>
@@ -1559,7 +1722,7 @@ const App = {
 
                                 <!-- Discussion Remarks -->
                                 <div class="form-group">
-                                    <label class="text-xs font-weight-bold text-muted">Discussion Remarks *</label>
+                                    <label class="modal-label-contrast">Discussion Remarks *</label>
                                     <textarea name="remarks" id="call-remarks" class="form-control" rows="3" placeholder="Enter detailed notes and client feedback..." required></textarea>
                                 </div>
                             </div>
@@ -1696,12 +1859,20 @@ const App = {
 
         const res = await fetch('api/calls', { method: 'POST', body: formData });
         const data = await res.json();
-        alert(data.message || 'Call logged successfully.');
         if (data.success) {
             $('#call-modal').modal('hide');
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open').css('padding-right', '');
             if (this.currentView === 'calling_queue') this.renderCallingQueue();
             else if (this.currentView === 'workspace') this.renderWorkspace();
-            else if (this.currentView === 'leads') this.renderLeads(this.leadsFilterState.page);
+            else if (this.currentView === 'leads') this.renderLeads(this.leadsFilterState.page || 1);
+            else if (this.currentView === 'dashboard') this.renderDashboard();
+            this.fetchNotifications();
+            setTimeout(() => {
+                alert(data.message || 'Call logged successfully.');
+            }, 50);
+        } else {
+            alert(data.message || 'Failed to log call.');
         }
     },
 
@@ -2176,21 +2347,29 @@ const App = {
                             <th>Date &amp; Time</th>
                             <th>Platform / Link</th>
                             <th>Host Executive</th>
-                            <th>Status</th>
-                            <th class="text-center" style="width: 170px;">Actions</th>
+                            <th>Status &amp; Outcome</th>
+                            <th class="text-center" style="width: 220px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${meetings.length === 0 ? '<tr><td colspan="8" class="text-center py-4 text-muted">No scheduled meetings found matching criteria.</td></tr>' : meetings.map((m, i) => `
+                        ${meetings.length === 0 ? '<tr><td colspan="8" class="text-center py-4 text-muted">No scheduled meetings found matching criteria.</td></tr>' : meetings.map((m, i) => {
+                            const isConverted = (m.notes && m.notes.includes('[Project Created:')) || m.status === 'Converted';
+                            const canPushToProject = (m.status === 'Completed' || (m.notes && m.notes.includes('Outcome: Successful'))) && !isConverted;
+                            return `
                             <tr>
                                 <td>${i + 1}</td>
                                 <td>
                                     <strong><a href="javascript:void(0)" onclick="App.openLeadDetailModal(${m.lead_id})">${m.lead_name}</a></strong>
-                                    <div class="text-xs text-muted"><a href="tel:${m.lead_mobile}">${m.lead_mobile}</a></div>
+                                    <div class="phone-cell-horizontal mt-1">
+                                        <i class="fas fa-phone-alt text-success"></i>
+                                        <a href="tel:${m.lead_mobile}">${m.lead_mobile}</a>
+                                    </div>
+                                    ${m.company_name ? `<div class="text-xs text-muted">${m.company_name}</div>` : ''}
                                 </td>
                                 <td>
-                                    <div>${m.meeting_title}</div>
+                                    <div class="font-weight-bold text-dark">${m.meeting_title}</div>
                                     <span class="badge badge-light border text-xs">${m.type_name || 'Demo'}</span>
+                                    ${m.notes ? `<div class="text-xs text-muted mt-1" style="max-width: 240px; font-size: 0.75rem; white-space: pre-wrap;">${m.notes}</div>` : ''}
                                 </td>
                                 <td>
                                     <div class="font-weight-bold">${m.meeting_date}</div>
@@ -2198,23 +2377,32 @@ const App = {
                                 </td>
                                 <td>
                                     <div><span class="badge badge-light border">${m.meeting_mode || 'Google Meet'}</span></div>
-                                    ${m.meeting_link ? `<div class="text-xs"><a href="${m.meeting_link}" target="_blank" class="text-primary text-truncate d-inline-block" style="max-width: 140px;">Open Link</a></div>` : ''}
+                                    ${m.meeting_link ? `<div class="text-xs mt-1"><a href="${m.meeting_link}" target="_blank" class="text-primary text-truncate d-inline-block" style="max-width: 140px;">Open Link</a></div>` : ''}
                                 </td>
                                 <td><span class="badge badge-light border text-xs">${m.agent_name || 'Staff'}</span></td>
-                                <td><span class="badge badge-${m.status === 'Scheduled' ? 'primary' : (m.status === 'Completed' ? 'success' : (m.status === 'Rescheduled' ? 'warning text-dark' : 'secondary'))} text-xs font-weight-bold">${m.status || 'Scheduled'}</span></td>
+                                <td>
+                                    <span class="badge badge-${m.status === 'Scheduled' ? 'primary' : (m.status === 'Completed' ? 'success' : (m.status === 'Rescheduled' ? 'warning text-dark' : 'secondary'))} text-xs font-weight-bold">${m.status || 'Scheduled'}</span>
+                                    ${isConverted ? `<div class="mt-1"><span class="badge badge-success text-xs font-weight-bold"><i class="fas fa-check-circle mr-1"></i> In Projects</span></div>` : ''}
+                                </td>
                                 <td class="text-center">
-                                    <button class="btn btn-warning btn-xs font-weight-bold mr-1" onclick="App.openRescheduleMeetingModal(${m.id}, '${m.meeting_title.replace(/'/g, "\\'")}', '${m.meeting_date}', '${m.meeting_time}')" title="Reschedule">
-                                        <i class="fas fa-calendar-alt"></i>
-                                    </button>
-                                    <button class="btn btn-success btn-xs font-weight-bold mr-1" onclick="App.updateMeetingStatus(${m.id}, 'Completed')" title="Mark Done">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-xs" onclick="App.updateMeetingStatus(${m.id}, 'Cancelled')" title="Cancel">
-                                        <i class="fas fa-times"></i>
-                                    </button>
+                                    <div class="btn-group btn-group-xs mb-1">
+                                        <button class="btn btn-info btn-xs font-weight-bold mr-1" onclick="App.openMeetingFeedbackModal(${m.id}, '${m.meeting_title.replace(/'/g, "\\'")}', '${m.lead_name.replace(/'/g, "\\'")}', '${m.status}', '${(m.notes || '').replace(/'/g, "\\'").replace(/\n/g, ' ')}')" title="Record Feedback">
+                                            <i class="fas fa-comment-dots mr-1"></i> Feedback
+                                        </button>
+                                        <button class="btn btn-warning btn-xs font-weight-bold" onclick="App.openRescheduleMeetingModal(${m.id}, '${m.meeting_title.replace(/'/g, "\\'")}', '${m.meeting_date}', '${m.meeting_time}')" title="Reschedule">
+                                            <i class="fas fa-calendar-alt"></i>
+                                        </button>
+                                    </div>
+                                    ${canPushToProject ? `
+                                    <div>
+                                        <button class="btn btn-success btn-xs font-weight-bold btn-block mt-1" onclick="App.openPushToProjectModal(${m.id}, '${m.lead_name.replace(/'/g, "\\'")}', '${m.lead_mobile}', '${m.lead_email || ''}')" title="Convert Meeting to Project">
+                                            <i class="fas fa-rocket mr-1"></i> Push to Project Funnel
+                                        </button>
+                                    </div>` : ''}
                                 </td>
                             </tr>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -2394,6 +2582,187 @@ const App = {
         alert(data.message || 'Status updated.');
         if (data.success) {
             this.renderMeetings();
+        }
+    },
+
+    openMeetingFeedbackModal: function(meetingId, currentTitle, clientName, currentStatus = 'Completed', currentNotes = '') {
+        const modalHtml = `
+            <div class="modal fade" id="meeting-feedback-modal" tabindex="-1" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-md" role="document">
+                    <div class="modal-content shadow-lg">
+                        <div class="modal-header bg-info text-white">
+                            <h5 class="modal-title font-weight-bold">
+                                <i class="fas fa-comment-dots mr-2"></i> Post-Meeting Feedback &bull; #${meetingId}
+                            </h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <form onsubmit="App.submitMeetingFeedback(event, ${meetingId})">
+                            <div class="modal-body p-4">
+                                <div class="alert alert-light border mb-3">
+                                    <div class="font-weight-bold text-dark">${currentTitle}</div>
+                                    <div class="text-xs text-muted">Client: <strong>${clientName}</strong></div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="modal-label-contrast">Meeting Status *</label>
+                                    <select name="status" class="form-control" required>
+                                        <option value="Completed" ${currentStatus === 'Completed' ? 'selected' : ''}>Completed</option>
+                                        <option value="Rescheduled" ${currentStatus === 'Rescheduled' ? 'selected' : ''}>Rescheduled</option>
+                                        <option value="Cancelled" ${currentStatus === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                                        <option value="No Show" ${currentStatus === 'No Show' ? 'selected' : ''}>No Show / Client Absent</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="modal-label-contrast">Meeting Outcome *</label>
+                                    <select name="outcome" class="form-control font-weight-bold" required>
+                                        <option value="Successful">Successful - High Buying Intent / Ready for Project</option>
+                                        <option value="Needs Followup">Needs Follow-up / Evaluating Commercials</option>
+                                        <option value="Not Interested">Not Interested / Unqualified</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group mb-0">
+                                    <label class="modal-label-contrast">Discussion Feedback &amp; Next Steps *</label>
+                                    <textarea name="feedback" class="form-control" rows="3" placeholder="Enter key discussion highlights, client budget expectations, technical scope, or objections..." required></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light">
+                                <button type="button" class="btn btn-default font-weight-bold" data-dismiss="modal">Close</button>
+                                <button type="submit" class="btn btn-info font-weight-bold">
+                                    <i class="fas fa-save mr-1"></i> Save Meeting Outcome
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#global-modal-container').html(modalHtml);
+        $('#meeting-feedback-modal').modal('show');
+    },
+
+    submitMeetingFeedback: async function(e, meetingId) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        formData.append('action', 'record_feedback');
+        formData.append('id', meetingId);
+
+        const res = await fetch('api/meetings', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            $('#meeting-feedback-modal').modal('hide');
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open').css('padding-right', '');
+            this.renderMeetings();
+            this.fetchNotifications();
+            setTimeout(() => {
+                alert(data.message || 'Meeting feedback recorded successfully!');
+            }, 50);
+        } else {
+            alert(data.message || 'Failed to record meeting feedback.');
+        }
+    },
+
+    openPushToProjectModal: function(meetingId, clientName, phone = '', email = '') {
+        const modalHtml = `
+            <div class="modal fade" id="push-project-modal" tabindex="-1" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-md" role="document">
+                    <div class="modal-content shadow-lg">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title font-weight-bold">
+                                <i class="fas fa-rocket mr-2"></i> Push to Project Funnel
+                            </h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <form onsubmit="App.submitPushToProject(event, ${meetingId})">
+                            <div class="modal-body p-4">
+                                <div class="alert alert-success border mb-3">
+                                    <div class="font-weight-bold"><i class="fas fa-check-circle mr-1"></i> Converting Meeting #${meetingId} to Live Project</div>
+                                    <div class="text-xs">Client: <strong>${clientName}</strong> &bull; Contact: <strong>${phone}</strong></div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="modal-label-contrast">Project / Deal Amount (₹) *</label>
+                                        <input type="number" step="0.01" min="1" name="final_amount" class="form-control" placeholder="e.g. 50000" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="modal-label-contrast">Advance Amount Received (₹)</label>
+                                        <input type="number" step="0.01" min="0" name="advance_amount" class="form-control" placeholder="e.g. 15000" value="0">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="modal-label-contrast">Expected Delivery Date</label>
+                                    <input type="date" name="expected_delivery_date" class="form-control">
+                                </div>
+
+                                <div class="form-group mb-0">
+                                    <label class="modal-label-contrast">Project Scope &amp; Deliverables Notes</label>
+                                    <textarea name="notes" class="form-control" rows="3" placeholder="Enter agreed deliverables, milestones, tech requirements..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light">
+                                <button type="button" class="btn btn-default font-weight-bold" data-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success font-weight-bold">
+                                    <i class="fas fa-arrow-right mr-1"></i> Create Project
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#global-modal-container').html(modalHtml);
+        $('#push-project-modal').modal('show');
+    },
+
+    submitPushToProject: async function(e, meetingId) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        formData.append('action', 'convert_meeting');
+        formData.append('meeting_id', meetingId);
+
+        const res = await fetch('api/projects', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            $('#push-project-modal').modal('hide');
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open').css('padding-right', '');
+            this.renderMeetings();
+            this.fetchNotifications();
+            setTimeout(() => {
+                alert(data.message || `Project ${data.project_code || ''} generated successfully!`);
+                if (App.currentUser && (App.currentUser.role_name === 'admin' || App.currentUser.role_name === 'manager' || App.currentUser.role_name === 'super_admin' || App.currentUser.role_id === 1 || App.currentUser.role_id === 2)) {
+                    App.navigate('projects');
+                }
+            }, 50);
+        } else {
+            alert(data.message || 'Failed to convert meeting to project.');
+        }
+    },
+
+    deleteLead: async function(id) {
+        if (!confirm('Are you sure you want to archive/delete this lead?')) return;
+        const formData = new FormData();
+        formData.append('action', 'delete');
+        formData.append('id', id);
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message || 'Lead action completed.');
+        if (data.success) {
+            this.renderLeads(this.leadsFilterState.page || 1);
         }
     },
 

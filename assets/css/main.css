@@ -361,3 +361,26 @@ table.dataTable th, table.dataTable td {
 .timeline-item.followup::before { background: #fd7e14; box-shadow: 0 0 0 2px #fd7e14; }
 .timeline-item.reassigned::before { background: #e83e8c; box-shadow: 0 0 0 2px #e83e8c; }
 
+/* Table Layout, Phone Alignment & Action Dropdown */
+.table th, .table td {
+    vertical-align: middle !important;
+}
+.phone-cell-horizontal {
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+    gap: 6px !important;
+}
+.dropdown-menu {
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.modal-label-contrast {
+    color: #212529 !important;
+    font-weight: 600 !important;
+    font-size: 0.8rem !important;
+    margin-bottom: 4px;
+}
+
+

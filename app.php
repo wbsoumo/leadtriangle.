@@ -55,7 +55,7 @@ if (empty($_SESSION['user_id'])) {
                     <i class="fas fa-bars"></i>
                 </a>
             </li>
-            <li class="nav-item d-none d-sm-inline-block ml-2">
+            <li class="nav-item d-none d-sm-inline-block ml-2 admin-manager-only" id="top-add-lead-btn">
                 <button class="btn btn-primary btn-sm font-weight-bold" onclick="App.openCreateLeadModal()">
                     <i class="fas fa-plus-circle mr-1"></i> Add Lead
                 </button>
@@ -65,9 +65,9 @@ if (empty($_SESSION['user_id'])) {
         <!-- Global Quick Search -->
         <div class="form-inline ml-3 d-none d-md-flex flex-grow-1" style="max-width: 420px;">
             <div class="input-group input-group-sm w-100">
-                <input class="form-control form-control-navbar" type="search" placeholder="Search leads, phone, email, project code..." aria-label="Search" onkeyup="if(event.key==='Enter'){ App.navigate('leads'); }">
+                <input class="form-control form-control-navbar" type="search" id="top-global-search" placeholder="Search leads, phone, email, project code..." aria-label="Search" onkeyup="if(event.key==='Enter'){ App.handleGlobalSearch(this.value); }">
                 <div class="input-group-append">
-                    <button class="btn btn-navbar" type="button" onclick="App.navigate('leads')">
+                    <button class="btn btn-navbar" type="button" onclick="App.handleGlobalSearch(document.getElementById('top-global-search').value)">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
@@ -204,22 +204,25 @@ if (empty($_SESSION['user_id'])) {
                             <p>Follow-ups</p>
                         </a>
                     </li>
+
+                    <!-- MEETINGS & DEMONSTRATIONS -->
+                    <li class="nav-header">MEETINGS & APPOINTMENTS</li>
                     <li class="nav-item">
                         <a href="javascript:void(0)" class="nav-link" data-view="meetings" onclick="App.navigate('meetings')">
                             <i class="nav-icon fas fa-calendar-alt"></i>
-                            <p>Scheduled Meetings</p>
+                            <p>Client Meetings</p>
                         </a>
                     </li>
 
-                    <!-- SALES & PROJECTS -->
-                    <li class="nav-header">SALES & PIPELINE</li>
-                    <li class="nav-item">
+                    <!-- SALES & PROJECTS (Admin & Managers Only) -->
+                    <li class="nav-header admin-manager-only">SALES & PIPELINE</li>
+                    <li class="nav-item admin-manager-only">
                         <a href="javascript:void(0)" class="nav-link" data-view="funnel" onclick="App.navigate('funnel')">
                             <i class="nav-icon fas fa-filter"></i>
                             <p>Sales Funnel</p>
                         </a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item admin-manager-only">
                         <a href="javascript:void(0)" class="nav-link" data-view="projects" onclick="App.navigate('projects')">
                             <i class="nav-icon fas fa-project-diagram"></i>
                             <p>Projects Workspace</p>

@@ -150,6 +150,128 @@ if ($action === 'convert') {
     exit;
 }
 
+// 2B. PUSH MEETING TO PROJECT FUNNEL
+if ($action === 'convert_meeting') {
+    if ($roleName === 'operation_executive') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Managers and Administrators can convert meetings to projects.']);
+        exit;
+    }
+
+    $meetingId = (int)($_POST['meeting_id'] ?? 0);
+    $finalAmount = (float)($_POST['final_amount'] ?? 0);
+    $advanceAmount = (float)($_POST['advance_amount'] ?? 0);
+    $deliveryDate = !empty($_POST['expected_delivery_date']) ? trim($_POST['expected_delivery_date']) : null;
+    $notes = trim($_POST['notes'] ?? '');
+
+    if (!$meetingId) {
+        echo json_encode(['success' => false, 'message' => 'Meeting ID is required.']);
+        exit;
+    }
+
+    if ($finalAmount <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Valid Project Amount / Deal Value is required.']);
+        exit;
+    }
+
+    // Fetch meeting & lead details
+    $mStmt = $pdo->prepare("
+        SELECT m.*, l.name as client_name, l.company_name, l.mobile, l.email, l.service_id, l.assigned_manager_id, l.assigned_executive_id
+        FROM meetings m
+        JOIN leads l ON m.lead_id = l.id
+        WHERE m.id = :mid
+    ");
+    $mStmt->execute(['mid' => $meetingId]);
+    $meeting = $mStmt->fetch();
+
+    if (!$meeting) {
+        echo json_encode(['success' => false, 'message' => 'Meeting record not found.']);
+        exit;
+    }
+
+    // DUPLICATE PREVENTION: Check if a project already exists for this lead
+    $dupCheck = $pdo->prepare("SELECT id, project_code FROM projects WHERE lead_id = :lid");
+    $dupCheck->execute(['lid' => $meeting['lead_id']]);
+    $existingProject = $dupCheck->fetch();
+    if ($existingProject) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'A project already exists for this client (' . $existingProject['project_code'] . '). Duplicate project creation prevented.',
+            'project_code' => $existingProject['project_code']
+        ]);
+        exit;
+    }
+
+    // Code generator
+    $codeStmt = $pdo->query("SELECT MAX(id) as max_id FROM projects");
+    $nextId = ((int)$codeStmt->fetch()['max_id']) + 2001;
+    $prjCode = 'PRJ-' . $nextId;
+
+    $payStatus = ($advanceAmount >= $finalAmount && $finalAmount > 0) ? 'Paid' : (($advanceAmount > 0) ? 'Partial' : 'Unpaid');
+    $assignedMgr = $meeting['assigned_manager_id'] ?: $userId;
+
+    $fullNotes = trim("Transferred from Meeting: " . $meeting['meeting_title'] . "\n" . ($meeting['notes'] ? "Meeting Notes: " . $meeting['notes'] . "\n" : "") . ($notes ? "Project Scope: " . $notes : ""));
+
+    $stmt = $pdo->prepare("
+        INSERT INTO projects (
+            project_code, lead_id, client_name, company_name, phone, email, 
+            service_id, assigned_manager_id, project_owner_id, 
+            quoted_amount, final_amount, advance_amount, paid_amount, 
+            payment_status, stage_id, priority, start_date, expected_delivery_date, notes
+        ) VALUES (
+            :code, :lid, :cname, :comp, :phone, :email, 
+            :srv, :mgr, :owner, 
+            :qamt, :famt, :adv, :paid, 
+            :pst, 1, 'High', CURDATE(), :ddate, :notes
+        )
+    ");
+    $stmt->execute([
+        'code'   => $prjCode,
+        'lid'    => $meeting['lead_id'],
+        'cname'  => $meeting['client_name'],
+        'comp'   => $meeting['company_name'],
+        'phone'  => $meeting['mobile'],
+        'email'  => $meeting['email'],
+        'srv'    => $meeting['service_id'],
+        'mgr'    => $assignedMgr,
+        'owner'  => $meeting['assigned_executive_id'] ?: $userId,
+        'qamt'   => $finalAmount,
+        'famt'   => $finalAmount,
+        'adv'    => $advanceAmount,
+        'paid'   => $advanceAmount,
+        'pst'    => $payStatus,
+        'ddate'  => $deliveryDate,
+        'notes'  => $fullNotes
+    ]);
+    $projectId = $pdo->lastInsertId();
+
+    // Record Advance Payment if received
+    if ($advanceAmount > 0) {
+        $pdo->prepare("
+            INSERT INTO payments (project_id, amount, payment_mode, payment_date, recorded_by, notes) 
+            VALUES (:pid, :amt, 'Bank Transfer / Online', CURDATE(), :uid, 'Advance payment confirmed on meeting project transfer')
+        ")->execute(['pid' => $projectId, 'amt' => $advanceAmount, 'uid' => $userId]);
+    }
+
+    // Update meeting status to Completed
+    $pdo->prepare("UPDATE meetings SET status = 'Completed', notes = CONCAT(COALESCE(notes, ''), '\n[Project Created: $prjCode]') WHERE id = :mid")
+        ->execute(['mid' => $meetingId]);
+
+    // Update lead status to Converted (11) and record qualification
+    $pdo->prepare("UPDATE leads SET status_id = 11, is_qualified = 1 WHERE id = :lid")
+        ->execute(['lid' => $meeting['lead_id']]);
+
+    logActivity($pdo, 'projects', 'pushed_from_meeting', $projectId);
+
+    echo json_encode([
+        'success' => true,
+        'message' => "Successfully pushed to Project Funnel! Project Code: $prjCode",
+        'project_id' => $projectId,
+        'project_code' => $prjCode
+    ]);
+    exit;
+}
+
 // 3. PROJECT WORKSPACE DETAILS
 if ($action === 'detail') {
     $projectId = (int)($_GET['id'] ?? 0);

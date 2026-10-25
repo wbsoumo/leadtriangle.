@@ -343,6 +343,12 @@ if ($action === 'check_duplicate') {
 
 // 3. CREATE LEAD
 if ($action === 'create') {
+    // Role-based permission: Telecallers / Operations Executives cannot create leads
+    if ($roleName === 'operation_executive') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Permission denied: Only Administrators and Managers can add new leads.']);
+        exit;
+    }
     $name = trim($_POST['name'] ?? '');
     $mobile = trim($_POST['mobile'] ?? '');
     $alternateMobile = trim($_POST['alternate_mobile'] ?? '');

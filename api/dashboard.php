@@ -83,9 +83,12 @@ $stmt = $pdo->prepare("SELECT COUNT(*) as new_today FROM leads WHERE DATE(create
 $stmt->execute();
 $newLeadsToday = $stmt->fetch()['new_today'];
 
-// 3. Contacted vs Contacting
+// 3. Contacted vs Contacting & Telecaller Metrics
 $stmt = $pdo->prepare("
     SELECT 
+        SUM(CASE WHEN (status_id IN (1, 2, 3) AND last_contacted_at IS NULL) THEN 1 ELSE 0 END) as fresh_leads,
+        SUM(CASE WHEN status_id IN (5, 7, 8, 9, 10, 11) THEN 1 ELSE 0 END) as connected_leads,
+        SUM(CASE WHEN status_id = 6 OR EXISTS (SELECT 1 FROM call_logs cl WHERE cl.lead_id = leads.id AND cl.call_outcome_id IN (2, 6, 18)) THEN 1 ELSE 0 END) as callbacks_required,
         SUM(CASE WHEN status_id IN (5, 8, 9, 10, 11) THEN 1 ELSE 0 END) as contacted,
         SUM(CASE WHEN is_qualified = 1 THEN 1 ELSE 0 END) as qualified,
         SUM(CASE WHEN status_id = 11 THEN 1 ELSE 0 END) as converted,
@@ -119,21 +122,28 @@ $stmt = $pdo->prepare("
 $stmt->execute($callParams);
 $callStats = $stmt->fetch();
 
-// 5. Follow-ups Metrics
-$fuWhere = "WHERE 1=1";
-$fuParams = [];
+// 5. Follow-ups Metrics (Synchronized with leads.next_followup_at and followups table)
+$fuLeadWhere = "WHERE l.is_archived = 0 AND l.status_id NOT IN (11, 13)";
+$fuLeadParams = [];
 if ($roleName === 'operation_executive') {
-    $fuWhere .= " AND user_id = :fu_uid";
-    $fuParams['fu_uid'] = $userId;
+    $fuLeadWhere .= " AND l.assigned_executive_id = :fu_exec_id";
+    $fuLeadParams['fu_exec_id'] = $userId;
+} elseif ($roleName === 'manager') {
+    $fuLeadWhere .= " AND (l.assigned_manager_id = :fu_mgr_id OR l.assigned_executive_id IN (SELECT id FROM users WHERE team_id = :fu_team_id))";
+    $fuLeadParams['fu_mgr_id'] = $userId;
+    $fuLeadParams['fu_team_id'] = $teamId;
 }
 
 $stmt = $pdo->prepare("
     SELECT 
-        SUM(CASE WHEN followup_date = CURDATE() AND status = 'Pending' THEN 1 ELSE 0 END) as followups_today,
-        SUM(CASE WHEN followup_date < CURDATE() AND status = 'Pending' THEN 1 ELSE 0 END) as overdue_followups
-    FROM followups $fuWhere
+        COUNT(DISTINCT l.id) as followups_today,
+        SUM(CASE WHEN ((DATE(l.next_followup_at) < CURDATE() AND l.next_followup_at IS NOT NULL) OR (f.followup_date < CURDATE() AND f.status = 'Pending')) THEN 1 ELSE 0 END) as overdue_followups
+    FROM leads l
+    LEFT JOIN followups f ON f.lead_id = l.id AND f.followup_date = CURDATE() AND f.status = 'Pending'
+    $fuLeadWhere
+      AND (DATE(l.next_followup_at) = CURDATE() OR f.id IS NOT NULL)
 ");
-$stmt->execute($fuParams);
+$stmt->execute($fuLeadParams);
 $fuStats = $stmt->fetch();
 
 // 6. Meetings Metrics
@@ -253,6 +263,9 @@ echo json_encode([
         'total_leads' => (int)$totalLeads,
         'total_assigned' => (int)$totalLeads,
         'new_leads_today' => (int)$newLeadsToday,
+        'fresh_leads' => (int)($leadStats['fresh_leads'] ?? 0),
+        'connected_leads' => (int)($leadStats['connected_leads'] ?? 0),
+        'callbacks_required' => (int)($leadStats['callbacks_required'] ?? 0),
         'contacted_leads' => (int)($leadStats['contacted'] ?? 0),
         'qualified_leads' => (int)($leadStats['qualified'] ?? 0),
         'converted_leads' => (int)($leadStats['converted'] ?? 0),

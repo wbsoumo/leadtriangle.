@@ -255,3 +255,71 @@ if ($action === 'update_status') {
     echo json_encode(['success' => true, 'message' => 'Meeting status updated to ' . $status]);
     exit;
 }
+
+// 5. RECORD POST-MEETING FEEDBACK & OUTCOME
+if ($action === 'record_feedback') {
+    $id = (int)($_POST['id'] ?? 0);
+    $status = trim($_POST['status'] ?? 'Completed');
+    $feedback = trim($_POST['feedback'] ?? $_POST['notes'] ?? '');
+    $outcome = trim($_POST['outcome'] ?? 'Successful'); // Successful, Needs Followup, Cancelled, Not Interested
+
+    if (!$id) {
+        echo json_encode(['success' => false, 'message' => 'Meeting ID required']);
+        exit;
+    }
+
+    $mStmt = $pdo->prepare("SELECT * FROM meetings WHERE id = :id");
+    $mStmt->execute(['id' => $id]);
+    $meeting = $mStmt->fetch();
+    if (!$meeting) {
+        echo json_encode(['success' => false, 'message' => 'Meeting not found']);
+        exit;
+    }
+
+    // Role check: Admin, Manager, or meeting owner
+    $isOwner = ((int)$meeting['assigned_user_id'] === $userId);
+    $isMgmt = in_array($roleName, ['super_admin', 'admin', 'manager']);
+    if (!$isOwner && !$isMgmt) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Unauthorized to record feedback for this meeting.']);
+        exit;
+    }
+
+    $existingNotes = $meeting['notes'] ?? '';
+    $timestamp = date('d-M-Y H:i');
+    $formattedNotes = trim($existingNotes . "\n[Outcome: $outcome | $timestamp]: " . $feedback);
+
+    $stmt = $pdo->prepare("UPDATE meetings SET status = :st, notes = :notes WHERE id = :id");
+    $stmt->execute([
+        'st' => $status,
+        'notes' => $formattedNotes,
+        'id' => $id
+    ]);
+
+    // If outcome is successful or status is Completed, mark lead as qualified
+    if ($outcome === 'Successful' || $status === 'Completed') {
+        $pdo->prepare("UPDATE leads SET is_qualified = 1 WHERE id = :lid")->execute(['lid' => $meeting['lead_id']]);
+    }
+
+    // Activity log
+    try {
+        $pdo->prepare("
+            INSERT INTO activity_logs (user_id, module, action, record_id, new_value, ip_address)
+            VALUES (:uid, 'meetings', 'feedback_recorded', :rec, :new, :ip)
+        ")->execute([
+            'uid' => $userId,
+            'rec' => $meeting['lead_id'],
+            'new' => json_encode(['meeting_id' => $id, 'status' => $status, 'outcome' => $outcome, 'feedback' => $feedback]),
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+        ]);
+    } catch (Exception $e) {}
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Meeting feedback and outcome recorded successfully!',
+        'meeting_id' => $id,
+        'status' => $status,
+        'outcome' => $outcome
+    ]);
+    exit;
+}

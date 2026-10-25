@@ -18,7 +18,7 @@ $roleName = $_SESSION['role_name'];
 $action = $_GET['action'] ?? $_POST['action'] ?? 'kanban';
 
 // 1. KANBAN BOARD VIEW
-if ($action === 'kanban') {
+if ($action === 'kanban' || $action === 'get_board') {
     // Fetch all stages
     $stagesStmt = $pdo->query("SELECT * FROM funnel_stages ORDER BY stage_order ASC");
     $stages = $stagesStmt->fetchAll();
@@ -136,7 +136,7 @@ if ($action === 'push_lead') {
 // 3. MOVE STAGE
 if ($action === 'move_stage') {
     $oppId = (int)($_POST['opportunity_id'] ?? 0);
-    $newStageId = (int)($_POST['stage_id'] ?? 0);
+    $newStageId = (int)($_POST['stage_id'] ?? $_POST['target_stage_id'] ?? 0);
 
     if (!$oppId || !$newStageId) {
         echo json_encode(['success' => false, 'message' => 'Opportunity ID and Stage ID required']);

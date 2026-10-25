@@ -112,8 +112,8 @@ $stmt = $pdo->prepare("
     SELECT 
         COUNT(*) as total_calls,
         SUM(CASE WHEN DATE(called_at) = CURDATE() THEN 1 ELSE 0 END) as calls_today,
-        SUM(CASE WHEN call_outcome_id IN (1, 2, 3, 9, 10) THEN 1 ELSE 0 END) as connected_calls,
-        SUM(CASE WHEN call_outcome_id IN (5, 6) THEN 1 ELSE 0 END) as no_answer_busy
+        SUM(CASE WHEN call_outcome_id IN (1, 2, 3, 4, 9, 10, 12, 14, 18) THEN 1 ELSE 0 END) as connected_calls,
+        SUM(CASE WHEN call_outcome_id IN (5, 6, 15, 16) THEN 1 ELSE 0 END) as no_answer_busy
     FROM call_logs $callWhere
 ");
 $stmt->execute($callParams);
@@ -174,7 +174,7 @@ if ($roleName !== 'operation_executive') {
             u.id, u.name, u.email, r.display_name as role,
             (SELECT COUNT(*) FROM leads WHERE assigned_executive_id = u.id AND is_archived = 0) as total_leads,
             (SELECT COUNT(*) FROM call_logs WHERE user_id = u.id AND DATE(called_at) = CURDATE()) as calls_today,
-            (SELECT COUNT(*) FROM call_logs WHERE user_id = u.id AND call_outcome_id IN (1,2,3,9,10)) as connected_calls,
+            (SELECT COUNT(*) FROM call_logs WHERE user_id = u.id AND call_outcome_id IN (1,2,3,4,9,10,12,14,18)) as connected_calls,
             (SELECT COUNT(*) FROM followups WHERE user_id = u.id AND followup_date = CURDATE() AND status = 'Pending') as followups_today,
             (SELECT COUNT(*) FROM meetings WHERE assigned_user_id = u.id AND meeting_date = CURDATE()) as meetings_today,
             (SELECT COUNT(*) FROM leads WHERE assigned_executive_id = u.id AND is_qualified = 1) as qualified_leads
@@ -190,11 +190,12 @@ if ($roleName !== 'operation_executive') {
 // 9. Detailed Call Outcomes Breakdown (Today)
 $outcomeStmt = $pdo->prepare("
     SELECT 
-        SUM(CASE WHEN call_outcome_id IN (1, 2) THEN 1 ELSE 0 END) as connected,
-        SUM(CASE WHEN call_outcome_id = 4 THEN 1 ELSE 0 END) as no_answer,
-        SUM(CASE WHEN call_outcome_id = 5 THEN 1 ELSE 0 END) as busy,
-        SUM(CASE WHEN call_outcome_id = 6 THEN 1 ELSE 0 END) as switched_off,
-        SUM(CASE WHEN call_outcome_id = 7 THEN 1 ELSE 0 END) as wrong_number
+        SUM(CASE WHEN call_outcome_id IN (1, 2, 3, 9, 10, 12, 18) THEN 1 ELSE 0 END) as connected,
+        SUM(CASE WHEN call_outcome_id IN (4, 14) THEN 1 ELSE 0 END) as not_interested,
+        SUM(CASE WHEN call_outcome_id IN (5, 15) THEN 1 ELSE 0 END) as no_answer,
+        SUM(CASE WHEN call_outcome_id IN (6, 16) THEN 1 ELSE 0 END) as busy,
+        SUM(CASE WHEN call_outcome_id IN (7) THEN 1 ELSE 0 END) as switched_off,
+        SUM(CASE WHEN call_outcome_id IN (8, 17) THEN 1 ELSE 0 END) as wrong_number
     FROM call_logs $callWhere AND DATE(called_at) = CURDATE()
 ");
 $outcomeStmt->execute($callParams);
@@ -256,6 +257,7 @@ echo json_encode([
         'qualified_leads' => (int)($leadStats['qualified'] ?? 0),
         'converted_leads' => (int)($leadStats['converted'] ?? 0),
         'lost_leads' => (int)($leadStats['lost'] ?? 0),
+        'total_calls' => (int)($callStats['total_calls'] ?? 0),
         'calls_today' => $calledTodayCount,
         'remaining_calls' => $remainingCount,
         'connected_calls' => (int)($callStats['connected_calls'] ?? 0),

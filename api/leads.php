@@ -402,7 +402,7 @@ if ($action === 'create') {
 }
 
 // 4. GET LEAD DETAILS (Full timeline & info)
-if ($action === 'detail') {
+if ($action === 'detail' || $action === 'get') {
     $leadId = (int)($_GET['id'] ?? 0);
     if (!$leadId) {
         echo json_encode(['success' => false, 'message' => 'Lead ID required']);
@@ -433,9 +433,9 @@ if ($action === 'detail') {
         exit;
     }
 
-    // Call history
+    // Call history with agent details
     $callStmt = $pdo->prepare("
-        SELECT c.*, co.name as outcome_name, co.color_code as outcome_color, u.name as agent_name
+        SELECT c.*, co.name as outcome_name, co.color_code as outcome_color, u.name as agent_name, u.email as agent_email
         FROM call_logs c
         JOIN call_outcomes co ON c.call_outcome_id = co.id
         JOIN users u ON c.user_id = u.id
@@ -463,12 +463,47 @@ if ($action === 'detail') {
         JOIN meeting_types mt ON m.meeting_type_id = mt.id
         JOIN users u ON m.assigned_user_id = u.id
         WHERE m.lead_id = :id
-        ORDER BY m.meeting_date DESC
+        ORDER BY m.meeting_date DESC, m.meeting_time DESC
     ");
     $mtStmt->execute(['id' => $leadId]);
     $meetings = $mtStmt->fetchAll();
 
-    // Opportunities & Projects
+    // Opportunities
+    $oppStmt = $pdo->prepare("
+        SELECT o.*, fs.name as stage_name, u.name as manager_name
+        FROM opportunities o
+        JOIN funnel_stages fs ON o.stage_id = fs.id
+        LEFT JOIN users u ON o.assigned_manager_id = u.id
+        WHERE o.lead_id = :id
+        ORDER BY o.id DESC
+    ");
+    $oppStmt->execute(['id' => $leadId]);
+    $opportunities = $oppStmt->fetchAll();
+
+    // Projects
+    $prjStmt = $pdo->prepare("
+        SELECT p.*, ps.name as stage_name
+        FROM projects p
+        LEFT JOIN project_stages ps ON p.stage_id = ps.id
+        WHERE p.lead_id = :id
+        ORDER BY p.id DESC
+    ");
+    $prjStmt->execute(['id' => $leadId]);
+    $projects = $prjStmt->fetchAll();
+
+    // Assignment & Reassignment History
+    $ahStmt = $pdo->prepare("
+        SELECT ah.*, u_prev.name as previous_agent, u_new.name as new_agent, u_by.name as assigned_by_name
+        FROM lead_assignments_history ah
+        LEFT JOIN users u_prev ON ah.previous_executive_id = u_prev.id
+        LEFT JOIN users u_new ON ah.new_executive_id = u_new.id
+        LEFT JOIN users u_by ON ah.assigned_by = u_by.id
+        WHERE ah.lead_id = :id
+        ORDER BY ah.id DESC
+    ");
+    $ahStmt->execute(['id' => $leadId]);
+    $assignmentsHistory = $ahStmt->fetchAll();
+
     // Notes
     try {
         $pdo->exec("
@@ -506,6 +541,17 @@ if ($action === 'detail') {
     $docsStmt->execute(['id' => $leadId]);
     $documents = $docsStmt->fetchAll();
 
+    // Full Lead Activity Logs
+    $actStmt = $pdo->prepare("
+        SELECT al.*, u.name as user_name
+        FROM activity_logs al
+        LEFT JOIN users u ON al.user_id = u.id
+        WHERE al.record_id = :id AND al.module IN ('leads', 'calls')
+        ORDER BY al.id DESC
+    ");
+    $actStmt->execute(['id' => $leadId]);
+    $logs = $actStmt->fetchAll();
+
     echo json_encode([
         'success' => true,
         'data' => [
@@ -516,8 +562,10 @@ if ($action === 'detail') {
             'opportunities' => $opportunities,
             'projects' => $projects,
             'notes' => $notes,
-            'documents' => $documents
-        ]
+            'documents' => $documents,
+            'assignments_history' => $assignmentsHistory
+        ],
+        'logs' => $logs
     ]);
     exit;
 }
@@ -745,17 +793,64 @@ if ($action === 'assign') {
         exit;
     }
 
-    $stmt = $pdo->prepare("UPDATE leads SET assigned_executive_id = :exec_id, status_id = 3 WHERE id = :id");
-    $histStmt = $pdo->prepare("INSERT INTO lead_assignments_history (lead_id, new_executive_id, assigned_by) VALUES (:lid, :exec_id, :by)");
-
-    foreach ($leadIds as $id) {
-        $stmt->execute(['exec_id' => $executiveId, 'id' => $id]);
-        $histStmt->execute(['lid' => $id, 'exec_id' => $executiveId, 'by' => $userId]);
+    // Verify target executive exists
+    $execCheck = $pdo->prepare("SELECT id, name FROM users WHERE id = :id AND status = 'active'");
+    $execCheck->execute(['id' => $executiveId]);
+    $targetExec = $execCheck->fetch();
+    if (!$targetExec) {
+        echo json_encode(['success' => false, 'message' => 'Target executive not found or inactive.']);
+        exit;
     }
 
-    logActivity($pdo, 'leads', 'assigned', 0, null, ['count' => count($leadIds), 'executive_id' => $executiveId]);
+    $getPrev = $pdo->prepare("SELECT id, name, assigned_executive_id, status_id FROM leads WHERE id = :id");
+    $stmt = $pdo->prepare("UPDATE leads SET assigned_executive_id = :exec_id, status_id = 3 WHERE id = :id");
+    $histStmt = $pdo->prepare("
+        INSERT INTO lead_assignments_history (lead_id, previous_executive_id, new_executive_id, assigned_by, assigned_at) 
+        VALUES (:lid, :prev, :new, :by, NOW())
+    ");
 
-    echo json_encode(['success' => true, 'message' => count($leadIds) . ' lead(s) assigned successfully!']);
+    $successCount = 0;
+    $failedIds = [];
+
+    foreach ($leadIds as $id) {
+        $lid = (int)$id;
+        $getPrev->execute(['id' => $lid]);
+        $leadRow = $getPrev->fetch();
+        if ($leadRow) {
+            $prevExecId = $leadRow['assigned_executive_id'];
+            $stmt->execute(['exec_id' => $executiveId, 'id' => $lid]);
+            $histStmt->execute(['lid' => $lid, 'prev' => $prevExecId, 'new' => $executiveId, 'by' => $userId]);
+
+            // Also record in activity_logs
+            try {
+                $pdo->prepare("
+                    INSERT INTO activity_logs (user_id, module, action, record_id, old_value, new_value, ip_address)
+                    VALUES (:uid, 'leads', 'reassigned', :rec, :old, :new, :ip)
+                ")->execute([
+                    'uid' => $userId,
+                    'rec' => $lid,
+                    'old' => json_encode(['assigned_executive_id' => $prevExecId]),
+                    'new' => json_encode(['assigned_executive_id' => $executiveId, 'assigned_to_name' => $targetExec['name']]),
+                    'ip'  => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+                ]);
+            } catch(Exception $e) {}
+
+            $successCount++;
+        } else {
+            $failedIds[] = $lid;
+        }
+    }
+
+    logActivity($pdo, 'leads', 'assigned', 0, null, ['count' => $successCount, 'executive_id' => $executiveId]);
+
+    echo json_encode([
+        'success' => true,
+        'message' => "$successCount lead(s) successfully assigned to {$targetExec['name']}!",
+        'assigned_count' => $successCount,
+        'failed_count' => count($failedIds),
+        'failed_ids' => $failedIds,
+        'target_executive' => $targetExec['name']
+    ]);
     exit;
 }
 
@@ -777,28 +872,57 @@ if ($action === 'auto_assign') {
     }
 
     // Get active Operation Executives
-    $execs = $pdo->query("SELECT id FROM users WHERE role_id = 3 AND status = 'active' ORDER BY id ASC")->fetchAll(PDO::FETCH_COLUMN);
+    $execs = $pdo->query("SELECT id, name FROM users WHERE role_id = 3 AND status = 'active' ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
 
     if (empty($execs)) {
         echo json_encode(['success' => false, 'message' => 'No active Operation Executives available for auto-assignment.']);
         exit;
     }
 
+    $getPrev = $pdo->prepare("SELECT id, assigned_executive_id FROM leads WHERE id = :id");
     $stmt = $pdo->prepare("UPDATE leads SET assigned_executive_id = :exec_id, status_id = 3 WHERE id = :id");
-    $histStmt = $pdo->prepare("INSERT INTO lead_assignments_history (lead_id, new_executive_id, assigned_by) VALUES (:lid, :exec_id, :by)");
+    $histStmt = $pdo->prepare("
+        INSERT INTO lead_assignments_history (lead_id, previous_executive_id, new_executive_id, assigned_by, assigned_at) 
+        VALUES (:lid, :prev, :new, :by, NOW())
+    ");
 
     $execCount = count($execs);
     $assignedCount = 0;
 
     foreach ($leadIds as $idx => $id) {
-        $assignedExec = $execs[$idx % $execCount];
-        $stmt->execute(['exec_id' => $assignedExec, 'id' => $id]);
-        $histStmt->execute(['lid' => $id, 'exec_id' => $assignedExec, 'by' => $userId]);
+        $lid = (int)$id;
+        $getPrev->execute(['id' => $lid]);
+        $leadRow = $getPrev->fetch();
+        $prevExecId = $leadRow ? $leadRow['assigned_executive_id'] : null;
+
+        $targetObj = $execs[$idx % $execCount];
+        $assignedExec = $targetObj['id'];
+
+        $stmt->execute(['exec_id' => $assignedExec, 'id' => $lid]);
+        $histStmt->execute(['lid' => $lid, 'prev' => $prevExecId, 'new' => $assignedExec, 'by' => $userId]);
+
+        try {
+            $pdo->prepare("
+                INSERT INTO activity_logs (user_id, module, action, record_id, old_value, new_value, ip_address)
+                VALUES (:uid, 'leads', 'auto_assigned', :rec, :old, :new, :ip)
+            ")->execute([
+                'uid' => $userId,
+                'rec' => $lid,
+                'old' => json_encode(['assigned_executive_id' => $prevExecId]),
+                'new' => json_encode(['assigned_executive_id' => $assignedExec, 'assigned_to_name' => $targetObj['name']]),
+                'ip'  => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+            ]);
+        } catch(Exception $e) {}
+
         $assignedCount++;
     }
 
     logActivity($pdo, 'leads', 'auto_assigned', 0, null, ['count' => $assignedCount]);
-    echo json_encode(['success' => true, 'message' => "$assignedCount leads distributed equally via Round Robin!"]);
+    echo json_encode([
+        'success' => true,
+        'message' => "$assignedCount leads distributed equally across " . count($execs) . " executives via Round Robin!",
+        'assigned_count' => $assignedCount
+    ]);
     exit;
 }
 

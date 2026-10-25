@@ -1,0 +1,9 @@
+<?php
+// config/database.local.php - Untracked Local / Production Database Credentials
+// Rename this file to database.local.php on your server.
+
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'helnovexaa_leadtriangle');
+define('DB_USER', 'helnovexaa_leadtriangle');
+define('DB_PASS', 'Soumojit1234@');
+define('DB_CHARSET', 'utf8mb4');

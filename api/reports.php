@@ -17,6 +17,77 @@ $reportType = $_GET['type'] ?? 'leads';
 
 $action = $_GET['action'] ?? 'json';
 
+// Handle Full Operational Overview
+if ($action === 'overview') {
+    // 1. Agent Calling & Productivity Stats
+    $agentStmt = $pdo->query("
+        SELECT 
+            u.id, u.name, u.email,
+            COUNT(c.id) as total_calls,
+            SUM(CASE WHEN c.call_outcome_id IN (1, 2, 3, 4, 9, 10, 12, 14, 18) THEN 1 ELSE 0 END) as connected,
+            SUM(CASE WHEN c.call_outcome_id IN (5, 6, 15, 16) THEN 1 ELSE 0 END) as unanswered,
+            SUM(CASE WHEN c.call_outcome_id IN (2, 6, 18) THEN 1 ELSE 0 END) as followups,
+            SUM(CASE WHEN c.call_outcome_id IN (10) THEN 1 ELSE 0 END) as converted,
+            SUM(CASE WHEN c.call_outcome_id IN (3, 9) THEN 1 ELSE 0 END) as meetings_scheduled,
+            COALESCE(SUM(c.call_duration_seconds), 0) as total_duration_seconds,
+            CASE 
+                WHEN COUNT(c.id) > 0 THEN CONCAT(ROUND((SUM(CASE WHEN c.call_outcome_id IN (1, 2, 3, 4, 9, 10, 12, 14, 18) THEN 1 ELSE 0 END) / COUNT(c.id)) * 100, 1), '%')
+                ELSE '0%'
+            END as success_rate
+        FROM users u
+        LEFT JOIN call_logs c ON c.user_id = u.id
+        WHERE u.status = 'active'
+        GROUP BY u.id, u.name, u.email
+        ORDER BY total_calls DESC
+    ");
+    $agentStats = $agentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 2. Lead Status Breakdown
+    $statusStmt = $pdo->query("
+        SELECT ls.id, ls.name as status_name, ls.color_code, COUNT(l.id) as lead_count,
+               SUM(CASE WHEN l.is_qualified = 1 THEN 1 ELSE 0 END) as qualified_count
+        FROM lead_statuses ls
+        LEFT JOIN leads l ON l.status_id = ls.id AND l.is_archived = 0
+        GROUP BY ls.id, ls.name, ls.color_code, ls.sort_order
+        ORDER BY ls.sort_order ASC
+    ");
+    $leadStages = $statusStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 3. Lead Sources Performance
+    $sourceStmt = $pdo->query("
+        SELECT src.id, src.name as source_name, COUNT(l.id) as total_leads,
+               SUM(CASE WHEN l.is_qualified = 1 THEN 1 ELSE 0 END) as qualified_leads,
+               SUM(CASE WHEN l.status_id = 11 THEN 1 ELSE 0 END) as converted_projects
+        FROM lead_sources src
+        LEFT JOIN leads l ON l.lead_source_id = src.id AND l.is_archived = 0
+        GROUP BY src.id, src.name
+        ORDER BY total_leads DESC
+    ");
+    $sources = $sourceStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 4. Summary Totals
+    $totalCalls = (int)$pdo->query("SELECT COUNT(*) FROM call_logs")->fetchColumn();
+    $totalLeads = (int)$pdo->query("SELECT COUNT(*) FROM leads WHERE is_archived = 0")->fetchColumn();
+    $totalMeetings = (int)$pdo->query("SELECT COUNT(*) FROM meetings")->fetchColumn();
+    $totalFollowups = (int)$pdo->query("SELECT COUNT(*) FROM followups WHERE status = 'Pending'")->fetchColumn();
+
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'agent_stats' => $agentStats,
+            'lead_stages' => $leadStages,
+            'sources' => $sources,
+            'summary' => [
+                'total_calls' => $totalCalls,
+                'total_leads' => $totalLeads,
+                'total_meetings' => $totalMeetings,
+                'pending_followups' => $totalFollowups
+            ]
+        ]
+    ]);
+    exit;
+}
+
 // Handle CSV Download
 if ($action === 'export') {
     header('Content-Type: text/csv');

@@ -1029,7 +1029,7 @@ const App = {
                                 ${leads.length === 0 ? '<tr><td colspan="10" class="text-center py-4 text-muted">No lead records found matching criteria.</td></tr>' : leads.map(l => {
                                     return `
                                     <tr>
-                                        <td><input type="checkbox" class="lead-row-checkbox" value="${l.id}"></td>
+                                        <td><input type="checkbox" class="lead-row-checkbox" value="${l.id}" onchange="App.updateBulkSelectionState()"></td>
                                         <td>
                                             <strong><a href="javascript:void(0)" onclick="App.openLeadDetailModal(${l.id})">${l.name}</a></strong>
                                             ${l.company_name ? `<div class="text-xs text-muted">${l.company_name}</div>` : ''}
@@ -1057,6 +1057,29 @@ const App = {
                     </div>
                 </div>
 
+                <!-- Bulk Selection Floating / Sticky Bar -->
+                <div id="leads-bulk-actions-bar" class="bulk-actions-bar mx-3 my-2" style="display: none;">
+                    <div class="d-flex align-items-center">
+                        <span class="badge badge-light text-dark font-weight-bold mr-2 px-2 py-1" id="bulk-selected-count">0</span>
+                        <span class="font-weight-bold text-white">leads selected</span>
+                    </div>
+                    <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                        <select id="bulk-assign-user-id" class="form-control form-control-sm" style="width: 220px; display: inline-block;">
+                            <option value="">Select Telecaller to Assign...</option>
+                            ${(this.dropdowns.users || []).map(u => `<option value="${u.id}">${u.name} (${u.role_display || u.role_name || 'Staff'})</option>`).join('')}
+                        </select>
+                        <button type="button" class="btn btn-warning btn-sm font-weight-bold" onclick="App.applyBulkAssign()">
+                            <i class="fas fa-user-check mr-1"></i> Assign Selected
+                        </button>
+                        <button type="button" class="btn btn-info btn-sm font-weight-bold" onclick="App.applyRoundRobinAssign()">
+                            <i class="fas fa-random mr-1"></i> Auto Assign (Round Robin)
+                        </button>
+                        <button type="button" class="btn btn-outline-light btn-sm font-weight-bold" onclick="App.clearLeadSelections()">
+                            <i class="fas fa-times mr-1"></i> Deselect
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Footer Pagination -->
                 <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap">
                     <div class="text-xs text-muted">
@@ -1079,6 +1102,77 @@ const App = {
 
     toggleSelectAllLeads: function(masterCb) {
         document.querySelectorAll('.lead-row-checkbox').forEach(cb => cb.checked = masterCb.checked);
+        this.updateBulkSelectionState();
+    },
+
+    updateBulkSelectionState: function() {
+        const checked = Array.from(document.querySelectorAll('.lead-row-checkbox:checked'));
+        const bar = document.getElementById('leads-bulk-actions-bar');
+        const countSpan = document.getElementById('bulk-selected-count');
+        if (!bar) return;
+        if (checked.length > 0) {
+            bar.style.display = 'flex';
+            if (countSpan) countSpan.innerText = checked.length;
+        } else {
+            bar.style.display = 'none';
+            const master = document.getElementById('select-all-leads');
+            if (master) master.checked = false;
+        }
+    },
+
+    clearLeadSelections: function() {
+        document.querySelectorAll('.lead-row-checkbox').forEach(cb => cb.checked = false);
+        const master = document.getElementById('select-all-leads');
+        if (master) master.checked = false;
+        const bar = document.getElementById('leads-bulk-actions-bar');
+        if (bar) bar.style.display = 'none';
+    },
+
+    applyBulkAssign: async function() {
+        const checked = Array.from(document.querySelectorAll('.lead-row-checkbox:checked')).map(cb => parseInt(cb.value));
+        if (checked.length === 0) {
+            alert('Please select at least one lead.');
+            return;
+        }
+        const select = document.getElementById('bulk-assign-user-id');
+        const execId = select ? select.value : '';
+        if (!execId) {
+            alert('Please select a telecaller to assign the leads to.');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('action', 'assign');
+        formData.append('executive_id', execId);
+        checked.forEach(id => formData.append('lead_ids[]', id));
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message || 'Leads assigned successfully!');
+        if (data.success) {
+            this.clearLeadSelections();
+            this.renderLeads(this.leadsFilterState.page || 1);
+        }
+    },
+
+    applyRoundRobinAssign: async function() {
+        const checked = Array.from(document.querySelectorAll('.lead-row-checkbox:checked')).map(cb => parseInt(cb.value));
+        if (checked.length === 0) {
+            alert('Please select at least one lead to auto-assign.');
+            return;
+        }
+        if (!confirm(`Are you sure you want to distribute ${checked.length} leads equally among active telecallers?`)) return;
+
+        const formData = new FormData();
+        formData.append('action', 'auto_assign');
+        checked.forEach(id => formData.append('lead_ids[]', id));
+
+        const res = await fetch('api/leads', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message || 'Leads auto-assigned successfully!');
+        if (data.success) {
+            this.clearLeadSelections();
+            this.renderLeads(this.leadsFilterState.page || 1);
+        }
     },
 
     // Daily Operator Workspace
@@ -1206,6 +1300,11 @@ const App = {
     openCallModal: function(leadId, leadName, phone, currentStatusId = 0) {
         const statuses = this.dropdowns.statuses || [];
         const outcomes = this.dropdowns.outcomes || [];
+        const isActiveCall = !!(this.activeCallData && (this.activeCallData.lead_id == leadId || !this.activeCallData.lead_id));
+        const autoDuration = isActiveCall ? (parseInt(this.activeCallData.duration_seconds) || 75) : 0;
+        const autoDurationFormatted = autoDuration > 0 
+            ? `${String(Math.floor(autoDuration / 60)).padStart(2, '0')}:${String(autoDuration % 60).padStart(2, '0')}` 
+            : '01:15';
 
         const modalHtml = `
             <div class="modal fade" id="call-modal" tabindex="-1" role="dialog" aria-hidden="true">
@@ -1221,6 +1320,7 @@ const App = {
                         </div>
                         <form onsubmit="App.submitCallLog(event, ${leadId})">
                             <div class="modal-body p-4">
+                                <!-- Lead Header & Redial -->
                                 <div class="alert alert-light border d-flex justify-content-between align-items-center mb-3">
                                     <div>
                                         <div class="font-weight-bold text-dark">${leadName}</div>
@@ -1231,29 +1331,138 @@ const App = {
                                     </a>
                                 </div>
 
+                                <!-- Duration Capture Section -->
+                                <div class="card p-2 bg-light mb-3 border">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="text-xs font-weight-bold text-muted mb-0">Call Duration</label>
+                                        ${isActiveCall ? `
+                                            <span class="badge badge-success px-2 py-1"><i class="fas fa-satellite-dish mr-1"></i> Auto-Captured</span>
+                                        ` : `
+                                            <span class="badge badge-secondary px-2 py-1"><i class="fas fa-keyboard mr-1"></i> Manual Entry</span>
+                                        `}
+                                    </div>
+                                    ${isActiveCall ? `
+                                        <div class="d-flex align-items-center justify-content-between mt-1">
+                                            <div class="font-weight-bold text-success" style="font-size: 1.15rem;">
+                                                <i class="fas fa-stopwatch mr-1"></i> <span id="call-duration-label">${autoDurationFormatted}</span>
+                                            </div>
+                                            <input type="hidden" name="call_duration" id="call-duration-input" value="${autoDuration}">
+                                            <div class="text-xs text-muted font-italic">Auto-captured from telephony session</div>
+                                        </div>
+                                    ` : `
+                                        <div class="input-group input-group-sm mt-1">
+                                            <div class="input-group-prepend">
+                                                <span class="input-group-text"><i class="fas fa-stopwatch"></i></span>
+                                            </div>
+                                            <input type="text" name="call_duration_display" id="call-duration-display" class="form-control" placeholder="e.g. 02:30 or 150 (sec)" oninput="App.onManualDurationInput(this)">
+                                            <input type="hidden" name="call_duration" id="call-duration-input" value="60">
+                                        </div>
+                                        <div class="text-xs text-muted mt-1">Format: MM:SS or total seconds (default 60s)</div>
+                                    `}
+                                </div>
+
+                                <!-- Call Outcome Dropdown -->
                                 <div class="form-group">
                                     <label class="text-xs font-weight-bold text-muted">Call Outcome *</label>
-                                    <select name="outcome_id" class="form-control" required>
+                                    <select name="outcome_id" id="call-outcome-select" class="form-control font-weight-bold" required onchange="App.onCallOutcomeChanged(this)">
                                         <option value="">Select Outcome...</option>
-                                        ${outcomes.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                        ${outcomes.map(o => `<option value="${o.id}" data-cat="${o.category || ''}" data-name="${o.name}">${o.name}</option>`).join('')}
                                     </select>
                                 </div>
 
+                                <!-- Branch: Interested Branch (Follow-up vs Meeting) -->
+                                <div id="call-branch-interested" class="card p-3 border-info mb-3 bg-light" style="display: none;">
+                                    <div class="font-weight-bold text-primary mb-2 text-sm">
+                                        <i class="fas fa-star mr-1 text-warning"></i> Interested Lead - Next Step Action
+                                    </div>
+                                    <div class="d-flex mb-3" style="gap: 15px;">
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="action-followup" name="interested_action" class="custom-control-input" value="followup" checked onchange="App.onInterestedActionToggle(this.value)">
+                                            <label class="custom-control-label font-weight-bold text-sm" for="action-followup">Schedule Follow-up</label>
+                                        </div>
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="action-meeting" name="interested_action" class="custom-control-input" value="meeting" onchange="App.onInterestedActionToggle(this.value)">
+                                            <label class="custom-control-label font-weight-bold text-sm" for="action-meeting">Schedule Client Meeting / Demo</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Sub-branch: Followup -->
+                                    <div id="subbranch-followup">
+                                        <div class="form-group mb-2">
+                                            <label class="text-xs font-weight-bold text-muted">Follow-up Date &amp; Time *</label>
+                                            <input type="datetime-local" name="next_followup_date" id="call-followup-dt" class="form-control form-control-sm">
+                                        </div>
+                                        <div class="form-group mb-0">
+                                            <label class="text-xs font-weight-bold text-muted">Follow-up Purpose</label>
+                                            <input type="text" name="followup_purpose" class="form-control form-control-sm" placeholder="e.g. Detailed price quote review">
+                                        </div>
+                                    </div>
+
+                                    <!-- Sub-branch: Meeting -->
+                                    <div id="subbranch-meeting" style="display: none;">
+                                        <div class="form-group mb-2">
+                                            <label class="text-xs font-weight-bold text-muted">Meeting Title *</label>
+                                            <input type="text" name="meeting_title" class="form-control form-control-sm" value="Product Demo - ${leadName}">
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="col-md-7 mb-2">
+                                                <label class="text-xs font-weight-bold text-muted">Meeting Date &amp; Time *</label>
+                                                <input type="datetime-local" name="meeting_datetime" id="call-meeting-dt" class="form-control form-control-sm">
+                                            </div>
+                                            <div class="col-md-5 mb-2">
+                                                <label class="text-xs font-weight-bold text-muted">Meeting Mode</label>
+                                                <select name="meeting_mode" class="form-control form-control-sm">
+                                                    <option value="Google Meet">Google Meet</option>
+                                                    <option value="Zoom">Zoom</option>
+                                                    <option value="In-Person">In-Person</option>
+                                                    <option value="Phone Call">Phone Call</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-group mb-0">
+                                            <label class="text-xs font-weight-bold text-muted">Meeting Link / Room (Optional)</label>
+                                            <input type="url" name="meeting_link" class="form-control form-control-sm" placeholder="https://meet.google.com/xyz-abcd">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Branch: Not Interested Disqualification Reason -->
+                                <div id="call-branch-not-interested" class="card p-3 border-danger mb-3 bg-light" style="display: none;">
+                                    <div class="font-weight-bold text-danger mb-2 text-sm">
+                                        <i class="fas fa-times-circle mr-1"></i> Disqualification Reason *
+                                    </div>
+                                    <div class="form-group mb-0">
+                                        <select name="disqualification_reason" id="call-disqualify-reason" class="form-control form-control-sm">
+                                            <option value="">Select Reason for Disqualification...</option>
+                                            <option value="Budget Constraint / Too Expensive">Budget Constraint / Too Expensive</option>
+                                            <option value="Not Required Currently / Bad Timing">Not Required Currently / Bad Timing</option>
+                                            <option value="Already Using Competitor Product">Already Using Competitor Product</option>
+                                            <option value="Not Decision Maker / Wrong Profile">Not Decision Maker / Wrong Profile</option>
+                                            <option value="Missing Required Features">Missing Required Features</option>
+                                            <option value="No Budget Allocated">No Budget Allocated</option>
+                                            <option value="Other / Non-Responsive">Other / Non-Responsive</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Branch: Standard Follow-up Option for Ringing / Connected -->
+                                <div id="call-branch-standard-followup" class="form-group" style="display: none;">
+                                    <label class="text-xs font-weight-bold text-muted">Schedule Next Follow-up (Optional)</label>
+                                    <input type="datetime-local" name="simple_followup_date" class="form-control">
+                                </div>
+
+                                <!-- Lead Status Select -->
                                 <div class="form-group">
                                     <label class="text-xs font-weight-bold text-muted">Update Lead Status *</label>
-                                    <select name="status_id" class="form-control" required>
+                                    <select name="status_id" id="call-status-select" class="form-control" required>
                                         ${statuses.map(s => `<option value="${s.id}" ${s.id == currentStatusId ? 'selected' : ''}>${s.name}</option>`).join('')}
                                     </select>
                                 </div>
 
+                                <!-- Discussion Remarks -->
                                 <div class="form-group">
                                     <label class="text-xs font-weight-bold text-muted">Discussion Remarks *</label>
-                                    <textarea name="remarks" class="form-control" rows="3" placeholder="Enter notes from the call..." required></textarea>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="text-xs font-weight-bold text-muted">Schedule Next Follow-up (Optional)</label>
-                                    <input type="datetime-local" name="next_followup_date" class="form-control">
+                                    <textarea name="remarks" id="call-remarks" class="form-control" rows="3" placeholder="Enter detailed notes and client feedback..." required></textarea>
                                 </div>
                             </div>
                             <div class="modal-footer bg-light">
@@ -1272,12 +1481,120 @@ const App = {
         $('#call-modal').modal('show');
     },
 
+    onManualDurationInput: function(input) {
+        let val = input.value.trim();
+        let seconds = 0;
+        if (val.includes(':')) {
+            const parts = val.split(':');
+            seconds = (parseInt(parts[0]) || 0) * 60 + (parseInt(parts[1]) || 0);
+        } else {
+            seconds = parseInt(val) || 0;
+        }
+        const hidden = document.getElementById('call-duration-input');
+        if (hidden) hidden.value = seconds;
+    },
+
+    onInterestedActionToggle: function(action) {
+        const fu = document.getElementById('subbranch-followup');
+        const mt = document.getElementById('subbranch-meeting');
+        const stSelect = document.getElementById('call-status-select');
+        if (action === 'meeting') {
+            if (fu) fu.style.display = 'none';
+            if (mt) mt.style.display = 'block';
+            if (stSelect) stSelect.value = "7"; // Meeting Scheduled
+        } else {
+            if (fu) fu.style.display = 'block';
+            if (mt) mt.style.display = 'none';
+            if (stSelect) stSelect.value = "6"; // Follow-up Required
+        }
+    },
+
+    onCallOutcomeChanged: function(select) {
+        const val = parseInt(select.value);
+        const opt = select.options[select.selectedIndex];
+        const name = opt ? (opt.getAttribute('data-name') || opt.text) : '';
+        const branchInterested = document.getElementById('call-branch-interested');
+        const branchNotInterested = document.getElementById('call-branch-not-interested');
+        const branchStdFollowup = document.getElementById('call-branch-standard-followup');
+        const stSelect = document.getElementById('call-status-select');
+
+        // Reset display
+        if (branchInterested) branchInterested.style.display = 'none';
+        if (branchNotInterested) branchNotInterested.style.display = 'none';
+        if (branchStdFollowup) branchStdFollowup.style.display = 'none';
+
+        if (val === 1 || (name.toLowerCase().includes('interested') && !name.toLowerCase().includes('not interested'))) {
+            if (branchInterested) branchInterested.style.display = 'block';
+            if (stSelect) stSelect.value = "6"; // Follow-up Required by default
+        } else if (val === 4 || val === 14 || name.toLowerCase().includes('not interested')) {
+            if (branchNotInterested) branchNotInterested.style.display = 'block';
+            if (stSelect) stSelect.value = "13"; // Not Interested
+        } else if (val === 2 || val === 12 || val === 18 || name.toLowerCase().includes('call back') || name.toLowerCase().includes('connected')) {
+            if (branchStdFollowup) branchStdFollowup.style.display = 'block';
+            if (stSelect) stSelect.value = "6"; // Follow-up Required
+        } else if (val === 5 || val === 6 || val === 15 || val === 16) {
+            if (stSelect) stSelect.value = "4"; // Contacting
+        } else if (val === 7 || val === 8 || val === 17) {
+            if (stSelect) stSelect.value = "14"; // Invalid / Unreachable
+        }
+    },
+
     submitCallLog: async function(e, leadId) {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
-        formData.append('action', 'log_call');
+        formData.append('action', 'log');
         formData.append('lead_id', leadId);
+
+        const outcomeSelect = document.getElementById('call-outcome-select');
+        const outcomeVal = outcomeSelect ? parseInt(outcomeSelect.value) : 0;
+        const outcomeOpt = outcomeSelect ? outcomeSelect.options[outcomeSelect.selectedIndex] : null;
+        const outcomeName = outcomeOpt ? (outcomeOpt.getAttribute('data-name') || outcomeOpt.text) : '';
+
+        // Handle duration
+        const durInput = document.getElementById('call-duration-input');
+        if (durInput && durInput.value) {
+            formData.set('call_duration', durInput.value);
+        }
+
+        // Handle Interested Branch
+        if (outcomeVal === 1 || (outcomeName.toLowerCase().includes('interested') && !outcomeName.toLowerCase().includes('not interested'))) {
+            const actionRadio = form.querySelector('input[name="interested_action"]:checked');
+            if (actionRadio && actionRadio.value === 'meeting') {
+                formData.set('schedule_meeting', '1');
+                const mDt = form.querySelector('input[name="meeting_datetime"]');
+                if (mDt && !mDt.value) {
+                    alert('Please specify the Meeting Date & Time.');
+                    return;
+                }
+            } else {
+                formData.set('schedule_followup', '1');
+                const fDt = form.querySelector('input[name="next_followup_date"]');
+                if (fDt && !fDt.value) {
+                    alert('Please specify the Follow-up Date & Time.');
+                    return;
+                }
+            }
+        }
+
+        // Handle Not Interested Branch
+        if (outcomeVal === 4 || outcomeVal === 14 || outcomeName.toLowerCase().includes('not interested')) {
+            const reasonSelect = document.getElementById('call-disqualify-reason');
+            const reasonVal = reasonSelect ? reasonSelect.value : '';
+            if (!reasonVal) {
+                alert('Please select a disqualification reason.');
+                return;
+            }
+            formData.set('disqualification_reason', reasonVal);
+            formData.set('status_id', '13'); // Not Interested
+        }
+
+        // Handle standard followup if provided
+        const simpleFu = form.querySelector('input[name="simple_followup_date"]');
+        if (simpleFu && simpleFu.value) {
+            formData.set('schedule_followup', '1');
+            formData.set('next_followup_date', simpleFu.value);
+        }
 
         const res = await fetch('api/calls', { method: 'POST', body: formData });
         const data = await res.json();
@@ -1481,50 +1798,484 @@ const App = {
         document.getElementById('content-viewport').innerHTML = html;
     },
 
+    meetingsState: {
+        view: 'month',
+        year: 2026,
+        month: 10,
+        filterStatus: ''
+    },
+
+    setMeetingsView: function(view) {
+        this.meetingsState.view = view;
+        this.renderMeetings();
+    },
+
+    changeMeetingMonth: function(delta) {
+        let m = this.meetingsState.month + delta;
+        let y = this.meetingsState.year;
+        if (m > 12) { m = 1; y++; }
+        else if (m < 1) { m = 12; y--; }
+        this.meetingsState.month = m;
+        this.meetingsState.year = y;
+        this.renderMeetings();
+    },
+
+    filterMeetingsStatus: function(status) {
+        this.meetingsState.filterStatus = status;
+        this.renderMeetings();
+    },
+
     renderMeetings: async function() {
-        const res = await fetch('api/meetings?action=list');
+        const monthStr = `${this.meetingsState.year}-${String(this.meetingsState.month).padStart(2, '0')}`;
+        const queryParams = new URLSearchParams({
+            action: 'list',
+            month: monthStr,
+            ...(this.meetingsState.filterStatus ? { status: this.meetingsState.filterStatus } : {})
+        }).toString();
+
+        const res = await fetch(`api/meetings?${queryParams}`);
         const data = await res.json();
         const meetings = data.data || [];
+        const types = data.meeting_types || [];
+        this.meetingTypesList = types;
+
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const currentMonthName = monthNames[this.meetingsState.month - 1];
 
         let html = `
             <div class="card card-primary card-outline shadow-sm">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h3 class="card-title font-weight-bold">
-                        <i class="fas fa-calendar-alt mr-1 text-primary"></i> Client Meetings &amp; Demonstrations
-                    </h3>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover text-sm mb-0">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>Client / Lead</th>
-                                    <th>Meeting Type</th>
-                                    <th>Date & Time</th>
-                                    <th>Platform / Location</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${meetings.length === 0 ? '<tr><td colspan="6" class="text-center py-4 text-muted">No scheduled client meetings.</td></tr>' : meetings.map((m, i) => `
-                                    <tr>
-                                        <td>${i + 1}</td>
-                                        <td><strong>${m.lead_name}</strong></td>
-                                        <td><span class="badge badge-light border">${m.type_name || 'Demo'}</span></td>
-                                        <td>${m.meeting_time}</td>
-                                        <td>${m.location || 'Google Meet / Zoom'}</td>
-                                        <td><span class="badge badge-info">${m.status || 'Scheduled'}</span></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                <!-- Header Toolbar with Calendar Controls -->
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap" style="gap: 10px;">
+                        <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                            <h3 class="card-title font-weight-bold mb-0 mr-2">
+                                <i class="fas fa-calendar-alt mr-1 text-primary"></i> Client Meetings &amp; Appointments
+                            </h3>
+                            <!-- Month Nav Controls -->
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-default" onclick="App.changeMeetingMonth(-1)" title="Previous Month">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <span class="btn btn-default font-weight-bold px-3" style="cursor: default; pointer-events: none;">
+                                    ${currentMonthName} ${this.meetingsState.year}
+                                </span>
+                                <button class="btn btn-default" onclick="App.changeMeetingMonth(1)" title="Next Month">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right Controls: View Switcher, Filter & Schedule Button -->
+                        <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn ${this.meetingsState.view === 'month' ? 'btn-primary' : 'btn-default'}" onclick="App.setMeetingsView('month')">
+                                    <i class="fas fa-calendar mr-1"></i> Month
+                                </button>
+                                <button class="btn ${this.meetingsState.view === 'week' ? 'btn-primary' : 'btn-default'}" onclick="App.setMeetingsView('week')">
+                                    <i class="fas fa-calendar-week mr-1"></i> Week
+                                </button>
+                                <button class="btn ${this.meetingsState.view === 'day' ? 'btn-primary' : 'btn-default'}" onclick="App.setMeetingsView('day')">
+                                    <i class="fas fa-calendar-day mr-1"></i> Day
+                                </button>
+                                <button class="btn ${this.meetingsState.view === 'list' ? 'btn-primary' : 'btn-default'}" onclick="App.setMeetingsView('list')">
+                                    <i class="fas fa-list mr-1"></i> List
+                                </button>
+                            </div>
+
+                            <select class="form-control form-control-sm" style="width: 140px;" onchange="App.filterMeetingsStatus(this.value)">
+                                <option value="" ${this.meetingsState.filterStatus === '' ? 'selected' : ''}>All Statuses</option>
+                                <option value="Scheduled" ${this.meetingsState.filterStatus === 'Scheduled' ? 'selected' : ''}>Scheduled</option>
+                                <option value="Rescheduled" ${this.meetingsState.filterStatus === 'Rescheduled' ? 'selected' : ''}>Rescheduled</option>
+                                <option value="Completed" ${this.meetingsState.filterStatus === 'Completed' ? 'selected' : ''}>Completed</option>
+                                <option value="Cancelled" ${this.meetingsState.filterStatus === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                            </select>
+
+                            <button class="btn btn-success btn-sm font-weight-bold" onclick="App.openScheduleMeetingModal()">
+                                <i class="fas fa-plus mr-1"></i> Schedule Meeting
+                            </button>
+                        </div>
                     </div>
+                </div>
+
+                <!-- Calendar Content Body -->
+                <div class="card-body p-3">
+                    ${this.renderCalendarViewContent(meetings)}
                 </div>
             </div>
         `;
 
         document.getElementById('content-viewport').innerHTML = html;
+    },
+
+    renderCalendarViewContent: function(meetings) {
+        if (this.meetingsState.view === 'month') {
+            return this.renderMonthCalendarGrid(meetings);
+        } else if (this.meetingsState.view === 'week') {
+            return this.renderWeekCalendar(meetings);
+        } else if (this.meetingsState.view === 'day') {
+            return this.renderDayCalendar(meetings);
+        } else {
+            return this.renderMeetingsListTable(meetings);
+        }
+    },
+
+    renderMonthCalendarGrid: function(meetings) {
+        const year = this.meetingsState.year;
+        const month = this.meetingsState.month;
+        const firstDayIndex = new Date(year, month - 1, 1).getDay(); // 0 is Sun
+        const daysInMonth = new Date(year, month, 0).getDate();
+
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        let gridHtml = `
+            <div class="calendar-grid">
+                ${days.map(d => `<div class="calendar-header-day text-center font-weight-bold py-2 bg-light border text-xs text-uppercase">${d}</div>`).join('')}
+        `;
+
+        // Blank cells before first day
+        for (let i = 0; i < firstDayIndex; i++) {
+            gridHtml += `<div class="calendar-cell bg-light opacity-50 border p-1" style="min-height: 100px;"></div>`;
+        }
+
+        // Days of month
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const dayMeetings = meetings.filter(m => m.meeting_date === dateStr);
+            const isToday = (new Date().toISOString().substring(0, 10) === dateStr);
+
+            gridHtml += `
+                <div class="calendar-cell border p-1 ${isToday ? 'bg-light border-primary' : ''}" style="min-height: 105px; overflow-y: auto;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="badge ${isToday ? 'badge-primary' : 'badge-light border'} text-xs font-weight-bold">${d}</span>
+                        ${dayMeetings.length > 0 ? `<span class="badge badge-info text-xs">${dayMeetings.length}</span>` : ''}
+                    </div>
+                    <div class="calendar-events-list">
+                        ${dayMeetings.map(m => `
+                            <div class="calendar-meeting-pill ${m.status === 'Rescheduled' ? 'bg-warning text-dark' : (m.status === 'Completed' ? 'bg-success text-white' : 'bg-primary text-white')} p-1 rounded mb-1 text-xs" style="cursor: pointer; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;" onclick="App.openRescheduleMeetingModal(${m.id}, '${m.meeting_title.replace(/'/g, "\\'")}', '${m.meeting_date}', '${m.meeting_time}')" title="${m.meeting_title} with ${m.lead_name} (${m.meeting_time})">
+                                <i class="fas fa-video mr-1"></i> ${m.meeting_time ? m.meeting_time.substring(0, 5) : '11:00'} ${m.lead_name}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        gridHtml += `</div>`;
+        return gridHtml;
+    },
+
+    renderWeekCalendar: function(meetings) {
+        const year = this.meetingsState.year;
+        const month = this.meetingsState.month;
+        const today = new Date();
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+
+        let daysHtml = '';
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(startOfWeek);
+            d.setDate(startOfWeek.getDate() + i);
+            const dStr = d.toISOString().substring(0, 10);
+            const dMeetings = meetings.filter(m => m.meeting_date === dStr);
+
+            daysHtml += `
+                <div class="col border-right p-2" style="min-height: 250px;">
+                    <div class="text-center font-weight-bold text-xs border-bottom pb-2 mb-2">
+                        <div>${d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                        <span class="badge badge-secondary">${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    <div>
+                        ${dMeetings.length === 0 ? '<div class="text-muted text-xs text-center pt-3">No meetings</div>' : dMeetings.map(m => `
+                            <div class="callout callout-info p-2 mb-2 shadow-sm text-xs" style="cursor: pointer;" onclick="App.openRescheduleMeetingModal(${m.id}, '${m.meeting_title.replace(/'/g, "\\'")}', '${m.meeting_date}', '${m.meeting_time}')">
+                                <div class="font-weight-bold text-primary">${m.meeting_time ? m.meeting_time.substring(0, 5) : '11:00'}</div>
+                                <div class="font-weight-bold">${m.lead_name}</div>
+                                <div class="text-muted">${m.meeting_mode || 'Google Meet'}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        return `<div class="row no-gutters border">${daysHtml}</div>`;
+    },
+
+    renderDayCalendar: function(meetings) {
+        const todayStr = new Date().toISOString().substring(0, 10);
+        const dayMeetings = meetings.filter(m => m.meeting_date === todayStr);
+
+        return `
+            <div class="p-3">
+                <h5 class="font-weight-bold text-dark mb-3">
+                    <i class="fas fa-calendar-day text-primary mr-2"></i> Today's Meeting Agenda (${todayStr})
+                </h5>
+                ${dayMeetings.length === 0 ? '<div class="alert alert-light border text-muted">No appointments scheduled for today. Use the "Schedule Meeting" button above to book client demonstrations.</div>' : `
+                    <div class="list-group">
+                        ${dayMeetings.map(m => `
+                            <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center flex-wrap p-3">
+                                <div>
+                                    <div class="font-weight-bold text-primary" style="font-size: 1.1rem;">
+                                        <i class="fas fa-clock mr-1 text-muted"></i> ${m.meeting_time ? m.meeting_time.substring(0, 5) : '11:00'} &bull; ${m.meeting_title}
+                                    </div>
+                                    <div class="text-sm mt-1">
+                                        Client: <strong>${m.lead_name}</strong> &bull; Contact: <a href="tel:${m.lead_mobile}">${m.lead_mobile}</a>
+                                    </div>
+                                    <div class="text-xs text-muted mt-1">
+                                        Mode: <span class="badge badge-light border">${m.meeting_mode || 'Google Meet'}</span> &bull; 
+                                        Assigned Host: <strong>${m.agent_name}</strong>
+                                        ${m.meeting_link ? `&bull; <a href="${m.meeting_link}" target="_blank" class="text-primary font-weight-bold"><i class="fas fa-external-link-alt ml-1"></i> Join Meeting</a>` : ''}
+                                    </div>
+                                </div>
+                                <div class="mt-2 mt-md-0" style="gap: 5px;">
+                                    <button class="btn btn-warning btn-xs font-weight-bold mr-1" onclick="App.openRescheduleMeetingModal(${m.id}, '${m.meeting_title.replace(/'/g, "\\'")}', '${m.meeting_date}', '${m.meeting_time}')">
+                                        <i class="fas fa-calendar-day mr-1"></i> Reschedule
+                                    </button>
+                                    <button class="btn btn-success btn-xs font-weight-bold mr-1" onclick="App.updateMeetingStatus(${m.id}, 'Completed')">
+                                        <i class="fas fa-check mr-1"></i> Completed
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-xs" onclick="App.updateMeetingStatus(${m.id}, 'Cancelled')">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+    },
+
+    renderMeetingsListTable: function(meetings) {
+        return `
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover text-sm mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Lead / Client</th>
+                            <th>Meeting Title &amp; Type</th>
+                            <th>Date &amp; Time</th>
+                            <th>Platform / Link</th>
+                            <th>Host Executive</th>
+                            <th>Status</th>
+                            <th class="text-center" style="width: 170px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${meetings.length === 0 ? '<tr><td colspan="8" class="text-center py-4 text-muted">No scheduled meetings found matching criteria.</td></tr>' : meetings.map((m, i) => `
+                            <tr>
+                                <td>${i + 1}</td>
+                                <td>
+                                    <strong><a href="javascript:void(0)" onclick="App.openLeadDetailModal(${m.lead_id})">${m.lead_name}</a></strong>
+                                    <div class="text-xs text-muted"><a href="tel:${m.lead_mobile}">${m.lead_mobile}</a></div>
+                                </td>
+                                <td>
+                                    <div>${m.meeting_title}</div>
+                                    <span class="badge badge-light border text-xs">${m.type_name || 'Demo'}</span>
+                                </td>
+                                <td>
+                                    <div class="font-weight-bold">${m.meeting_date}</div>
+                                    <div class="text-xs text-muted">${m.meeting_time ? m.meeting_time.substring(0, 5) : '11:00'}</div>
+                                </td>
+                                <td>
+                                    <div><span class="badge badge-light border">${m.meeting_mode || 'Google Meet'}</span></div>
+                                    ${m.meeting_link ? `<div class="text-xs"><a href="${m.meeting_link}" target="_blank" class="text-primary text-truncate d-inline-block" style="max-width: 140px;">Open Link</a></div>` : ''}
+                                </td>
+                                <td><span class="badge badge-light border text-xs">${m.agent_name || 'Staff'}</span></td>
+                                <td><span class="badge badge-${m.status === 'Scheduled' ? 'primary' : (m.status === 'Completed' ? 'success' : (m.status === 'Rescheduled' ? 'warning text-dark' : 'secondary'))} text-xs font-weight-bold">${m.status || 'Scheduled'}</span></td>
+                                <td class="text-center">
+                                    <button class="btn btn-warning btn-xs font-weight-bold mr-1" onclick="App.openRescheduleMeetingModal(${m.id}, '${m.meeting_title.replace(/'/g, "\\'")}', '${m.meeting_date}', '${m.meeting_time}')" title="Reschedule">
+                                        <i class="fas fa-calendar-alt"></i>
+                                    </button>
+                                    <button class="btn btn-success btn-xs font-weight-bold mr-1" onclick="App.updateMeetingStatus(${m.id}, 'Completed')" title="Mark Done">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button class="btn btn-danger btn-xs" onclick="App.updateMeetingStatus(${m.id}, 'Cancelled')" title="Cancel">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    },
+
+    openScheduleMeetingModal: function(preLeadId = null, preLeadName = '') {
+        const types = this.meetingTypesList || [];
+
+        const modalHtml = `
+            <div class="modal fade" id="schedule-meeting-modal" tabindex="-1" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-md" role="document">
+                    <div class="modal-content shadow-lg">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title font-weight-bold">
+                                <i class="fas fa-calendar-plus mr-2"></i> Schedule Client Demonstration / Meeting
+                            </h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <form onsubmit="App.submitScheduleMeeting(event)">
+                            <div class="modal-body p-4">
+                                <div class="form-group">
+                                    <label class="text-xs font-weight-bold text-muted">Lead Record ID *</label>
+                                    <input type="number" name="lead_id" class="form-control" value="${preLeadId || ''}" placeholder="Enter Lead ID (e.g. 1)" required>
+                                    ${preLeadName ? `<small class="text-muted">Lead Name: <strong>${preLeadName}</strong></small>` : ''}
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="text-xs font-weight-bold text-muted">Meeting Title *</label>
+                                    <input type="text" name="meeting_title" class="form-control" placeholder="e.g. Product Demo & Commercials" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="text-xs font-weight-bold text-muted">Meeting Type</label>
+                                    <select name="meeting_type_id" class="form-control">
+                                        ${types.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+                                    </select>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="col-md-7 mb-3">
+                                        <label class="text-xs font-weight-bold text-muted">Date &amp; Time *</label>
+                                        <input type="datetime-local" name="meeting_datetime" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-5 mb-3">
+                                        <label class="text-xs font-weight-bold text-muted">Platform</label>
+                                        <select name="meeting_mode" class="form-control">
+                                            <option value="Google Meet">Google Meet</option>
+                                            <option value="Zoom">Zoom</option>
+                                            <option value="In-Person">In-Person</option>
+                                            <option value="Phone Call">Phone Call</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="text-xs font-weight-bold text-muted">Meeting Link (Optional)</label>
+                                    <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.google.com/xyz-1234">
+                                </div>
+
+                                <div class="form-group mb-0">
+                                    <label class="text-xs font-weight-bold text-muted">Agenda / Discussion Notes</label>
+                                    <textarea name="notes" class="form-control" rows="2" placeholder="Key topics to discuss..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light">
+                                <button type="button" class="btn btn-default font-weight-bold" data-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success font-weight-bold">
+                                    <i class="fas fa-check-circle mr-1"></i> Book Meeting
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#global-modal-container').html(modalHtml);
+        $('#schedule-meeting-modal').modal('show');
+    },
+
+    submitScheduleMeeting: async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        formData.append('action', 'schedule');
+
+        const res = await fetch('api/meetings', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message || 'Meeting scheduled successfully!');
+        if (data.success) {
+            $('#schedule-meeting-modal').modal('hide');
+            this.renderMeetings();
+        }
+    },
+
+    openRescheduleMeetingModal: function(meetingId, currentTitle, currentDate, currentTime) {
+        const modalHtml = `
+            <div class="modal fade" id="reschedule-modal" tabindex="-1" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-md" role="document">
+                    <div class="modal-content shadow-lg">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title font-weight-bold">
+                                <i class="fas fa-calendar-day mr-2"></i> Reschedule Meeting &bull; #${meetingId}
+                            </h5>
+                            <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <form onsubmit="App.submitRescheduleMeeting(event, ${meetingId})">
+                            <div class="modal-body p-4">
+                                <div class="alert alert-light border mb-3">
+                                    <div class="font-weight-bold">${currentTitle}</div>
+                                    <div class="text-xs text-muted">Currently scheduled for: <strong>${currentDate} ${currentTime ? currentTime.substring(0, 5) : ''}</strong></div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="col-md-7 mb-3">
+                                        <label class="text-xs font-weight-bold text-muted">New Date *</label>
+                                        <input type="date" name="meeting_date" class="form-control" required value="${currentDate}">
+                                    </div>
+                                    <div class="col-md-5 mb-3">
+                                        <label class="text-xs font-weight-bold text-muted">New Time *</label>
+                                        <input type="time" name="meeting_time" class="form-control" required value="${currentTime ? currentTime.substring(0, 5) : '11:00'}">
+                                    </div>
+                                </div>
+
+                                <div class="form-group mb-0">
+                                    <label class="text-xs font-weight-bold text-muted">Reason for Rescheduling *</label>
+                                    <textarea name="notes" class="form-control" rows="2" placeholder="e.g. Client requested postponement to next week" required></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light">
+                                <button type="button" class="btn btn-default font-weight-bold" data-dismiss="modal">Close</button>
+                                <button type="submit" class="btn btn-warning font-weight-bold text-dark">
+                                    <i class="fas fa-save mr-1"></i> Confirm Reschedule
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#global-modal-container').html(modalHtml);
+        $('#reschedule-modal').modal('show');
+    },
+
+    submitRescheduleMeeting: async function(e, meetingId) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        formData.append('action', 'reschedule');
+        formData.append('id', meetingId);
+
+        const res = await fetch('api/meetings', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message || 'Meeting rescheduled.');
+        if (data.success) {
+            $('#reschedule-modal').modal('hide');
+            this.renderMeetings();
+        }
+    },
+
+    updateMeetingStatus: async function(meetingId, status) {
+        if (!confirm(`Are you sure you want to mark this meeting as ${status}?`)) return;
+
+        const formData = new FormData();
+        formData.append('action', 'update_status');
+        formData.append('id', meetingId);
+        formData.append('status', status);
+
+        const res = await fetch('api/meetings', { method: 'POST', body: formData });
+        const data = await res.json();
+        alert(data.message || 'Status updated.');
+        if (data.success) {
+            this.renderMeetings();
+        }
     },
 
     // ==========================================
@@ -1851,66 +2602,344 @@ const App = {
         }
     },
 
-    // Modal: Lead Details Viewer
+    // Modal: Comprehensive Lead Details & Multi-Agent Audit Timeline Viewer
     openLeadDetailModal: async function(leadId) {
-        const res = await fetch(`api/leads?action=get&id=${leadId}`);
+        const res = await fetch(`api/leads?action=detail&id=${leadId}`);
         const data = await res.json();
-        if (!data.success) return;
+        if (!data.success) {
+            alert(data.message || 'Unable to load lead details.');
+            return;
+        }
 
-        const l = data.data || {};
-        const logs = data.logs || [];
+        const d = data.data || {};
+        const l = d.lead || {};
+        const calls = d.calls || [];
+        const followups = d.followups || [];
+        const meetings = d.meetings || [];
+        const assignmentsHistory = d.assignments_history || [];
+
+        // Build Unified Chronological Multi-Agent Timeline
+        const timelineEvents = [];
+
+        // 1. Add Call Logs
+        calls.forEach(c => {
+            const durMin = Math.floor(c.call_duration_seconds / 60);
+            const durSec = c.call_duration_seconds % 60;
+            const durText = `${durMin}m ${durSec}s`;
+            timelineEvents.push({
+                timestamp: c.called_at,
+                agent: c.agent_name || 'Telecaller',
+                type: 'call',
+                icon: 'fas fa-phone-alt bg-primary text-white',
+                header: `Call Logged by <strong>${c.agent_name || 'Telecaller'}</strong> &bull; <span class="badge badge-info">${c.outcome_name}</span> &bull; <span class="badge badge-light border"><i class="fas fa-stopwatch mr-1"></i>${durText}</span>`,
+                body: `<div class="p-2 bg-light rounded border text-sm mt-1">"${c.remarks || 'No discussion remarks recorded'}"</div>`
+            });
+        });
+
+        // 2. Add Ownership Reassignments
+        assignmentsHistory.forEach(a => {
+            timelineEvents.push({
+                timestamp: a.assigned_at,
+                agent: a.assigned_by_name || 'Admin',
+                type: 'assignment',
+                icon: 'fas fa-user-tag bg-warning text-dark',
+                header: `<span class="badge badge-warning text-dark font-weight-bold">Lead Reassigned</span> by <strong>${a.assigned_by_name || 'Admin'}</strong>`,
+                body: `<div class="p-2 border rounded bg-white text-sm mt-1">Transferred from <strong>${a.previous_agent || 'General Queue'}</strong> &rarr; <strong>${a.new_agent}</strong></div>`
+            });
+        });
+
+        // 3. Add Follow-ups
+        followups.forEach(f => {
+            timelineEvents.push({
+                timestamp: `${f.followup_date} ${f.followup_time || '10:00:00'}`,
+                agent: f.agent_name || 'Telecaller',
+                type: 'followup',
+                icon: 'fas fa-clock bg-info text-white',
+                header: `Follow-up Scheduled by <strong>${f.agent_name}</strong> &bull; <span class="badge badge-secondary">${f.status}</span>`,
+                body: `<div class="text-sm mt-1"><strong>Purpose:</strong> ${f.purpose} ${f.notes ? `<div class="text-muted mt-1">${f.notes}</div>` : ''}</div>`
+            });
+        });
+
+        // 4. Add Meetings
+        meetings.forEach(m => {
+            timelineEvents.push({
+                timestamp: `${m.meeting_date} ${m.meeting_time || '11:00:00'}`,
+                agent: m.agent_name || 'Telecaller',
+                type: 'meeting',
+                icon: 'fas fa-calendar-check bg-success text-white',
+                header: `Demo / Meeting Booked by <strong>${m.agent_name}</strong> &bull; <span class="badge badge-success">${m.status}</span>`,
+                body: `<div class="text-sm mt-1"><strong>${m.meeting_title}</strong> (${m.type_name || 'Demo'}) &bull; Platform: <span class="badge badge-light border">${m.meeting_mode || 'Google Meet'}</span>${m.notes ? `<div class="text-muted mt-1">${m.notes}</div>` : ''}</div>`
+            });
+        });
+
+        // Sort descending by timestamp
+        timelineEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
         const modalHtml = `
             <div class="modal fade" id="lead-detail-modal" tabindex="-1" role="dialog" aria-hidden="true">
-                <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-dialog modal-xl" role="document">
                     <div class="modal-content shadow-lg">
                         <div class="modal-header bg-primary text-white">
                             <h5 class="modal-title font-weight-bold">
-                                <i class="fas fa-user mr-2"></i> ${l.name} &bull; Details &amp; History
+                                <i class="fas fa-address-card mr-2"></i> ${l.name} &bull; Lead Audit &amp; Activity Center
                             </h5>
                             <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
-                        <div class="modal-body p-4">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <p class="mb-1 text-xs text-muted">Phone Number:</p>
-                                    <h6 class="font-weight-bold"><a href="tel:${l.phone}"><i class="fas fa-phone mr-1 text-success"></i>${l.phone}</a></h6>
-                                    
-                                    <p class="mb-1 text-xs text-muted mt-3">Email Address:</p>
-                                    <h6 class="font-weight-bold">${l.email || 'None'}</h6>
-                                    
-                                    <p class="mb-1 text-xs text-muted mt-3">Company / Business:</p>
-                                    <h6>${l.company_name || 'Individual'}</h6>
-                                </div>
-                                <div class="col-md-6 border-left">
-                                    <p class="mb-1 text-xs text-muted">Lead Status:</p>
-                                    <span class="badge badge-info p-2 font-weight-bold">${l.status_name}</span>
-                                    
-                                    <p class="mb-1 text-xs text-muted mt-3">Assigned Operator:</p>
-                                    <span class="badge badge-light border p-2 font-weight-bold">${l.assigned_name || 'Unassigned'}</span>
-                                    
-                                    <p class="mb-1 text-xs text-muted mt-3">Lead Source:</p>
-                                    <span class="badge badge-light border p-2">${l.source_name || 'Direct'}</span>
-                                </div>
-                            </div>
+                        <div class="modal-body p-0">
+                            <!-- Nav tabs -->
+                            <ul class="nav nav-tabs px-3 pt-2 bg-light" id="leadDetailTab" role="tablist">
+                                <li class="nav-item">
+                                    <a class="nav-link active font-weight-bold" id="lead-overview-tab" data-toggle="tab" href="#tab-lead-overview" role="tab">
+                                        <i class="fas fa-info-circle mr-1"></i> Lead Overview
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link font-weight-bold text-dark" id="lead-timeline-tab" data-toggle="tab" href="#tab-lead-timeline" role="tab">
+                                        <i class="fas fa-history mr-1 text-primary"></i> Multi-Agent Audit Timeline (${timelineEvents.length})
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link font-weight-bold text-dark" id="lead-calls-tab" data-toggle="tab" href="#tab-lead-calls" role="tab">
+                                        <i class="fas fa-phone-alt mr-1 text-success"></i> Call Logs (${calls.length})
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link font-weight-bold text-dark" id="lead-appointments-tab" data-toggle="tab" href="#tab-lead-appointments" role="tab">
+                                        <i class="fas fa-calendar-alt mr-1 text-info"></i> Meetings &amp; Follow-ups (${meetings.length + followups.length})
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link font-weight-bold text-dark" id="lead-history-tab" data-toggle="tab" href="#tab-lead-history" role="tab">
+                                        <i class="fas fa-user-tag mr-1 text-warning"></i> Ownership History (${assignmentsHistory.length})
+                                    </a>
+                                </li>
+                            </ul>
 
-                            <hr class="my-4">
-                            <h6 class="font-weight-bold text-primary mb-3"><i class="fas fa-history mr-1"></i> Activity Timeline</h6>
-                            <div style="max-height: 220px; overflow-y: auto;">
-                                ${logs.length === 0 ? '<div class="text-muted text-xs">No recorded logs for this lead yet.</div>' : logs.map(g => `
-                                    <div class="callout callout-info py-2 px-3 mb-2 text-xs">
-                                        <strong>${g.action || 'Activity'}</strong> - <span class="text-muted">${g.created_at}</span>
-                                        <div>${g.description || ''}</div>
+                            <!-- Tab panes -->
+                            <div class="tab-content p-4">
+                                <!-- TAB 1: OVERVIEW -->
+                                <div class="tab-pane fade show active" id="tab-lead-overview" role="tabpanel">
+                                    <div class="row">
+                                        <div class="col-md-6 border-right">
+                                            <h6 class="text-uppercase text-xs font-weight-bold text-primary mb-3">Contact &amp; Personal Info</h6>
+                                            <table class="table table-sm table-borderless">
+                                                <tr>
+                                                    <td class="text-muted text-xs" style="width: 140px;">Full Name:</td>
+                                                    <td class="font-weight-bold">${l.name}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Primary Phone:</td>
+                                                    <td class="font-weight-bold"><a href="tel:${l.mobile}"><i class="fas fa-phone mr-1 text-success"></i>${l.mobile}</a></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Alternate Mobile:</td>
+                                                    <td>${l.alternate_mobile || '<span class="text-muted">-</span>'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Email Address:</td>
+                                                    <td>${l.email ? `<a href="mailto:${l.email}">${l.email}</a>` : '<span class="text-muted">-</span>'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Company / Business:</td>
+                                                    <td><strong>${l.company_name || 'Individual Client'}</strong></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Location / City:</td>
+                                                    <td>${l.location || l.city || 'India'}</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-uppercase text-xs font-weight-bold text-primary mb-3">CRM Status &amp; Assignments</h6>
+                                            <table class="table table-sm table-borderless">
+                                                <tr>
+                                                    <td class="text-muted text-xs" style="width: 150px;">Current Status:</td>
+                                                    <td><span class="badge badge-info p-2 font-weight-bold">${l.status_name}</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Assigned Telecaller:</td>
+                                                    <td><span class="badge badge-light border p-2 font-weight-bold">${l.assigned_executive_name || l.assigned_name || 'Queue Pool (Unassigned)'}</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Assigned Manager:</td>
+                                                    <td><span class="badge badge-light border p-2">${l.assigned_manager_name || 'Not assigned'}</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Lead Source:</td>
+                                                    <td><span class="badge badge-light border p-2">${l.source_name || 'Direct Inbound'}</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Priority:</td>
+                                                    <td><span class="badge badge-${l.priority === 'high' ? 'danger' : 'secondary'} text-xs">${l.priority || 'Medium'}</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Created Date:</td>
+                                                    <td class="text-xs text-muted">${l.created_at}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted text-xs">Last Contacted:</td>
+                                                    <td class="text-xs font-weight-bold text-dark">${l.last_contacted_at || 'Never contacted'}</td>
+                                                </tr>
+                                            </table>
+                                        </div>
                                     </div>
-                                `).join('')}
+                                </div>
+
+                                <!-- TAB 2: MULTI-AGENT AUDIT TIMELINE -->
+                                <div class="tab-pane fade" id="tab-lead-timeline" role="tabpanel">
+                                    <div class="alert alert-light border mb-3 text-xs text-muted">
+                                        <i class="fas fa-info-circle mr-1 text-primary"></i> 
+                                        <strong>Multi-Agent Audit Trail:</strong> Review remarks and calls logged by previous vs. currently assigned telecallers across lead reassignments.
+                                    </div>
+                                    <div style="max-height: 450px; overflow-y: auto;" class="pr-2">
+                                        ${timelineEvents.length === 0 ? '<div class="text-center py-4 text-muted text-sm">No recorded call activities or reassignment events yet.</div>' : `
+                                            <div class="timeline">
+                                                ${timelineEvents.map(ev => `
+                                                    <div>
+                                                        <i class="${ev.icon}"></i>
+                                                        <div class="timeline-item shadow-sm mb-3">
+                                                            <span class="time text-xs"><i class="fas fa-clock mr-1"></i>${ev.timestamp}</span>
+                                                            <h3 class="timeline-header font-weight-bold text-sm" style="border-bottom: 1px solid #f0f0f0;">
+                                                                ${ev.header}
+                                                            </h3>
+                                                            <div class="timeline-body py-2">
+                                                                ${ev.body}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                `).join('')}
+                                                <div>
+                                                    <i class="fas fa-clock bg-gray"></i>
+                                                </div>
+                                            </div>
+                                        `}
+                                    </div>
+                                </div>
+
+                                <!-- TAB 3: CALL LOGS -->
+                                <div class="tab-pane fade" id="tab-lead-calls" role="tabpanel">
+                                    <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                                        <table class="table table-bordered table-hover text-sm mb-0">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th>Date &amp; Time</th>
+                                                    <th>Telecaller Agent</th>
+                                                    <th>Call Outcome</th>
+                                                    <th>Duration</th>
+                                                    <th>Discussion Remarks</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${calls.length === 0 ? '<tr><td colspan="5" class="text-center py-4 text-muted">No calls recorded.</td></tr>' : calls.map(c => `
+                                                    <tr>
+                                                        <td class="text-xs text-nowrap">${c.called_at}</td>
+                                                        <td class="font-weight-bold">${c.agent_name}</td>
+                                                        <td><span class="badge badge-info">${c.outcome_name}</span></td>
+                                                        <td><span class="badge badge-light border"><i class="fas fa-stopwatch mr-1"></i>${Math.floor(c.call_duration_seconds / 60)}m ${c.call_duration_seconds % 60}s</span></td>
+                                                        <td class="text-xs">${c.remarks || '-'}</td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- TAB 4: MEETINGS & FOLLOWUPS -->
+                                <div class="tab-pane fade" id="tab-lead-appointments" role="tabpanel">
+                                    <h6 class="font-weight-bold text-primary mb-2"><i class="fas fa-calendar-alt mr-1"></i> Scheduled Demonstrations &amp; Meetings</h6>
+                                    <div class="table-responsive mb-4">
+                                        <table class="table table-bordered table-hover text-sm mb-0">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th>Title</th>
+                                                    <th>Date &amp; Time</th>
+                                                    <th>Platform</th>
+                                                    <th>Agent</th>
+                                                    <th>Status</th>
+                                                    <th class="text-center">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${meetings.length === 0 ? '<tr><td colspan="6" class="text-center py-3 text-muted text-xs">No meetings scheduled for this lead.</td></tr>' : meetings.map(m => `
+                                                    <tr>
+                                                        <td><strong>${m.meeting_title}</strong></td>
+                                                        <td>${m.meeting_date} ${m.meeting_time ? m.meeting_time.substring(0, 5) : ''}</td>
+                                                        <td><span class="badge badge-light border">${m.meeting_mode || 'Google Meet'}</span></td>
+                                                        <td>${m.agent_name}</td>
+                                                        <td><span class="badge badge-primary">${m.status}</span></td>
+                                                        <td class="text-center">
+                                                            <button class="btn btn-warning btn-xs font-weight-bold" onclick="$('#lead-detail-modal').modal('hide'); App.openRescheduleMeetingModal(${m.id}, '${m.meeting_title.replace(/'/g, "\\'")}', '${m.meeting_date}', '${m.meeting_time}')">
+                                                                Reschedule
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h6 class="font-weight-bold text-info mb-2"><i class="fas fa-clock mr-1"></i> Call Follow-ups</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-hover text-sm mb-0">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th>Date &amp; Time</th>
+                                                    <th>Purpose</th>
+                                                    <th>Agent</th>
+                                                    <th>Status</th>
+                                                    <th>Notes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${followups.length === 0 ? '<tr><td colspan="5" class="text-center py-3 text-muted text-xs">No pending follow-ups.</td></tr>' : followups.map(f => `
+                                                    <tr>
+                                                        <td>${f.followup_date} ${f.followup_time ? f.followup_time.substring(0, 5) : ''}</td>
+                                                        <td><strong>${f.purpose}</strong></td>
+                                                        <td>${f.agent_name}</td>
+                                                        <td><span class="badge badge-secondary">${f.status}</span></td>
+                                                        <td class="text-xs text-muted">${f.notes || '-'}</td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- TAB 5: OWNERSHIP HISTORY -->
+                                <div class="tab-pane fade" id="tab-lead-history" role="tabpanel">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-hover text-sm mb-0">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Previous Telecaller</th>
+                                                    <th>New Assigned Telecaller</th>
+                                                    <th>Reassigned By</th>
+                                                    <th>Timestamp</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${assignmentsHistory.length === 0 ? '<tr><td colspan="5" class="text-center py-4 text-muted">No ownership transfer history. Assigned directly to current telecaller.</td></tr>' : assignmentsHistory.map((a, i) => `
+                                                    <tr>
+                                                        <td>${i + 1}</td>
+                                                        <td><span class="badge badge-secondary">${a.previous_agent || 'Unassigned Queue'}</span></td>
+                                                        <td><span class="badge badge-success font-weight-bold">${a.new_agent}</span></td>
+                                                        <td><strong>${a.assigned_by_name || 'System Admin'}</strong></td>
+                                                        <td class="text-xs text-muted">${a.assigned_at}</td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div class="modal-footer bg-light">
                             <button type="button" class="btn btn-default font-weight-bold" data-dismiss="modal">Close</button>
-                            <button type="button" class="btn btn-primary font-weight-bold" onclick="$('#lead-detail-modal').modal('hide'); App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.phone}', ${l.status_id})">
-                                <i class="fas fa-phone-alt mr-1"></i> Call Lead
+                            <button type="button" class="btn btn-primary font-weight-bold" onclick="$('#lead-detail-modal').modal('hide'); App.openCallModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', '${l.phone || l.mobile}', ${l.status_id})">
+                                <i class="fas fa-phone-alt mr-1"></i> Call Lead Now
                             </button>
                         </div>
                     </div>

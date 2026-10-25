@@ -131,7 +131,7 @@ if ($action === 'get_active_call') {
         $activeCall = $stmt->fetch();
 
         if ($activeCall) {
-            $statuses = $pdo->query("SELECT id, name FROM lead_statuses ORDER BY display_order ASC")->fetchAll();
+            $statuses = $pdo->query("SELECT id, name FROM lead_statuses ORDER BY sort_order ASC")->fetchAll();
             $outcomes = $pdo->query("SELECT id, name FROM call_outcomes ORDER BY id ASC")->fetchAll();
 
             echo json_encode([
@@ -167,17 +167,37 @@ if ($action === 'get_active_call') {
 }
 
 // 4. LOG CALL & REMARK
-if ($action === 'log') {
+if ($action === 'log' || $action === 'log_call') {
     $leadId = (int)($_POST['lead_id'] ?? 0);
-    $callOutcomeId = (int)($_POST['call_outcome_id'] ?? 0);
-    $callDuration = (int)($_POST['call_duration'] ?? 0);
+    $callOutcomeId = (int)($_POST['call_outcome_id'] ?? $_POST['outcome_id'] ?? 0);
+    $callDuration = (int)($_POST['call_duration'] ?? $_POST['duration'] ?? 0);
     $remarks = trim($_POST['remarks'] ?? '');
+    $disqualifyReason = trim($_POST['disqualification_reason'] ?? $_POST['reason'] ?? '');
+    if (!empty($disqualifyReason) && stripos($remarks, $disqualifyReason) === false) {
+        $remarks .= " [Disqualification Reason: " . $disqualifyReason . "]";
+    }
     
     // Follow-up scheduling option
     $scheduleFollowup = $_POST['schedule_followup'] ?? '0';
     $followupDate = $_POST['followup_date'] ?? null;
     $followupTime = $_POST['followup_time'] ?? null;
     $followupPurpose = trim($_POST['followup_purpose'] ?? '');
+
+    // Allow combined datetime if provided
+    if (!empty($_POST['next_followup_date'])) {
+        $dtRaw = trim($_POST['next_followup_date']);
+        if (strpos($dtRaw, 'T') !== false) {
+            list($followupDate, $followupTime) = explode('T', $dtRaw);
+            $scheduleFollowup = '1';
+        } elseif (strpos($dtRaw, ' ') !== false) {
+            list($followupDate, $followupTime) = explode(' ', $dtRaw);
+            $scheduleFollowup = '1';
+        } else {
+            $followupDate = $dtRaw;
+            $followupTime = '10:00:00';
+            $scheduleFollowup = '1';
+        }
+    }
 
     // Meeting scheduling option
     $scheduleMeeting = $_POST['schedule_meeting'] ?? '0';
@@ -188,10 +208,34 @@ if ($action === 'log') {
     $meetingMode = $_POST['meeting_mode'] ?? 'Google Meet';
     $meetingLink = trim($_POST['meeting_link'] ?? '');
 
+    if (!empty($_POST['meeting_datetime'])) {
+        $mRaw = trim($_POST['meeting_datetime']);
+        if (strpos($mRaw, 'T') !== false) {
+            list($meetingDate, $meetingTime) = explode('T', $mRaw);
+            $scheduleMeeting = '1';
+        } elseif (strpos($mRaw, ' ') !== false) {
+            list($meetingDate, $meetingTime) = explode(' ', $mRaw);
+            $scheduleMeeting = '1';
+        }
+    }
+
     if (!$leadId || !$callOutcomeId) {
         echo json_encode(['success' => false, 'message' => 'Lead ID and Call Outcome are required.']);
         exit;
     }
+
+    // Fetch previous lead status & details for reliable audit trail
+    $currLeadStmt = $pdo->prepare("SELECT id, name, mobile, status_id, assigned_executive_id FROM leads WHERE id = :lid");
+    $currLeadStmt->execute(['lid' => $leadId]);
+    $currentLead = $currLeadStmt->fetch();
+    $prevStatusId = $currentLead ? $currentLead['status_id'] : null;
+
+    // Fetch outcome details
+    $outStmt = $pdo->prepare("SELECT id, name, category FROM call_outcomes WHERE id = :oid");
+    $outStmt->execute(['oid' => $callOutcomeId]);
+    $outcomeData = $outStmt->fetch();
+    $outcomeName = $outcomeData ? $outcomeData['name'] : 'Call Logged';
+    $outcomeCat = $outcomeData ? $outcomeData['category'] : 'connected';
 
     // Insert Call Log
     $stmt = $pdo->prepare("
@@ -205,21 +249,31 @@ if ($action === 'log') {
         'dur' => $callDuration,
         'rem' => $remarks
     ]);
+    $callLogId = $pdo->lastInsertId();
 
     // End active_calls for user if matching
-    $pdo->prepare("UPDATE active_calls SET status = 'ended', ended_at = NOW() WHERE user_id = :uid AND lead_id = :lid")
-        ->execute(['uid' => $userId, 'lid' => $leadId]);
+    $pdo->prepare("UPDATE active_calls SET status = 'ended', ended_at = NOW(), duration_seconds = :dur WHERE user_id = :uid AND lead_id = :lid")
+        ->execute(['dur' => $callDuration, 'uid' => $userId, 'lid' => $leadId]);
 
     // Update Lead last_contacted_at & Status based on outcome or explicit selection
-    $explicitStatusId = (int)($_POST['lead_status_id'] ?? 0);
+    $explicitStatusId = (int)($_POST['lead_status_id'] ?? $_POST['status_id'] ?? 0);
     $leadStatusUpdate = $explicitStatusId > 0 ? $explicitStatusId : 5; // Contacted by default
+    
     if (!$explicitStatusId) {
-        if (in_array($callOutcomeId, [3, 9])) { // Qualified or Meeting Scheduled
-            $leadStatusUpdate = 7;
-        } elseif ($callOutcomeId == 10) { // Converted
-            $leadStatusUpdate = 11;
-        } elseif ($callOutcomeId == 11) { // Lost
-            $leadStatusUpdate = 12;
+        if ($callOutcomeId == 4 || $callOutcomeId == 14 || stripos($outcomeName, 'Not Interested') !== false) {
+            $leadStatusUpdate = 13; // Not Interested
+        } elseif ($scheduleMeeting === '1' || $callOutcomeId == 3 || stripos($outcomeName, 'Meeting') !== false) {
+            $leadStatusUpdate = 7; // Meeting Scheduled
+        } elseif ($scheduleFollowup === '1' || $callOutcomeId == 2 || $callOutcomeId == 6 || $callOutcomeId == 18 || stripos($outcomeName, 'Follow-up') !== false) {
+            $leadStatusUpdate = 6; // Follow-up Required
+        } elseif ($callOutcomeId == 9) {
+            $leadStatusUpdate = 8; // Qualified
+        } elseif ($callOutcomeId == 10) {
+            $leadStatusUpdate = 11; // Converted
+        } elseif ($callOutcomeId == 11) {
+            $leadStatusUpdate = 12; // Lost
+        } elseif ($callOutcomeId == 7 || $callOutcomeId == 8 || $callOutcomeId == 17) {
+            $leadStatusUpdate = 14; // Invalid / Unreachable
         }
     }
 
@@ -227,47 +281,80 @@ if ($action === 'log') {
     $leadUpdate->execute(['st' => $leadStatusUpdate, 'lid' => $leadId]);
 
     // Schedule Follow-up if requested
-    if ($scheduleFollowup === '1' && $followupDate && $followupTime) {
+    if ($scheduleFollowup === '1' && $followupDate) {
+        $fTimeFinal = $followupTime ? (strlen($followupTime) === 5 ? $followupTime . ':00' : $followupTime) : '10:00:00';
         $fuStmt = $pdo->prepare("
-            INSERT INTO followups (lead_id, user_id, followup_date, followup_time, purpose, notes, status)
-            VALUES (:lid, :uid, :fdate, :ftime, :purp, :notes, 'Pending')
+            INSERT INTO followups (lead_id, user_id, followup_date, followup_time, purpose, notes, status, created_at)
+            VALUES (:lid, :uid, :fdate, :ftime, :purp, :notes, 'Pending', NOW())
         ");
         $fuStmt->execute([
             'lid'   => $leadId,
             'uid'   => $userId,
             'fdate' => $followupDate,
-            'ftime' => $followupTime,
-            'purp'  => $followupPurpose ?: 'Call Followup',
+            'ftime' => $fTimeFinal,
+            'purp'  => $followupPurpose ?: 'Scheduled Call Followup',
             'notes' => $remarks
         ]);
 
         $pdo->prepare("UPDATE leads SET next_followup_at = :nxt WHERE id = :lid")
-            ->execute(['nxt' => "$followupDate $followupTime", 'lid' => $leadId]);
+            ->execute(['nxt' => "$followupDate $fTimeFinal", 'lid' => $leadId]);
     }
 
     // Schedule Meeting if requested
-    if ($scheduleMeeting === '1' && $meetingDate && $meetingTime) {
+    if ($scheduleMeeting === '1' && $meetingDate) {
+        $mTimeFinal = $meetingTime ? (strlen($meetingTime) === 5 ? $meetingTime . ':00' : $meetingTime) : '11:00:00';
         $mtStmt = $pdo->prepare("
-            INSERT INTO meetings (lead_id, assigned_user_id, meeting_title, meeting_type_id, meeting_date, meeting_time, meeting_mode, meeting_link, notes, status)
-            VALUES (:lid, :uid, :title, :type, :mdate, :mtime, :mode, :link, :notes, 'Scheduled')
+            INSERT INTO meetings (lead_id, assigned_user_id, meeting_title, meeting_type_id, meeting_date, meeting_time, meeting_mode, meeting_link, notes, status, created_at)
+            VALUES (:lid, :uid, :title, :type, :mdate, :mtime, :mode, :link, :notes, 'Scheduled', NOW())
         ");
         $mtStmt->execute([
             'lid'   => $leadId,
             'uid'   => $userId,
-            'title' => $meetingTitle ?: 'Client Meeting',
+            'title' => $meetingTitle ?: ('Client Meeting - ' . ($currentLead['name'] ?? 'Lead')),
             'type'  => $meetingTypeId,
             'mdate' => $meetingDate,
-            'mtime' => $meetingTime,
+            'mtime' => $mTimeFinal,
             'mode'  => $meetingMode,
             'link'  => $meetingLink,
             'notes' => $remarks
         ]);
 
         $pdo->prepare("UPDATE leads SET meeting_scheduled_at = :mdate, status_id = 7 WHERE id = :lid")
-            ->execute(['mdate' => "$meetingDate $meetingTime", 'lid' => $leadId]);
+            ->execute(['mdate' => "$meetingDate $mTimeFinal", 'lid' => $leadId]);
     }
 
-    echo json_encode(['success' => true, 'message' => 'Call logged successfully!']);
+    // Write to activity_logs for audit tracking
+    try {
+        $stmtAct = $pdo->prepare("
+            INSERT INTO activity_logs (user_id, module, action, record_id, old_value, new_value, ip_address)
+            VALUES (:uid, 'calls', 'call_logged', :rec, :old, :new, :ip)
+        ");
+        $stmtAct->execute([
+            'uid' => $userId,
+            'rec' => $leadId,
+            'old' => json_encode(['status_id' => $prevStatusId]),
+            'new' => json_encode([
+                'call_log_id' => $callLogId,
+                'status_id' => $leadStatusUpdate,
+                'outcome_id' => $callOutcomeId,
+                'outcome_name' => $outcomeName,
+                'duration' => $callDuration,
+                'remarks' => $remarks,
+                'followup' => ($scheduleFollowup === '1' && $followupDate) ? "$followupDate " . ($followupTime ?: '10:00') : null,
+                'meeting' => ($scheduleMeeting === '1' && $meetingDate) ? "$meetingDate " . ($meetingTime ?: '11:00') : null
+            ]),
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+        ]);
+    } catch (Exception $e) {}
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Call logged successfully!',
+        'lead_id' => $leadId,
+        'new_status_id' => $leadStatusUpdate,
+        'followup_scheduled' => ($scheduleFollowup === '1'),
+        'meeting_scheduled' => ($scheduleMeeting === '1')
+    ]);
     exit;
 }
 

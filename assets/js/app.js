@@ -1297,7 +1297,7 @@ const App = {
                                         <td>${l.email ? `<a href="mailto:${l.email}">${l.email}</a>` : '<span class="text-muted">-</span>'}</td>
                                         <td><span class="badge badge-light border text-xs">${l.source_name || 'Direct'}</span></td>
                                         <td><span class="badge badge-info text-xs font-weight-bold" style="background-color:${l.status_color || '#17a2b8'}">${l.status_name}</span></td>
-                                        <td><span class="badge badge-light border text-xs">${l.assigned_name || 'Unassigned'}</span></td>
+                                        <td><span class="badge badge-light border text-xs">${l.assigned_name || l.executive_name || l.assigned_executive_name || 'Unassigned'}</span></td>
                                         <td><span class="badge badge-${l.priority === 'high' ? 'danger' : (l.priority === 'medium' ? 'warning text-dark' : 'secondary')} text-xs">${l.priority || 'Normal'}</span></td>
                                         <td class="text-xs text-muted">${l.created_at ? l.created_at.substring(0, 10) : '-'}</td>
                                         <td class="text-center">

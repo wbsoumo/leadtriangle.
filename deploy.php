@@ -23,44 +23,84 @@ header('Content-Type: text/html; charset=utf-8');
     <p style="color:#94a3b8; font-size:14px; margin-bottom:16px;">Pulling latest source code from GitHub (<strong>main</strong> branch)...</p>
     
     <pre><?php
-    function runCommand($cmd) {
+    $targetDir = __DIR__;
+    echo "Deployment Target: $targetDir\n";
+    echo "Source: https://github.com/wbsoumo/leadtriangle. (branch: main)\n\n";
+
+    $zipUrl = 'https://codeload.github.com/wbsoumo/leadtriangle./zip/refs/heads/main';
+    $tmpZip = sys_get_temp_dir() . '/lt_deploy_' . time() . '.zip';
+
+    echo "1. Downloading latest release from GitHub...\n";
+    $ch = curl_init($zipUrl);
+    $fp = fopen($tmpZip, 'wb');
+    curl_setopt($ch, CURLOPT_FILE, $fp);
+    curl_setopt($ch, CURLOPT_HEADER, 0);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'LeadTriangle-Deployer/2.0');
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    $success = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    fclose($fp);
+
+    if (!$success || $httpCode !== 200 || !file_exists($tmpZip) || filesize($tmpZip) < 1000) {
+        echo "⚠️ Direct download failed (HTTP $httpCode). Attempting shell git pull...\n";
         if (function_exists('shell_exec')) {
-            $out = shell_exec($cmd);
-            if ($out !== null && trim($out) !== '') return $out;
+            $gitOut = shell_exec("git pull origin main 2>&1");
+            echo htmlspecialchars($gitOut ?: 'No output from git');
+        } else {
+            echo "Failed to download code archive and shell_exec is disabled.";
         }
-        if (function_exists('exec')) {
-            @exec($cmd, $outputArray, $returnVar);
-            if (!empty($outputArray)) return implode("\n", $outputArray);
-        }
-        if (function_exists('passthru')) {
-            ob_start();
-            @passthru($cmd);
-            $out = ob_get_clean();
-            if (!empty($out)) return $out;
-        }
-        return false;
-    }
-
-    $gitPaths = ['git', '/usr/bin/git', '/usr/local/bin/git', '/bin/git'];
-    $output = false;
-    $usedCmd = '';
-
-    foreach ($gitPaths as $g) {
-        $cmd = "export PATH=\$PATH:/usr/bin:/usr/local/bin:/bin; {$g} pull origin main 2>&1";
-        $res = runCommand($cmd);
-        if ($res !== false && strpos($res, 'command not found') === false) {
-            $output = $res;
-            $usedCmd = $cmd;
-            break;
-        }
-    }
-
-    if ($output === false || trim($output) === '') {
-        echo "⚠️ Note: Command execution returned no text or git command is restricted by cPanel PHP security settings.\n";
-        echo "If your website is already up-to-date, no new files needed to be pulled.\n";
-        echo "Current Server Time: " . date('Y-m-d H:i:s T');
     } else {
-        echo htmlspecialchars(trim($output));
+        echo "2. Download complete (" . round(filesize($tmpZip) / 1024, 1) . " KB).\n";
+        echo "3. Extracting and deploying updated files...\n";
+
+        $zip = new ZipArchive();
+        if ($zip->open($tmpZip) === TRUE) {
+            $prefix = $zip->getNameIndex(0); // e.g. "leadtriangle.-main/"
+            $extractedCount = 0;
+            
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $filename = $zip->getNameIndex($i);
+                if (strpos($filename, $prefix) === 0) {
+                    $relPath = substr($filename, strlen($prefix));
+                } else {
+                    $relPath = $filename;
+                }
+                
+                if (empty($relPath)) continue;
+                
+                // Never overwrite production database configuration
+                if ($relPath === 'config/database.php') {
+                    echo "   • Preserving config/database.php (production DB credentials)\n";
+                    continue;
+                }
+                
+                // Skip flutter app mobile source files on web hosting
+                if (strpos($relPath, 'flutter_crm_app/') === 0) {
+                    continue;
+                }
+                
+                $dest = $targetDir . '/' . $relPath;
+                if (substr($relPath, -1) === '/') {
+                    if (!is_dir($dest)) mkdir($dest, 0755, true);
+                    continue;
+                }
+                
+                $dir = dirname($dest);
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                
+                $content = $zip->getFromIndex($i);
+                file_put_contents($dest, $content);
+                $extractedCount++;
+            }
+            $zip->close();
+            @unlink($tmpZip);
+            echo "4. ✅ SUCCESS: Deployed $extractedCount files.\n";
+            echo "   Timestamp: " . date('Y-m-d H:i:s T') . "\n";
+        } else {
+            echo "❌ Failed to open ZIP archive.\n";
+        }
     }
     ?></pre>
 

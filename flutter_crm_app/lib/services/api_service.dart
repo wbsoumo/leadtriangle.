@@ -73,9 +73,16 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/leads.php?action=list&search=${Uri.encodeComponent(search)}&filter=$filter');
       final res = await http.get(uri, headers: headers);
       final data = jsonDecode(res.body);
-      if (data['success'] == true && data['data'] != null) {
-        final leadsJson = data['data']['leads'] as List;
-        return leadsJson.map((l) => LeadModel.fromJson(l)).toList();
+      if (data['success'] == true) {
+        List<dynamic> leadsJson = [];
+        if (data['data'] is List) {
+          leadsJson = data['data'] as List;
+        } else if (data['data'] is Map && data['data']['leads'] is List) {
+          leadsJson = data['data']['leads'] as List;
+        } else if (data['leads'] is List) {
+          leadsJson = data['leads'] as List;
+        }
+        return leadsJson.map((l) => LeadModel.fromJson(l as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (e) {

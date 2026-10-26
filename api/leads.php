@@ -119,8 +119,9 @@ if ($action === 'list' || $action === 'workspace') {
             $where[] = "l.assigned_executive_id = :rbac_exec_id";
             $params['rbac_exec_id'] = $userId;
         } elseif ($roleName === 'manager') {
-            $where[] = "(l.assigned_manager_id = :rbac_mgr_id OR l.assigned_executive_id IN (SELECT id FROM users WHERE team_id = :rbac_team_id))";
+            $where[] = "(l.assigned_manager_id = :rbac_mgr_id OR l.assigned_executive_id = :rbac_mgr_exec_id OR l.assigned_executive_id IN (SELECT id FROM users WHERE team_id = :rbac_team_id))";
             $params['rbac_mgr_id'] = $userId;
+            $params['rbac_mgr_exec_id'] = $userId;
             $params['rbac_team_id'] = $teamId;
         }
 
@@ -246,7 +247,10 @@ if ($action === 'list' || $action === 'workspace') {
                 src.name as source_name,
                 srv.name as service_name,
                 u_exec.name as executive_name,
+                u_exec.name as assigned_name,
+                u_exec.name as assigned_executive_name,
                 u_mgr.name as manager_name,
+                u_mgr.name as assigned_manager_name,
                 (SELECT co.name FROM call_logs cl JOIN call_outcomes co ON cl.call_outcome_id = co.id WHERE cl.lead_id = l.id ORDER BY cl.id DESC LIMIT 1) as latest_call_outcome,
                 (SELECT cl.called_at FROM call_logs cl WHERE cl.lead_id = l.id ORDER BY cl.id DESC LIMIT 1) as latest_call_at,
                 (SELECT COUNT(*) FROM call_logs cl WHERE cl.lead_id = l.id) as call_count
@@ -884,7 +888,7 @@ if ($action === 'assign') {
     }
 
     $getPrev = $pdo->prepare("SELECT id, name, assigned_executive_id, status_id FROM leads WHERE id = :id");
-    $stmt = $pdo->prepare("UPDATE leads SET assigned_executive_id = :exec_id, status_id = 3 WHERE id = :id");
+    $stmt = $pdo->prepare("UPDATE leads SET assigned_executive_id = :exec_id, status_id = :st WHERE id = :id");
     $histStmt = $pdo->prepare("
         INSERT INTO lead_assignments_history (lead_id, previous_executive_id, new_executive_id, assigned_by, assigned_at) 
         VALUES (:lid, :prev, :new, :by, NOW())
@@ -899,7 +903,9 @@ if ($action === 'assign') {
         $leadRow = $getPrev->fetch();
         if ($leadRow) {
             $prevExecId = $leadRow['assigned_executive_id'];
-            $stmt->execute(['exec_id' => $executiveId, 'id' => $lid]);
+            $curStatus = (int)($leadRow['status_id'] ?? 1);
+            $newStatus = in_array($curStatus, [0, 1, 2]) ? 3 : $curStatus;
+            $stmt->execute(['exec_id' => $executiveId, 'st' => $newStatus, 'id' => $lid]);
             $histStmt->execute(['lid' => $lid, 'prev' => $prevExecId, 'new' => $executiveId, 'by' => $userId]);
 
             // Also record in activity_logs

@@ -3409,7 +3409,14 @@ const App = {
                                                 </tr>
                                                 <tr>
                                                     <td class="text-muted text-xs">Assigned Telecaller:</td>
-                                                    <td><span class="badge badge-light border p-2 font-weight-bold">${l.assigned_executive_name || l.assigned_name || 'Queue Pool (Unassigned)'}</span></td>
+                                                    <td>
+                                                        <span class="badge badge-light border p-2 font-weight-bold">${l.assigned_executive_name || l.assigned_name || 'Queue Pool (Unassigned)'}</span>
+                                                        ${(this.currentUser && (this.currentUser.role_name === 'admin' || this.currentUser.role_name === 'super_admin' || this.currentUser.role_name === 'manager')) ? `
+                                                            <button class="btn btn-outline-primary btn-xs ml-2 font-weight-bold" onclick="App.openQuickReassignModal(${l.id}, '${l.name.replace(/'/g, "\\'")}', ${l.assigned_executive_id || 0})">
+                                                                <i class="fas fa-user-edit mr-1"></i> Reassign
+                                                            </button>
+                                                        ` : ''}
+                                                    </td>
                                                 </tr>
                                                 <tr>
                                                     <td class="text-muted text-xs">Assigned Manager:</td>
@@ -3598,6 +3605,81 @@ const App = {
 
         $('#global-modal-container').html(modalHtml);
         $('#lead-detail-modal').modal('show');
+    },
+
+    openQuickReassignModal: function(leadId, leadName, currentExecId) {
+        const users = (this.dropdowns.users || []).filter(u => u.status === 'active' || !u.status);
+        const modalHtml = `
+            <div class="modal fade" id="quick-reassign-modal" tabindex="-1" role="dialog" style="z-index: 1060;">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content shadow-lg border-0">
+                        <div class="modal-header bg-warning text-dark py-2 px-3">
+                            <h6 class="modal-title font-weight-bold mb-0">
+                                <i class="fas fa-user-edit mr-1"></i> Reassign Lead: ${leadName}
+                            </h6>
+                            <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        </div>
+                        <div class="modal-body p-3">
+                            <p class="text-xs text-muted mb-3">
+                                Transfer lead ownership to another telecaller. All previous call logs and notes will remain intact in the audit timeline.
+                            </p>
+                            <div class="form-group mb-2">
+                                <label class="text-xs font-weight-bold">Select New Telecaller / Agent *</label>
+                                <select id="reassign-target-exec-id" class="form-control form-control-sm font-weight-bold">
+                                    <option value="">-- Choose Telecaller --</option>
+                                    ${users.map(u => `
+                                        <option value="${u.id}" ${u.id == currentExecId ? 'disabled' : ''}>
+                                            ${u.name} (${u.role_display || u.role_name || 'Staff'}) ${u.id == currentExecId ? '• [Currently Assigned]' : ''}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between">
+                            <button type="button" class="btn btn-default btn-sm font-weight-bold" data-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-warning btn-sm font-weight-bold" onclick="App.submitQuickReassign(${leadId})">
+                                <i class="fas fa-check-circle mr-1"></i> Confirm Transfer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#quick-reassign-modal').remove();
+        $('body').append(modalHtml);
+        $('#quick-reassign-modal').modal('show');
+    },
+
+    submitQuickReassign: async function(leadId) {
+        const select = document.getElementById('reassign-target-exec-id');
+        const execId = select ? select.value : '';
+        if (!execId) {
+            alert('Please select a telecaller to transfer the lead to.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'assign');
+        formData.append('executive_id', execId);
+        formData.append('lead_ids[]', leadId);
+
+        try {
+            const res = await fetch('api/leads', { method: 'POST', body: formData });
+            const data = await res.json();
+            alert(data.message || 'Lead reassigned successfully!');
+            if (data.success) {
+                $('#quick-reassign-modal').modal('hide');
+                $('.modal-backdrop').remove();
+                $('body').removeClass('modal-open').css('padding-right', '');
+                $('#lead-detail-modal').modal('hide');
+                if (this.currentView === 'leads') this.renderLeads(this.leadsFilterState.page || 1);
+                else if (this.currentView === 'workspace') this.renderWorkspace();
+                this.openLeadDetailModal(leadId);
+            }
+        } catch (err) {
+            alert('Failed to reassign lead: ' + err.message);
+        }
     },
 
     // ==========================================

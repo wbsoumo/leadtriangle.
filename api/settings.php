@@ -26,6 +26,14 @@ if ($action === 'get_dropdowns') {
     $executives = $pdo->query("SELECT id, name, email FROM users WHERE role_id = 3 AND status = 'active' ORDER BY name ASC")->fetchAll();
     $managers = $pdo->query("SELECT id, name, email FROM users WHERE role_id = 2 AND status = 'active' ORDER BY name ASC")->fetchAll();
 
+    $users = $pdo->query("
+        SELECT u.id, u.name, u.email, u.status, u.role_id, r.name as role_name, r.display_name as role_display
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        WHERE u.status = 'active'
+        ORDER BY u.name ASC
+    ")->fetchAll();
+
     echo json_encode([
         'success' => true,
         'data' => [
@@ -37,7 +45,8 @@ if ($action === 'get_dropdowns') {
             'funnel_stages' => $funnelStages,
             'project_stages' => $projectStages,
             'executives' => $executives,
-            'managers' => $managers
+            'managers' => $managers,
+            'users' => $users
         ]
     ]);
     exit;

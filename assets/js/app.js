@@ -42,8 +42,11 @@ const App = {
         try {
             const res = await fetch('api/settings?action=get_dropdowns');
             const data = await res.json();
-            if (data.success) {
+            if (data.success && data.data) {
                 this.dropdowns = data.data;
+                if (!this.dropdowns.users && (this.dropdowns.executives || this.dropdowns.managers)) {
+                    this.dropdowns.users = [...(this.dropdowns.executives || []), ...(this.dropdowns.managers || [])];
+                }
             }
         } catch(e) {}
     },
@@ -3607,8 +3610,24 @@ const App = {
         $('#lead-detail-modal').modal('show');
     },
 
-    openQuickReassignModal: function(leadId, leadName, currentExecId) {
-        const users = (this.dropdowns.users || []).filter(u => u.status === 'active' || !u.status);
+    openQuickReassignModal: async function(leadId, leadName, currentExecId) {
+        if (!this.dropdowns.users || this.dropdowns.users.length === 0) {
+            await this.loadDropdowns();
+        }
+
+        let userList = this.dropdowns.users || this.dropdowns.executives || [];
+        if (userList.length === 0) {
+            try {
+                const uRes = await fetch('api/users?action=list');
+                const uData = await uRes.json();
+                if (uData.success && uData.data) {
+                    userList = uData.data;
+                    this.dropdowns.users = userList;
+                }
+            } catch (err) {}
+        }
+
+        const users = userList.filter(u => u.status === 'active' || !u.status);
         const modalHtml = `
             <div class="modal fade" id="quick-reassign-modal" tabindex="-1" role="dialog" style="z-index: 1060;">
                 <div class="modal-dialog modal-dialog-centered" role="document">
